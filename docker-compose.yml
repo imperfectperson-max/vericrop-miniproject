@@ -1,0 +1,28 @@
+version: '3.8'
+services:
+  ml-service:
+    build: ./docker/ml-service
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./models:/app/models
+    restart: on-failure
+
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: untitled
+      POSTGRES_PASSWORD: untitled
+      POSTGRES_DB: untitled
+    ports:
+      - "5432:5432"
+    volumes:
+      - gdata:/var/lib/postgresql/data
+
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    ports:
+      - "1883:1883"
+
+volumes:
+  gdata:
