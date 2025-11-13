@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<BorderPane xmlns:fx="http://javafx.com/fxml" fx:controller="org.untitled.gui.ProducerController">
+    <top>
+        <Label text="VeriCrop — Producer" style="-fx-font-size:18px; -fx-padding:10px;"/>
+    </top>
+    <center>
+        <VBox spacing="10">
+            <padding>
+                <Insets top="16" right="16" bottom="16" left="16"/>
+            </padding>
+            <HBox spacing="10">
+                <Button fx:id="chooseBtn" text="Choose Image" onAction="#onChoose"/>
+                <Label fx:id="selectedFileLabel" text="No file selected" />
+                <!-- Escape the ampersand as &amp; for XML -->
+                <Button fx:id="uploadBtn" text="Upload &amp; Create Shipment" onAction="#onUpload"/>
+                <ProgressIndicator fx:id="progress" visible="false" prefWidth="24" prefHeight="24"/>
+            </HBox>
+            <HBox spacing="10">
+                <Label text="ML Score:"/>
+                <Label fx:id="scoreLabel" text=""/>
+            </HBox>
+            <Label text="Blockchain (chain):"/>
+            <ListView fx:id="chainList" prefHeight="200"/>
+        </VBox>
+    </center>
+</BorderPane>
