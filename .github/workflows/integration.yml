@@ -1,0 +1,50 @@
+# Lightweight integration test: build ml-service, start it, wait for health, run test_predict.py, tear down
+on:
+  push:
+    paths:
+      - 'docker/ml-service/**'
+      - '.github/workflows/**'
+  pull_request:
+    paths:
+      - 'docker/ml-service/**'
+      - '.github/workflows/**'
+
+jobs:
+  integration-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx (optional)
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build ml-service image
+        run: docker compose build --no-cache ml-service
+
+      - name: Start ml-service
+        run: docker compose up -d ml-service
+
+      - name: Wait for service health
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8000/health >/dev/null 2>&1; then
+              echo "service healthy"
+              exit 0
+            fi
+            echo "waiting for service... ($i/30)"
+            sleep 2
+          done
+          echo "service did not become healthy" >&2
+          docker compose logs ml-service || true
+          exit 1
+
+      - name: Install Python deps for test
+        run: python -m pip install --upgrade pip && pip install requests
+
+      - name: Run integration test
+        run: python docker/ml-service/tests/test_predict.py
+
+      - name: Teardown
+        if: always()
+        run: docker compose down -v
