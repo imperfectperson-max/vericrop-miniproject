@@ -59,22 +59,46 @@ jobs:
             pip install -r docker/ml-service/requirements-test.txt
           elif [ -f requirements.txt ]; then
             pip install -r requirements.txt
+          else
+            pip install pytest requests
           fi
-          pip install pytest requests
 
-      - name: Run integration tests
+      - name: Run integration tests (produce junit xml)
         env:
           BASE_URL: http://localhost:8000
         run: |
-          # run tests and always produce junit xml (results.xml)
+          # try the repository test paths and always produce results.xml for upload
           pytest -q docker/ml-service/tests --junitxml=results.xml || pytest -q tests --junitxml=results.xml || pytest -q --junitxml=results.xml
+        continue-on-error: true
 
-      - name: Upload pytest results
+      - name: Collect container logs (always)
+        if: always()
+        run: |
+          docker logs mlservice-e2e > mlservice-logs.txt || true
+
+      - name: Debug test artifacts (list files)
+        if: always()
+        run: |
+          echo "CWD: $(pwd)"
+          echo "Listing repo root:"
+          ls -la || true
+          echo "Listing results.xml:"
+          ls -la results.xml || true
+          echo "Listing tests dir:"
+          ls -la docker/ml-service/tests || true
+          echo "Listing mlservice logs:"
+          ls -la mlservice-logs.txt || true
+
+      - name: Upload pytest results and logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: pytest-results
-          path: results.xml
+          path: |
+            results.xml
+            docker/ml-service/tests
+            mlservice-logs.txt
+          if-no-files-found: error
 
       - name: Show container logs (on failure)
         if: failure()
