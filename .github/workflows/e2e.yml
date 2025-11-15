@@ -44,11 +44,14 @@ jobs:
           for i in $(seq 1 30); do
             if curl -fsS http://localhost:8000/health >/dev/null 2>&1; then
               echo "service is up"
-              break
+              exit 0
             fi
             echo "waiting for service..."
             sleep 1
           done
+          echo "ERROR: Service did not become healthy within 30 seconds"
+          docker logs mlservice-e2e || true
+          exit 1
         timeout-minutes: 10
 
       - name: Install test deps
@@ -56,8 +59,8 @@ jobs:
           python -m pip install --upgrade pip
           if [ -f docker/ml-service/requirements-test.txt ]; then
             pip install -r docker/ml-service/requirements-test.txt
-          elif [ -f requirements.txt ]; then
-            pip install -r requirements.txt
+          elif [ -f docker/ml-service/requirements.txt ]; then
+            pip install -r docker/ml-service/requirements.txt
           fi
           pip install pytest requests
 
@@ -65,7 +68,13 @@ jobs:
         env:
           BASE_URL: http://localhost:8000
         run: |
-          pytest -q docker/ml-service/tests || pytest -q tests || pytest -q
+          if [ -d docker/ml-service/tests ]; then
+            pytest -q docker/ml-service/tests
+          elif [ -d tests ]; then
+            pytest -q tests
+          else
+            pytest -q
+          fi
 
       - name: Show container logs (on failure)
         if: failure()
