@@ -1,11 +1,15 @@
 import os
 import json
+import re
 import requests
+
+HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
 
 def load_sample():
     p = os.path.join(os.path.dirname(__file__), "data", "sample_input.json")
     with open(p, "r") as f:
         return json.load(f)
+
 
 def _write_debug(resp, suffix=""):
     debug_path = os.path.join(os.path.dirname(__file__), f"debug_predict_response{suffix}.json")
@@ -14,6 +18,7 @@ def _write_debug(resp, suffix=""):
             json.dump({"status_code": resp.status_code, "text": resp.text}, f)
     except Exception:
         pass
+
 
 def _server_says_missing_file(resp):
     try:
@@ -29,12 +34,18 @@ def _server_says_missing_file(resp):
     text = resp.text or ""
     return "file" in text and ("required" in text or "missing" in text)
 
-def _example_image_path():
-    # prefer repo-root examples/sample.png (present in repo); compute relative path
-    candidate = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "examples", "sample.png"))
+
+def _test_image_path():
+    # prefer image bundled with tests
+    candidate = os.path.normpath(os.path.join(os.path.dirname(__file__), "data", "sample.png"))
     if os.path.exists(candidate):
         return candidate
+    # fallback to repo-root examples/sample.png if present
+    root_example = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "examples", "sample.png"))
+    if os.path.exists(root_example):
+        return root_example
     return None
+
 
 def test_predict_returns_json():
     base = os.environ.get("BASE_URL", "http://localhost:8000")
@@ -45,12 +56,12 @@ def test_predict_returns_json():
     resp = requests.post(url, json=payload, timeout=20)
     _write_debug(resp, suffix="_json")
 
-    # 2) If server requires a file, upload the example image (repo root examples/sample.png)
+    # 2) If server requires a file, upload the test image
     if resp.status_code == 422 and _server_says_missing_file(resp):
-        image_path = _example_image_path()
+        image_path = _test_image_path()
         if not image_path:
             import pytest
-            pytest.skip("No example image available for file upload attempt; skipping detailed assertions")
+            pytest.skip("No test image available for file upload attempt; skipping detailed assertions")
 
         with open(image_path, "rb") as fh:
             content_type = "image/png" if image_path.lower().endswith(".png") else "application/octet-stream"
@@ -63,11 +74,18 @@ def test_predict_returns_json():
 
             data_resp = resp2.json()
             assert isinstance(data_resp, dict)
-            # The ml-service implementation returns quality_score and data_hash
-            assert "quality_score" in data_resp and "data_hash" in data_resp
+            # stricter assertions
+            assert "quality_score" in data_resp
+            qs = data_resp["quality_score"]
+            assert isinstance(qs, (float, int))
+            assert 0.0 <= float(qs) <= 1.0
+            assert "data_hash" in data_resp
+            dh = data_resp["data_hash"]
+            assert isinstance(dh, str) and HEX64_RE.match(dh), f"data_hash looks invalid: {dh}"
+            assert "label" in data_resp and isinstance(data_resp["label"], str) and data_resp["label"]
             return
 
-    # 3) If JSON attempt succeeded, assert as before; otherwise skip
+    # 3) If JSON attempt succeeded, assert backward-compatible keys; otherwise skip
     if resp.status_code != 200:
         import pytest
         pytest.skip(f"/predict returned status {resp.status_code}; skipping detailed assertions")

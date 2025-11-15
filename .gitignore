@@ -52,3 +52,4 @@ docker/ml-service/models/
 docker/ml-service/models/
 *.onnx
 *.pth
+__pycache__/
