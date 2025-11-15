@@ -66,7 +66,15 @@ jobs:
         env:
           BASE_URL: http://localhost:8000
         run: |
-          pytest -q docker/ml-service/tests || pytest -q tests || pytest -q
+          # run tests and always produce junit xml
+          pytest -q docker/ml-service/tests --junitxml=results.xml || pytest -q tests --junitxml=results.xml || pytest -q --junitxml=results.xml
+
+      - name: Upload pytest results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-results
+          path: results.xml
 
       - name: Show container logs (on failure)
         if: failure()
