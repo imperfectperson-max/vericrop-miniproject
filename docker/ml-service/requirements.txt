@@ -5,3 +5,5 @@ numpy
 python-multipart
 onnx
 onnxruntime
+pytest
+requests
