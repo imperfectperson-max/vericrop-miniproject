@@ -59,17 +59,15 @@ jobs:
             pip install -r docker/ml-service/requirements-test.txt
           elif [ -f requirements.txt ]; then
             pip install -r requirements.txt
-          else
-            pip install pytest requests
           fi
+          pip install pytest requests
 
-      - name: Run integration tests (produce junit xml)
+      - name: Run integration tests
         env:
           BASE_URL: http://localhost:8000
         run: |
-          # try the repository test paths and always produce results.xml for upload
+          # run tests and always produce junit xml (results.xml)
           pytest -q docker/ml-service/tests --junitxml=results.xml || pytest -q tests --junitxml=results.xml || pytest -q --junitxml=results.xml
-        continue-on-error: true
 
       - name: Upload pytest results
         if: always()
