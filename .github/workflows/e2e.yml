@@ -1,0 +1,77 @@
+name: E2E Integration Tests
+on:
+  pull_request:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  e2e:
+    name: E2E tests (build image, run container, pytest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU and buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Set up Python for tests
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Build Docker image (local)
+        id: build
+        uses: docker/build-push-action@v4
+        with:
+          push: false
+          load: true
+          tags: ml-service:e2e-${{ github.sha }}
+          file: docker/ml-service/Dockerfile
+          context: docker/ml-service
+
+      - name: Run container
+        run: |
+          docker run -d --name mlservice-e2e -p 8000:8000 -e PORT=8000 ml-service:e2e-${{ github.sha }}
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8000/health >/dev/null 2>&1; then
+              echo "service is up"
+              break
+            fi
+            echo "waiting for service..."
+            sleep 1
+          done
+        timeout-minutes: 10
+
+      - name: Install test deps
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f docker/ml-service/requirements-test.txt ]; then
+            pip install -r docker/ml-service/requirements-test.txt
+          elif [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
+          pip install pytest requests
+
+      - name: Run integration tests
+        env:
+          BASE_URL: http://localhost:8000
+        run: |
+          pytest -q docker/ml-service/tests || pytest -q tests || pytest -q
+
+      - name: Show container logs (on failure)
+        if: failure()
+        run: docker logs mlservice-e2e || true
+
+      - name: Stop and remove container
+        if: always()
+        run: docker rm -f mlservice-e2e || true
