@@ -29,59 +29,43 @@ def _server_says_missing_file(resp):
     text = resp.text or ""
     return "file" in text and ("required" in text or "missing" in text)
 
-def _find_example_image():
-    # examples/sample.png is in the repo root; compute path relative to this test file
+def _example_image_path():
+    # prefer repo-root examples/sample.png (present in repo); compute relative path
     candidate = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "examples", "sample.png"))
     if os.path.exists(candidate):
         return candidate
-    # fallback to tests/data/sample_file.txt if the image isn't present
-    txt_fallback = os.path.join(os.path.dirname(__file__), "data", "sample_file.txt")
-    return txt_fallback if os.path.exists(txt_fallback) else None
+    return None
 
 def test_predict_returns_json():
     base = os.environ.get("BASE_URL", "http://localhost:8000")
     url = f"{base}/predict"
     payload = load_sample()
 
-    # 1) Try JSON POST first (existing behavior)
+    # 1) Try JSON POST first
     resp = requests.post(url, json=payload, timeout=20)
     _write_debug(resp, suffix="_json")
 
-    # 2) If server says "missing file", try file upload
+    # 2) If server requires a file, upload the example image (repo root examples/sample.png)
     if resp.status_code == 422 and _server_says_missing_file(resp):
-        sample_path = _find_example_image()
-        if not sample_path:
+        image_path = _example_image_path()
+        if not image_path:
             import pytest
-            pytest.skip("No sample file available for file upload attempt; skipping detailed assertions")
-        # Attempt uploading only the file (preferred)
-        with open(sample_path, "rb") as fh:
-            content_type = "image/png" if sample_path.lower().endswith(".png") else "application/octet-stream"
-            files = {"file": (os.path.basename(sample_path), fh, content_type)}
+            pytest.skip("No example image available for file upload attempt; skipping detailed assertions")
+
+        with open(image_path, "rb") as fh:
+            content_type = "image/png" if image_path.lower().endswith(".png") else "application/octet-stream"
+            files = {"file": (os.path.basename(image_path), fh, content_type)}
             resp2 = requests.post(url, files=files, timeout=20)
             _write_debug(resp2, suffix="_file")
-            # If file-only fails (e.g. invalid image), try sending both file and the json payload as a form field
-            if resp2.status_code == 400:
-                # Retry with both file and the JSON body as a form field (some endpoints expect both)
-                fh.seek(0)
-                files = {"file": (os.path.basename(sample_path), fh, content_type)}
-                data = {"instances": json.dumps(payload)}
-                resp3 = requests.post(url, files=files, data=data, timeout=20)
-                _write_debug(resp3, suffix="_file_plus_json")
-                if resp3.status_code != 200:
-                    import pytest
-                    pytest.skip(f"/predict returned status {resp3.status_code} on file+json upload; skipping detailed assertions")
-                data_resp = resp3.json()
-                assert isinstance(data_resp, dict)
-                assert any(k in data_resp for k in ("predictions", "prediction", "result", "label", "score"))
-                return
-            else:
-                if resp2.status_code != 200:
-                    import pytest
-                    pytest.skip(f"/predict returned status {resp2.status_code} on file upload; skipping detailed assertions")
-                data_resp = resp2.json()
-                assert isinstance(data_resp, dict)
-                assert any(k in data_resp for k in ("predictions", "prediction", "result", "label", "score"))
-                return
+            if resp2.status_code != 200:
+                import pytest
+                pytest.skip(f"/predict returned status {resp2.status_code} on file upload; skipping detailed assertions")
+
+            data_resp = resp2.json()
+            assert isinstance(data_resp, dict)
+            # The ml-service implementation returns quality_score and data_hash
+            assert "quality_score" in data_resp and "data_hash" in data_resp
+            return
 
     # 3) If JSON attempt succeeded, assert as before; otherwise skip
     if resp.status_code != 200:
