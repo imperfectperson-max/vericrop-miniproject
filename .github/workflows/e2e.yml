@@ -1,0 +1,94 @@
+name: E2E Integration Tests
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  e2e-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('docker/ml-service/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: docker/ml-service
+          file: docker/ml-service/Dockerfile
+          push: false
+          tags: ml-service:e2e-${{ github.sha }}
+          load: true
+
+      - name: Run ml-service container
+        run: |
+          docker run -d --name mlservice-e2e -p 8000:8000 -e PORT=8000 ml-service:e2e-${{ github.sha }}
+
+      - name: Wait for service to be healthy
+        run: |
+          echo "Waiting for ml-service to become healthy..."
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8000/health >/dev/null 2>&1; then
+              echo "✓ Service is healthy!"
+              curl -s http://localhost:8000/health | jq '.' || curl -s http://localhost:8000/health
+              exit 0
+            fi
+            echo "  Attempt $i/30: waiting for service..."
+            sleep 1
+          done
+          echo "✗ Service did not become healthy within 30 seconds"
+          exit 1
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f docker/ml-service/requirements-test.txt ]; then
+            pip install -r docker/ml-service/requirements-test.txt
+          else
+            pip install -r docker/ml-service/requirements.txt
+          fi
+          pip install pytest requests
+
+      - name: Run integration tests
+        env:
+          BASE_URL: http://localhost:8000
+        run: |
+          if [ -d docker/ml-service/tests ]; then
+            pytest docker/ml-service/tests -v
+          elif [ -d tests ]; then
+            pytest tests -v
+          else
+            pytest -v
+          fi
+
+      - name: Dump container logs on failure
+        if: failure()
+        run: |
+          echo "=== Container logs ==="
+          docker logs mlservice-e2e
+
+      - name: Clean up container
+        if: always()
+        run: |
+          docker rm -f mlservice-e2e || true
