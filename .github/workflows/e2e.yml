@@ -9,6 +9,8 @@ jobs:
     name: E2E tests (build image, run container, pytest)
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
