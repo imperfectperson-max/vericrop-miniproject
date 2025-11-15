@@ -60,14 +60,13 @@ jobs:
           elif [ -f requirements.txt ]; then
             pip install -r requirements.txt
           else
-            pip install pytest requests
+            pip install pytest requests python-multipart pillow
           fi
 
       - name: Run integration tests (produce junit xml)
         env:
           BASE_URL: http://localhost:8000
         run: |
-          # try the repository test paths and always produce results.xml for upload
           pytest -q docker/ml-service/tests --junitxml=results.xml || pytest -q tests --junitxml=results.xml || pytest -q --junitxml=results.xml
         continue-on-error: true
 
@@ -80,7 +79,7 @@ jobs:
         if: always()
         run: |
           echo "CWD: $(pwd)"
-          echo "Listing repo root:"
+          echo "Listing repository root:"
           ls -la || true
           echo "Listing results.xml:"
           ls -la results.xml || true
