@@ -11,6 +11,10 @@ app = FastAPI()
 async def health():
     return {"status": "ok", "time": int(time.time())}
 
+@app.get("/")
+async def root():
+    return {"status": "ok", "message": "vericrop service running"}
+
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
     try:
