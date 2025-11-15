@@ -42,6 +42,19 @@ bin/
 ### Mac OS ###
 .DS_Store
 
+### Python ###
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+*.egg-info/
+dist/
+build/
+
 # ignore exported model artifacts used for local development
 /docker/ml-service/vericrop_models/
 docker/ml-service/models/
