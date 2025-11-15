@@ -63,38 +63,26 @@ jobs:
             pip install pytest requests python-multipart pillow
           fi
 
-      - name: Run integration tests (produce junit xml)
+      - name: Run integration test (produce junit xml and coverage)
         env:
           BASE_URL: http://localhost:8000
         run: |
-          pytest -q docker/ml-service/tests --junitxml=results.xml || pytest -q tests --junitxml=results.xml || pytest -q --junitxml=results.xml
+          # Run pytest with coverage and always write results.xml and coverage.xml
+          pytest -q docker/ml-service/tests --junitxml=results.xml --cov=docker/ml-service --cov-report=xml:coverage.xml || true
         continue-on-error: true
 
       - name: Collect container logs (always)
         if: always()
-        run: |
-          docker logs mlservice-e2e > mlservice-logs.txt || true
+        run: docker logs mlservice-e2e > mlservice-logs.txt || true
 
-      - name: Debug test artifacts (list files)
-        if: always()
-        run: |
-          echo "CWD: $(pwd)"
-          echo "Listing repository root:"
-          ls -la || true
-          echo "Listing results.xml:"
-          ls -la results.xml || true
-          echo "Listing tests dir:"
-          ls -la docker/ml-service/tests || true
-          echo "Listing mlservice logs:"
-          ls -la mlservice-logs.txt || true
-
-      - name: Upload pytest results and logs
+      - name: Upload pytest results, coverage and logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: pytest-results
           path: |
             results.xml
+            coverage.xml
             docker/ml-service/tests
             mlservice-logs.txt
           if-no-files-found: error
