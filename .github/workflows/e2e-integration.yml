@@ -71,12 +71,26 @@ jobs:
           pytest -q docker/ml-service/tests --junitxml=results.xml || pytest -q tests --junitxml=results.xml || pytest -q --junitxml=results.xml
         continue-on-error: true
 
+      # DEBUG: show whether the junit xml was created and list files (keeps job non-failing)
+      - name: Debug test artifacts (list files)
+        run: |
+          echo "CWD: $(pwd)"
+          echo "Listing repository root:"
+          ls -la || true
+          echo "Listing workspace root for results.xml:"
+          ls -la results.xml || true
+          echo "Listing test dir:"
+          ls -la docker/ml-service/tests || true
+
       - name: Upload pytest results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: pytest-results
-          path: results.xml
+          path: |
+            results.xml
+            docker/ml-service/tests
+          if-no-files-found: error
 
       - name: Show container logs (on failure)
         if: failure()
