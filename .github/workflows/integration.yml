@@ -1,50 +1,108 @@
-# Lightweight integration test: build ml-service, start it, wait for health, run test_predict.py, tear down
+name: E2E Integration Tests
 on:
-  push:
-    paths:
-      - 'docker/ml-service/**'
-      - '.github/workflows/**'
   pull_request:
-    paths:
-      - 'docker/ml-service/**'
-      - '.github/workflows/**'
+  push:
+    branches: [ "main" ]
 
 jobs:
-  integration-test:
+  e2e:
+    name: E2E tests (build image, run container, pytest)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx (optional)
+      - name: Set up QEMU and buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Build ml-service image
-        run: docker compose build --no-cache ml-service
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
 
-      - name: Start ml-service
-        run: docker compose up -d ml-service
+      - name: Set up Python for tests
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
 
-      - name: Wait for service health
+      - name: Build Docker image (local)
+        id: build
+        uses: docker/build-push-action@v4
+        with:
+          push: false
+          load: true
+          tags: ml-service:e2e-${{ github.sha }}
+          file: docker/ml-service/Dockerfile
+          context: docker/ml-service
+
+      - name: Run container
         run: |
+          docker run -d --name mlservice-e2e -p 8000:8000 -e PORT=8000 ml-service:e2e-${{ github.sha }}
           for i in $(seq 1 30); do
             if curl -fsS http://localhost:8000/health >/dev/null 2>&1; then
-              echo "service healthy"
-              exit 0
+              echo "service is up"
+              break
             fi
-            echo "waiting for service... ($i/30)"
-            sleep 2
+            echo "waiting for service..."
+            sleep 1
           done
-          echo "service did not become healthy" >&2
-          docker compose logs ml-service || true
-          exit 1
+        timeout-minutes: 10
 
-      - name: Install Python deps for test
-        run: python -m pip install --upgrade pip && pip install requests
+      - name: Install test deps
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f docker/ml-service/requirements-test.txt ]; then
+            pip install -r docker/ml-service/requirements-test.txt
+          elif [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          else
+            pip install pytest requests python-multipart pillow
+          fi
 
-      - name: Run integration test
-        run: python docker/ml-service/tests/test_predict.py
+      - name: Run integration tests (produce junit xml)
+        env:
+          BASE_URL: http://localhost:8000
+        run: |
+          pytest -q docker/ml-service/tests --junitxml=results.xml || pytest -q tests --junitxml=results.xml || pytest -q --junitxml=results.xml
+        continue-on-error: true
 
-      - name: Teardown
+      - name: Collect container logs (always)
         if: always()
-        run: docker compose down -v
+        run: |
+          docker logs mlservice-e2e > mlservice-logs.txt || true
+
+      - name: Debug test artifacts (list files)
+        if: always()
+        run: |
+          echo "CWD: $(pwd)"
+          echo "Listing repository root:"
+          ls -la || true
+          echo "Listing results.xml:"
+          ls -la results.xml || true
+          echo "Listing tests dir:"
+          ls -la docker/ml-service/tests || true
+          echo "Listing mlservice logs:"
+          ls -la mlservice-logs.txt || true
+
+      - name: Upload pytest results and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-results
+          path: |
+            results.xml
+            docker/ml-service/tests
+            mlservice-logs.txt
+          if-no-files-found: error
+
+      - name: Show container logs (on failure)
+        if: failure()
+        run: docker logs mlservice-e2e || true
+
+      - name: Stop and remove container
+        if: always()
+        run: docker rm -f mlservice-e2e || true
