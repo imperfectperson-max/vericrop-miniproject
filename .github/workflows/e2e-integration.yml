@@ -71,18 +71,25 @@ jobs:
           pytest -q docker/ml-service/tests --junitxml=results.xml || pytest -q tests --junitxml=results.xml || pytest -q --junitxml=results.xml
         continue-on-error: true
 
-      # DEBUG: show whether the junit xml was created and list files (keeps job non-failing)
+      - name: Collect container logs (always)
+        if: always()
+        run: |
+          docker logs mlservice-e2e > mlservice-logs.txt || true
+
       - name: Debug test artifacts (list files)
+        if: always()
         run: |
           echo "CWD: $(pwd)"
-          echo "Listing repository root:"
+          echo "Listing repo root:"
           ls -la || true
-          echo "Listing workspace root for results.xml:"
+          echo "Listing results.xml:"
           ls -la results.xml || true
-          echo "Listing test dir:"
+          echo "Listing tests dir:"
           ls -la docker/ml-service/tests || true
+          echo "Listing mlservice logs:"
+          ls -la mlservice-logs.txt || true
 
-      - name: Upload pytest results
+      - name: Upload pytest results and logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -90,6 +97,7 @@ jobs:
           path: |
             results.xml
             docker/ml-service/tests
+            mlservice-logs.txt
           if-no-files-found: error
 
       - name: Show container logs (on failure)
