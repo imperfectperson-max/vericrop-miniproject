@@ -1,11 +1,10 @@
-# pip requirements
-# Original file URL: https://github.com/imperfectperson-max/vericrop-miniproject/blob/main/ml_service/requirements.txt
 fastapi==0.109.1
 uvicorn[standard]==0.24.0
 
-# Use PyTorch CPU wheels explicitly so pip pulls CPU prebuilt wheels instead of trying to build
-torch==2.6.0+cpu
-torchvision==0.20.0+cpu
+# Use a PyTorch wheel that matches the Python runtime in the image
+# Example: use a 2.0.x+cpu wheel if that is available for Python 3.11
+torch==2.0.1+cpu
+torchvision==0.15.2+cpu
 
 pillow==10.3.0
 python-multipart==0.0.6
