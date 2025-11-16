@@ -23,13 +23,17 @@ def _write_debug(resp, suffix=""):
 def test_predict_strict_file_upload():
     base = os.environ.get("BASE_URL", "http://localhost:8000")
     url = f"{base}/predict"
-    payload = load_sample()
+    # payload is kept for compatibility or for endpoints expecting instances; not used in strict file test
+    _ = load_sample()
 
     # Always use the bundled test image (deterministic)
     image_path = os.path.join(os.path.dirname(__file__), "data", "sample.png")
     if not os.path.exists(image_path):
-        import pytest
-        pytest.skip("Bundled test image not found; skipping")
+        # fallback: repo-root examples/sample.png (for older clones)
+        image_path = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "examples", "sample.png"))
+        if not os.path.exists(image_path):
+            import pytest
+            pytest.skip("Bundled test image not found; skipping")
 
     with open(image_path, "rb") as fh:
         content_type = "image/png" if image_path.lower().endswith(".png") else "application/octet-stream"
