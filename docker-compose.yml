@@ -5,9 +5,8 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./models:/app/models
       - ./docker/ml-service:/app
-      - ./docker/ml-service/vericrop_models:/app/models:ro   # host models -> container /app/models
+      - ./docker/ml-service/weights:/app/weights
     restart: on-failure
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
@@ -15,14 +14,6 @@ services:
       timeout: 5s
       retries: 3
       start_period: 5s
-
-  ml_service:
-    build: ./ml_service
-    ports:
-      - "8001:8000"
-    volumes:
-      - ./ml_service/weights:/app/weights
-    restart: on-failure
 
   postgres:
     image: postgres:15

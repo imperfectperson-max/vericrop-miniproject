@@ -6,6 +6,7 @@ build/
 .kotlin
 
 ### IntelliJ IDEA ###
+.idea/
 .idea/modules.xml
 .idea/jarRepositories.xml
 .idea/compiler.xml
@@ -42,19 +43,13 @@ bin/
 ### Mac OS ###
 .DS_Store
 
-# ignore exported model artifacts used for local development
-/docker/ml-service/vericrop_models/
-docker/ml-service/models/
-*.onnx
-*.pth
-# ignore exported model artifacts used for local development
-/docker/ml-service/vericrop_models/
-docker/ml-service/models/
-*.onnx
-*.pth
+# Python cache
 __pycache__/
 
-# ML service weights
-ml_service/weights/*.pt
-ml_service/weights/*.pth
-ml_service/__pycache__/
+# ML service model artifacts
+docker/ml-service/weights/*.pt
+docker/ml-service/weights/*.pth
+docker/ml-service/vericrop_models/
+docker/ml-service/models/
+*.onnx
+*.pth
