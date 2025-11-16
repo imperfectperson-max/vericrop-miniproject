@@ -6,6 +6,7 @@ build/
 .kotlin
 
 ### IntelliJ IDEA ###
+.idea/
 .idea/modules.xml
 .idea/jarRepositories.xml
 .idea/compiler.xml
@@ -53,8 +54,3 @@ docker/ml-service/models/
 *.onnx
 *.pth
 __pycache__/
-
-# ML service weights
-ml_service/weights/*.pt
-ml_service/weights/*.pth
-ml_service/__pycache__/

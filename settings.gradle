@@ -1,3 +1,2 @@
-rootProject.name = 'untitled'
-include 'untitled-core', 'untitled-gui', 'untitled-ml-service'
+rootProject.name = 'vericrop'
 include 'vericrop-core', 'vericrop-gui'

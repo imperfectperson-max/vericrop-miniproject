@@ -2,19 +2,19 @@
 
 The following issues should be created in the repository to track the MVP development progress.
 
-## Issue 1: MVP: Scaffold ml_service (FastAPI + Docker)
+## Issue 1: MVP: Scaffold docker/ml-service (FastAPI + Docker)
 
-**Title:** MVP: Scaffold ml_service (FastAPI + Docker)
+**Title:** MVP: Scaffold docker/ml-service (FastAPI + Docker)
 
 **Description:**
 Set up the machine learning service infrastructure for the VeriCrop project.
 
 **Tasks:**
 - [x] Create FastAPI application with `/predict` endpoint
-- [x] Add PyTorch model loading with fallback to placeholder
-- [x] Create requirements.txt with FastAPI, PyTorch, Torchvision, Pillow
-- [x] Create Dockerfile for ml_service
-- [ ] Add model weights (model.pt) or integrate with Colab/S3
+- [x] Add dummy prediction logic for MVP demo
+- [x] Create requirements.txt with FastAPI, Pillow, uvicorn
+- [x] Create Dockerfile for docker/ml-service
+- [ ] Add model weights or integrate with actual ML model
 - [ ] Test endpoint with sample Fruits-360 images
 - [ ] Add unit tests for the predict endpoint
 
@@ -72,7 +72,7 @@ Set up continuous integration workflow to build and push the ML service Docker i
 
 **Tasks:**
 - [x] Create .github/workflows/ci-ghcr.yml workflow file
-- [x] Configure workflow to trigger on push to main for ml_service/** changes
+- [x] Configure workflow to trigger on push to main for docker/ml-service/** changes
 - [x] Set up Docker Buildx for multi-platform builds
 - [x] Configure GHCR authentication with GITHUB_TOKEN
 - [x] Add image tagging (sha-<commit>, main)
@@ -93,11 +93,11 @@ Set up continuous integration workflow to build and push the ML service Docker i
 Integrate all services in docker-compose.yml for local development and testing.
 
 **Tasks:**
-- [x] Add ml_service to docker-compose.yml
-- [x] Configure port mapping for ml_service (8001:8000)
+- [x] Add ml-service to docker-compose.yml
+- [x] Configure port mapping for ml-service (8000:8000)
 - [x] Set up volume mounting for model weights
 - [ ] Test docker-compose up with all services
-- [ ] Add health checks for ml_service
+- [x] Add health checks for ml-service
 - [ ] Document service dependencies
 - [ ] Add environment variable configuration
 - [ ] Create docker-compose.dev.yml for development
@@ -115,13 +115,13 @@ Implement dataset loader for Fruits-360 dataset to train and validate the ML mod
 
 **Tasks:**
 - [ ] Download Fruits-360 dataset (small/demo version)
-- [ ] Create data loader script in ml_service
+- [ ] Create data loader script in docker/ml-service
 - [ ] Implement data preprocessing and augmentation
 - [ ] Split dataset into train/val/test sets
 - [ ] Document dataset structure and usage
 - [ ] Add dataset to .gitignore
 - [ ] Create sample images for testing
-- [ ] Integrate with PyTorch DataLoader
+- [ ] Integrate with ML model (if using PyTorch, see legacy implementation)
 
 **Labels:** MVP, enhancement, ml-service, dataset
 
@@ -133,7 +133,7 @@ To create these issues in the GitHub repository, run the following commands or u
 
 ```bash
 # Issue 1
-gh issue create --title "MVP: Scaffold ml_service (FastAPI + Docker)" \
+gh issue create --title "MVP: Scaffold docker/ml-service (FastAPI + Docker)" \
   --body "$(sed -n '/## Issue 1/,/^---$/p' ISSUES.md | tail -n +3 | head -n -1)" \
   --label "MVP,enhancement,ml-service"
 
