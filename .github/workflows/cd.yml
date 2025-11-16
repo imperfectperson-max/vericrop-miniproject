@@ -9,7 +9,7 @@ jobs:
   deploy-to-render:
     runs-on: ubuntu-latest
     # only run when the required secrets are present (use expression syntax)
-    if: ${{ secrets.RENDER_API_KEY != '' && secrets.RENDER_SERVICE_ID != '' }}
+    if: ${{ secrets.RENDER_API_KEY && secrets.RENDER_SERVICE_ID }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
