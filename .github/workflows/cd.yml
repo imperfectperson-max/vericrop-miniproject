@@ -15,10 +15,9 @@ jobs:
       - name: Verify required secrets are present (fail early)
         run: |
           if [ -z "${{ secrets.RENDER_API_KEY }}" ] || [ -z "${{ secrets.RENDER_SERVICE_ID }}" ]; then
-            echo "RENDER_API_KEY or RENDER_SERVICE_ID secret missing; skipping deploy."
+            echo "RENDER_API_KEY or RENDER_SERVICE_ID secret missing; failing deploy step."
             exit 1
           fi
-        # No env needed: secrets are referenced inside the step expression
       - name: Trigger Render deploy
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
@@ -32,6 +31,7 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{}' )
           echo "Render API HTTP status: $http_code"
+          echo "Render response:"
           cat /tmp/render-deploy.json
           if [ "$http_code" -ge 400 ]; then
             echo "Render deploy API returned error (status $http_code)"
