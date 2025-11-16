@@ -26,7 +26,10 @@ def load_model():
     global model
     if MODEL_PATH.exists():
         try:
-            model = torch.load(MODEL_PATH, map_location=torch.device('cpu'))
+            # Security Note: torch.load with weights_only=False is used here because we're loading
+            # our own trusted model files. Only load models from trusted sources.
+            # For production, consider using weights_only=True or torch.jit.load for safer loading.
+            model = torch.load(MODEL_PATH, map_location=torch.device('cpu'), weights_only=False)
             model.eval()
             print(f"Model loaded successfully from {MODEL_PATH}")
         except Exception as e:
