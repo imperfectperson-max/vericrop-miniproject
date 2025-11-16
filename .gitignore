@@ -5,6 +5,33 @@ build/
 !**/src/test/**/build/
 .kotlin
 
+# Java/Gradle
+/.gradle
+/build
+**/build
+/.idea
+/*.iml
+
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Notebook checkpoints
+.ipynb_checkpoints
+
+# Docker
+docker/ml-service/__pycache__/
+docker/ml-service/*.pyc
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local secrets
+*.pem
+*.key
+kaggle.json
 ### IntelliJ IDEA ###
 .idea/
 .idea/modules.xml
