@@ -1,0 +1,77 @@
+name: Build and Push ML Service to GHCR
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'ml_service/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          # Use GITHUB_TOKEN for authentication (requires packages: write permission above)
+          # Alternative: Use a Personal Access Token stored as GHCR_TOKEN secret
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/vericrop-ml-service
+          tags: |
+            type=sha,prefix=sha-
+            type=raw,value=main,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./ml_service
+          file: ./ml_service/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Output image info
+        run: |
+          echo "✅ Docker image built and pushed successfully!"
+          echo "📦 Image tags:"
+          echo "${{ steps.meta.outputs.tags }}"
+          echo ""
+          echo "🔗 View at: https://github.com/${{ github.repository }}/pkgs/container/vericrop-ml-service"
+
+# Documentation:
+# This workflow builds and pushes the ML service Docker image to GitHub Container Registry (GHCR).
+# 
+# Authentication:
+# - Uses GITHUB_TOKEN by default (requires packages: write permission, configured above)
+# - If GITHUB_TOKEN doesn't have sufficient permissions, create a Personal Access Token (PAT)
+#   with 'write:packages' and 'read:packages' scopes, add it as a repository secret named
+#   GHCR_TOKEN, and update line 32 to use: password: ${{ secrets.GHCR_TOKEN }}
+#
+# Triggers:
+# - Automatically runs on push to main branch when files under ml_service/ change
+# - Can be manually triggered via workflow_dispatch
+#
+# Image tags:
+# - ghcr.io/<owner>/vericrop-ml-service:sha-<commit-sha> (for all pushes)
+# - ghcr.io/<owner>/vericrop-ml-service:main (for pushes to main branch)

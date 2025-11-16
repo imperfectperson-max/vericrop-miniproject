@@ -1,0 +1,32 @@
+plugins {
+    id 'java'
+    id 'application'
+    id 'org.openjfx.javafxplugin' version '0.0.13'
+}
+
+group = 'org.vericrop'
+version = '0.1.0'
+sourceCompatibility = '17'
+targetCompatibility = '17'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation project(':vericrop-core')
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.9.3'
+}
+
+application {
+    mainClass = 'org.vericrop.gui.MainApp'
+}
+
+javafx {
+    version = "20"
+    modules = [ 'javafx.controls' ]
+}
+
+test {
+    useJUnitPlatform()
+}
