@@ -31,7 +31,7 @@ jobs:
         uses: docker/login-action@v2
         with:
           registry: ghcr.io
-          username: ${{ github.actor }}
+          username: imperfectperson-max
           password: ${{ secrets.GHCR_TOKEN }}
 
       - name: Build and push ml-service image
