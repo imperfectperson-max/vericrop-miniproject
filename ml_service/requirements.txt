@@ -1,6 +1,12 @@
 fastapi==0.109.1
 uvicorn[standard]==0.24.0
-torch==2.6.0
-torchvision==0.20.0
+
+# Use PyTorch CPU wheels explicitly so pip pulls CPU prebuilt wheels instead of trying to build
+torch==2.6.0+cpu
+torchvision==0.20.0+cpu
+
 pillow==10.3.0
 python-multipart==0.0.6
+
+# PyTorch CPU wheel index - required for the +cpu wheel specifier above
+-f https://download.pytorch.org/whl/cpu/torch_stable.html
