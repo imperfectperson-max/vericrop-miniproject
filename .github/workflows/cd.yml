@@ -8,18 +8,17 @@ on:
 jobs:
   deploy-to-render:
     runs-on: ubuntu-latest
-    # Run only when both secrets exist (truthy check). Use a proper expression with ${{ ... }}
-    if: ${{ secrets.RENDER_API_KEY && secrets.RENDER_SERVICE_ID }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Show which secrets are configured (debug)
+      - name: Verify required secrets are present (fail early)
         run: |
-          echo "RENDER_SERVICE_ID is set: ${RENDER_SERVICE_ID:+yes}"
-        env:
-          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
-
+          if [ -z "${{ secrets.RENDER_API_KEY }}" ] || [ -z "${{ secrets.RENDER_SERVICE_ID }}" ]; then
+            echo "RENDER_API_KEY or RENDER_SERVICE_ID secret missing; skipping deploy."
+            exit 1
+          fi
+        # No env needed: secrets are referenced inside the step expression
       - name: Trigger Render deploy
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
@@ -33,7 +32,6 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{}' )
           echo "Render API HTTP status: $http_code"
-          echo "Render response:"
           cat /tmp/render-deploy.json
           if [ "$http_code" -ge 400 ]; then
             echo "Render deploy API returned error (status $http_code)"
