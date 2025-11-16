@@ -145,7 +145,61 @@ The current blockchain is in-memory (demo). If you want the chain to survive res
 I can prepare and add these if you want — it’s a small change.
 
 ---
+## Pulling the prebuilt Docker image (GHCR)
 
+We publish the ml-service image to GitHub Container Registry (GHCR). You can pull the image locally or use it in other CI jobs.
+
+### Authenticate to GHCR
+If the registry requires authentication (private package), use a PAT with packages: read (or read/write) permission. Example using an environment secret named `GHCR_TOKEN`:
+
+```bash
+# Linux / macOS
+echo "$GHCR_TOKEN" | docker login ghcr.io -u imperfectperson-max --password-stdin
+
+# Windows PowerShell
+$env:GHCR_TOKEN | docker login ghcr.io -u imperfectperson-max --password-stdin
+```
+
+### Pull the image
+```bash
+# Pull the image tagged from main
+docker pull ghcr.io/imperfectperson-max/vericrop-ml-service:main
+
+# Pull a specific commit-tagged image (replace <commit-sha> with the SHA)
+docker pull ghcr.io/imperfectperson-max/vericrop-ml-service:sha-<commit-sha>
+```
+
+### Run the container
+```bash
+docker run --rm -p 8000:8000 ghcr.io/imperfectperson-max/vericrop-ml-service:main
+# Adjust ports and flags as needed for your app
+```
+
+### Using in GitHub Actions
+Example step to pull the image in a workflow (requires GHCR token or GITHUB_TOKEN with packages: read permission):
+```yaml
+- name: Log in to GHCR
+  uses: docker/login-action@v2
+  with:
+    registry: ghcr.io
+    username: ${{ github.actor }}
+    password: ${{ secrets.GHCR_TOKEN }}
+
+- name: Pull ml-service image
+  run: docker pull ghcr.io/${{ github.repository_owner }}/vericrop-ml-service:sha-${{ github.sha }}
+```
+
+## Badge
+Add a quick badge linking to the package page (links to your GitHub Packages page for the repo):
+
+[![GHCR image ghcr.io/imperfectperson-max/vericrop-ml-service](https://img.shields.io/badge/ghcr.io%2Fimperfectperson--max%2Fvericrop--ml--service-main-blue?logo=github)](https://github.com/imperfectperson-max?tab=packages)
+
+(If you prefer a different badge style or a dynamic badge from a specific provider, I can adapt it.)
+
+---
+Notes
+- Replace `imperfectperson-max` or the image name if you want a different namespace.
+- Ensure the `GHCR_TOKEN` repository secret exists if your packages are private or organization policies require a PAT.
 ## Development tips
 
 - Use a feature branch for GUI work:
