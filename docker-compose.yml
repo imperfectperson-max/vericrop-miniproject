@@ -16,14 +16,6 @@ services:
       retries: 3
       start_period: 5s
 
-  ml_service:
-    build: ./ml_service
-    ports:
-      - "8001:8000"
-    volumes:
-      - ./ml_service/weights:/app/weights
-    restart: on-failure
-
   postgres:
     image: postgres:15
     environment:

@@ -1,8 +1,8 @@
-# Untitled — VeriCrop Mini Demo
+# VeriCrop Mini Demo
 
 This repository contains a small end-to-end demo for a VeriCrop-style workflow:
 - A Dockerized FastAPI "ml-service" that exposes a /predict endpoint (stub or model).
-- A JavaFX desktop "Producer" app (untitled-gui) that uploads images to the ML service and records a simple in-memory blockchain (vericrop-core).
+- A JavaFX desktop "Producer" app (vericrop-gui) that uploads images to the ML service and records a simple in-memory blockchain (vericrop-core).
 
 The app is intentionally small and educational — it demonstrates image → ML → ledger flow. This README explains how to run the system, common troubleshooting, and recommended next steps.
 
@@ -12,7 +12,7 @@ The app is intentionally small and educational — it demonstrates image → ML 
 
 - `docker/ml-service/` — FastAPI ML service, Dockerfile and requirements.
 - `vericrop-core/` — Java core module containing Block, Blockchain, SupplyChainTx and unit tests.
-- `untitled-gui/` — JavaFX GUI module (Producer app).
+- `vericrop-gui/` — JavaFX GUI module (Producer app).
 - `docker-compose.yml` — orchestrates the ml-service container.
 
 ---
@@ -26,7 +26,7 @@ The app is intentionally small and educational — it demonstrates image → ML 
 - Internet access for Gradle to download dependencies.
 
 Notes about JavaFX:
-- The Gradle JavaFX plugin in `untitled-gui/build.gradle` is configured to pull JavaFX for the version declared. If you run from IntelliJ instead of Gradle you may need to set VM options (instructions below). Using Gradle (`:untitled-gui:run`) avoids manual VM configuration.
+- The Gradle JavaFX plugin in `vericrop-gui/build.gradle` is configured to pull JavaFX for the version declared. If you run from IntelliJ instead of Gradle you may need to set VM options (instructions below). Using Gradle (`:vericrop-gui:run`) avoids manual VM configuration.
 
 ---
 
@@ -36,7 +36,6 @@ Notes about JavaFX:
 
    Windows PowerShell:
    ```powershell
-   cd C:\Users\bonga\IdeaProjects\untitled
    docker compose up -d ml-service
    ```
 
@@ -49,7 +48,7 @@ Notes about JavaFX:
 
 3. Run the GUI via Gradle (this ensures JavaFX is configured by Gradle):
    ```powershell
-   .\gradlew :untitled-gui:run
+   .\gradlew :vericrop-gui:run
    ```
 
 4. In the GUI:
@@ -63,7 +62,7 @@ Notes about JavaFX:
 If you use IntelliJ to run the Application, set an Application run configuration:
 
 - Main class: `org.untitled.gui.Main`
-- Use classpath of module: `untitled-gui`
+- Use classpath of module: `vericrop-gui`
 - VM options (only if you do NOT run via Gradle and you installed a local JavaFX SDK):
   ```
   --module-path "C:\javafx-sdk-25.0.1\lib" --add-modules javafx.controls,javafx.fxml

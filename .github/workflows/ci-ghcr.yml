@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - 'ml_service/**'
+      - 'docker/ml-service/**'
   workflow_dispatch:
 
 permissions:
@@ -43,8 +43,8 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: ./ml_service
-          file: ./ml_service/Dockerfile
+          context: ./docker/ml-service
+          file: ./docker/ml-service/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -69,7 +69,7 @@ jobs:
 #   GHCR_TOKEN, and update line 32 to use: password: ${{ secrets.GHCR_TOKEN }}
 #
 # Triggers:
-# - Automatically runs on push to main branch when files under ml_service/ change
+# - Automatically runs on push to main branch when files under docker/ml-service/ change
 # - Can be manually triggered via workflow_dispatch
 #
 # Image tags:

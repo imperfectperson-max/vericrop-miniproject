@@ -15,16 +15,18 @@ repositories {
 
 dependencies {
     implementation project(':vericrop-core')
+    implementation 'com.squareup.okhttp3:okhttp:4.11.0'
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.2'
     testImplementation 'org.junit.jupiter:junit-jupiter:5.9.3'
 }
 
 application {
-    mainClass = 'org.vericrop.gui.MainApp'
+    mainClass = 'org.untitled.gui.Main'
 }
 
 javafx {
     version = "20"
-    modules = [ 'javafx.controls' ]
+    modules = [ 'javafx.controls', 'javafx.fxml' ]
 }
 
 test {
