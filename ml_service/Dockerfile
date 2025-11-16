@@ -12,7 +12,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxrender1 \
  && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install dependencies
+# Upgrade pip, setuptools and wheel to ensure modern installer and wheel support
+RUN pip install --upgrade pip setuptools wheel
+
+# Copy requirements and install dependencies (requirements.txt includes the PyTorch CPU wheel index)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
