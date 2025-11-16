@@ -1,0 +1,20 @@
+plugins {
+    id 'java'
+}
+
+group = 'org.vericrop'
+version = '0.1.0'
+sourceCompatibility = '17'
+targetCompatibility = '17'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.9.3'
+}
+
+test {
+    useJUnitPlatform()
+}
