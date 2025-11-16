@@ -1,4 +1,5 @@
- url=https://github.com/imperfectperson-max/vericrop-miniproject/blob/main/ml_service/requirements.txt
+# pip requirements
+# Original file URL: https://github.com/imperfectperson-max/vericrop-miniproject/blob/main/ml_service/requirements.txt
 fastapi==0.109.1
 uvicorn[standard]==0.24.0
 
