@@ -1,0 +1,57 @@
+[ {
+  "index" : 0,
+  "timestamp" : 1763381628563,
+  "previousHash" : "0",
+  "hash" : "8f6001251ddb98208b1acd96bcac082a9b12f3903c16b7d0475b1301b9851f29",
+  "transactions" : [ {
+    "type" : "GENESIS",
+    "from" : "system",
+    "to" : "system",
+    "batchId" : "0",
+    "data" : "{}"
+  } ],
+  "dataHash" : "genesis",
+  "participant" : "system"
+}, {
+  "index" : 1,
+  "timestamp" : 1763381664089,
+  "previousHash" : "8f6001251ddb98208b1acd96bcac082a9b12f3903c16b7d0475b1301b9851f29",
+  "hash" : "bbc3c6d1de504ff84cd91faf6a489b7b066e47b38d97b6e510691404c3cf0ea4",
+  "transactions" : [ {
+    "type" : "CREATE_BATCH",
+    "from" : "farmer_john",
+    "to" : "system",
+    "batchId" : "cherry",
+    "data" : "{\"batch_name\":\"cherry\",\"image_path\":\"C:\\\\Users\\\\bonga\\\\Downloads\\\\cherry.jpg\",\"quality_report\":{\"class_id\":14,\"confidence\":0.2262466847896576,\"model_accuracy\":\"100%\",\"prediction\":\"Apple worm 1\",\"timestamp\":1763381642,\"top_predictions\":{\"Apple worm 1\":0.2262466847896576,\"Onion White Peeled 1\":0.04814442619681358,\"eggplant_long_1\":0.03296888247132301}}}"
+  } ],
+  "dataHash" : "191c31a15e28df9510f96a6c4a5d4049da0265583b07a9ba14264515dcf92227",
+  "participant" : "farmer"
+}, {
+  "index" : 2,
+  "timestamp" : 1763381759314,
+  "previousHash" : "bbc3c6d1de504ff84cd91faf6a489b7b066e47b38d97b6e510691404c3cf0ea4",
+  "hash" : "8292b05500f15fddfef96b16429c8395424b74e3ea5a75916061f4f5ebd902d0",
+  "transactions" : [ {
+    "type" : "CREATE_BATCH",
+    "from" : "farmer_john",
+    "to" : "system",
+    "batchId" : "pear",
+    "data" : "{\"batch_name\":\"pear\",\"image_path\":\"C:\\\\Users\\\\bonga\\\\Downloads\\\\download.jpg\",\"quality_report\":{\"class_id\":13,\"confidence\":0.3750840425491333,\"model_accuracy\":\"100%\",\"prediction\":\"Apple Red Yellow 2\",\"timestamp\":1763381718,\"top_predictions\":{\"Apple 7\":0.2827540636062622,\"Apple Red Yellow 2\":0.3750840425491333,\"Pear 11\":0.06164529174566269}}}"
+  } ],
+  "dataHash" : "75c722a237646d0019e6eace1c6c352e6b22b4c90c15e0e31689cea99de10763",
+  "participant" : "farmer"
+}, {
+  "index" : 3,
+  "timestamp" : 1763381968584,
+  "previousHash" : "8292b05500f15fddfef96b16429c8395424b74e3ea5a75916061f4f5ebd902d0",
+  "hash" : "b594aa96d2f14b2d4aca81a2ed3fbeeb932ee9e25c3bfbf44f906eb563dddbd9",
+  "transactions" : [ {
+    "type" : "CREATE_BATCH",
+    "from" : "farmer_john",
+    "to" : "system",
+    "batchId" : "cucumber",
+    "data" : "{\"batch_name\":\"cucumber\",\"image_path\":\"C:\\\\Users\\\\bonga\\\\Downloads\\\\download (1).jpg\",\"quality_report\":{\"class_id\":17,\"confidence\":0.29375869035720825,\"model_accuracy\":\"100%\",\"prediction\":\"Avocado Green 1\",\"timestamp\":1763381952,\"top_predictions\":{\"Avocado Green 1\":0.29375869035720825,\"Cucumber 7\":0.05407360941171646,\"Pear 11\":0.18315663933753967}}}"
+  } ],
+  "dataHash" : "1f0188eea75d1f3afb0362b2fb5e8268700d9a71c44951df391f8cecf635d0f2",
+  "participant" : "farmer"
+} ]

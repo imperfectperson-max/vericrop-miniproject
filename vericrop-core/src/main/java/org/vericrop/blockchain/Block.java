@@ -1,43 +1,38 @@
 package org.vericrop.blockchain;
 
-import java.nio.charset.StandardCharsets;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 
-/**
- * Represents a single block in the blockchain.
- * Contains index, timestamp, previous hash, data, and its own hash.
- */
 public class Block {
-    private final int index;
-    private final long timestamp;
-    private final String previousHash;
-    private final String data;
-    private final String hash;
+    private int index;
+    private long timestamp;
+    private String previousHash;
+    private String hash;
+    private List<Transaction> transactions;
+    private String dataHash; // Hash of ML report data
+    private String participant; // "farmer", "transporter", "warehouse"
 
-    public Block(int index, long timestamp, String previousHash, String data) {
+    public Block(int index, String previousHash, List<Transaction> transactions,
+                 String dataHash, String participant) {
         this.index = index;
-        this.timestamp = timestamp;
+        this.timestamp = System.currentTimeMillis();
         this.previousHash = previousHash;
-        this.data = data;
+        this.transactions = transactions != null ? transactions : new ArrayList<>();
+        this.dataHash = dataHash;
+        this.participant = participant;
         this.hash = calculateHash();
     }
 
-    public Block(int index, String previousHash, String data) {
-        this(index, Instant.now().toEpochMilli(), previousHash, data);
-    }
-
-    /**
-     * Calculate SHA-256 hash of the block's contents.
-     */
-    private String calculateHash() {
+    public String calculateHash() {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            String input = index + timestamp + previousHash + data;
-            byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
-            
-            // Convert byte array to hex string
+            String input = index + timestamp + previousHash +
+                    transactions.hashCode() + dataHash + participant;
+            byte[] hash = digest.digest(input.getBytes());
+
             StringBuilder hexString = new StringBuilder();
             for (byte b : hash) {
                 String hex = Integer.toHexString(0xff & b);
@@ -46,38 +41,18 @@ public class Block {
             }
             return hexString.toString();
         } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("SHA-256 algorithm not found", e);
+            throw new RuntimeException(e);
         }
     }
 
-    public int getIndex() {
-        return index;
-    }
+    // Getters and setters
+    public int getIndex() { return index; }
+    public long getTimestamp() { return timestamp; }
+    public String getPreviousHash() { return previousHash; }
+    public String getHash() { return hash; }
+    public List<Transaction> getTransactions() { return transactions; }
+    public String getDataHash() { return dataHash; }
+    public String getParticipant() { return participant; }
 
-    public long getTimestamp() {
-        return timestamp;
-    }
-
-    public String getPreviousHash() {
-        return previousHash;
-    }
-
-    public String getData() {
-        return data;
-    }
-
-    public String getHash() {
-        return hash;
-    }
-
-    @Override
-    public String toString() {
-        return "Block{" +
-                "index=" + index +
-                ", timestamp=" + timestamp +
-                ", previousHash='" + previousHash + '\'' +
-                ", data='" + data + '\'' +
-                ", hash='" + hash + '\'' +
-                '}';
-    }
+    public void setHash(String hash) { this.hash = hash; }
 }

@@ -1,88 +1,69 @@
 package org.vericrop.blockchain;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Simple blockchain implementation with basic validation.
- * Maintains a chain of blocks and provides methods to add blocks and validate the chain.
- */
 public class Blockchain {
-    private final List<Block> chain;
+    private List<Block> chain;
+    private ObjectMapper mapper;
 
     public Blockchain() {
-        chain = new ArrayList<>();
+        this.chain = new ArrayList<>();
+        this.mapper = new ObjectMapper();
         // Create genesis block
-        chain.add(createGenesisBlock());
+        createGenesisBlock();
     }
 
-    /**
-     * Create the first block in the chain (genesis block).
-     */
-    private Block createGenesisBlock() {
-        return new Block(0, 0L, "0", "Genesis Block");
+    private void createGenesisBlock() {
+        List<Transaction> genesisTransactions = new ArrayList<>();
+        genesisTransactions.add(new Transaction("GENESIS", "system", "system", "0", "{}"));
+        Block genesis = new Block(0, "0", genesisTransactions, "genesis", "system");
+        chain.add(genesis);
     }
 
-    /**
-     * Get the latest block in the chain.
-     */
     public Block getLatestBlock() {
         return chain.get(chain.size() - 1);
     }
 
-    /**
-     * Add a new block to the chain.
-     */
-    public void addBlock(String data) {
-        Block previousBlock = getLatestBlock();
-        Block newBlock = new Block(
-            chain.size(),
-            previousBlock.getHash(),
-            data
-        );
+    public Block addBlock(List<Transaction> transactions, String dataHash, String participant) {
+        Block latestBlock = getLatestBlock();
+        Block newBlock = new Block(chain.size(), latestBlock.getHash(),
+                transactions, dataHash, participant);
         chain.add(newBlock);
+        return newBlock;
     }
 
-    /**
-     * Get the entire chain.
-     */
-    public List<Block> getChain() {
-        return new ArrayList<>(chain);
-    }
-
-    /**
-     * Validate the blockchain by checking:
-     * 1. Each block's hash is correct
-     * 2. Each block's previousHash matches the previous block's hash
-     */
-    public boolean isValid() {
+    public boolean isChainValid() {
         for (int i = 1; i < chain.size(); i++) {
-            Block currentBlock = chain.get(i);
-            Block previousBlock = chain.get(i - 1);
+            Block current = chain.get(i);
+            Block previous = chain.get(i - 1);
 
-            // Check if the current block's hash is correct
-            Block testBlock = new Block(
-                currentBlock.getIndex(),
-                currentBlock.getTimestamp(),
-                currentBlock.getPreviousHash(),
-                currentBlock.getData()
-            );
-            if (!currentBlock.getHash().equals(testBlock.getHash())) {
+            // Check if hash is correct
+            if (!current.getHash().equals(current.calculateHash())) {
                 return false;
             }
 
-            // Check if previousHash matches the previous block's hash
-            if (!currentBlock.getPreviousHash().equals(previousBlock.getHash())) {
+            // Check if previous hash matches
+            if (!current.getPreviousHash().equals(previous.getHash())) {
                 return false;
             }
         }
         return true;
     }
 
-    /**
-     * Get the size of the blockchain.
-     */
-    public int size() {
-        return chain.size();
+    public void saveToFile(String filename) throws IOException {
+        mapper.writerWithDefaultPrettyPrinter().writeValue(new File(filename), chain);
+    }
+
+    public void loadFromFile(String filename) throws IOException {
+        chain = mapper.readValue(new File(filename),
+                mapper.getTypeFactory().constructCollectionType(List.class, Block.class));
+    }
+
+    public List<Block> getChain() {
+        return new ArrayList<>(chain);
     }
 }

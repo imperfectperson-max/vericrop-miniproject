@@ -3,29 +3,55 @@
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.text.Font?>
 
-<BorderPane xmlns:fx="http://javafx.com/fxml" fx:controller="org.untitled.gui.ProducerController">
-    <top>
-        <Label text="VeriCrop — Producer" style="-fx-font-size:18px; -fx-padding:10px;"/>
-    </top>
-    <center>
-        <VBox spacing="10">
-            <padding>
-                <Insets top="16" right="16" bottom="16" left="16"/>
-            </padding>
-            <HBox spacing="10">
-                <Button fx:id="chooseBtn" text="Choose Image" onAction="#onChoose"/>
-                <Label fx:id="selectedFileLabel" text="No file selected" />
-                <!-- Escape the ampersand as &amp; for XML -->
-                <Button fx:id="uploadBtn" text="Upload &amp; Create Shipment" onAction="#onUpload"/>
-                <ProgressIndicator fx:id="progress" visible="false" prefWidth="24" prefHeight="24"/>
-            </HBox>
-            <HBox spacing="10">
-                <Label text="ML Score:"/>
-                <Label fx:id="scoreLabel" text=""/>
-            </HBox>
-            <Label text="Blockchain (chain):"/>
-            <ListView fx:id="chainList" prefHeight="200"/>
+<VBox spacing="20" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="org.vericrop.gui.ProducerController">
+    <padding><Insets top="20" right="20" bottom="20" left="20"/></padding>
+
+    <Label text="🍎 VeriCrop - Farmer Dashboard" style="-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: #2E8B57;">
+        <padding><Insets bottom="10"/></padding>
+    </Label>
+
+    <HBox spacing="20">
+        <!-- Left Panel - Image Upload & Analysis -->
+        <VBox spacing="15" style="-fx-background-color: #f5f5f5; -fx-padding: 15; -fx-border-radius: 5; -fx-border-color: #ddd;">
+            <Label text="1. Upload Food Image" style="-fx-font-weight: bold; -fx-font-size: 16px;"/>
+
+            <ImageView fx:id="imageView" fitHeight="200" fitWidth="200" style="-fx-border-color: #ccc; -fx-border-width: 2; -fx-border-style: dashed;"/>
+
+            <Button fx:id="uploadButton" text="📸 Upload Image" onAction="#handleUploadImage" style="-fx-background-color: #4CAF50; -fx-text-fill: white;"/>
+
+            <ProgressIndicator fx:id="progressIndicator" visible="false"/>
+
+            <VBox spacing="5">
+                <Label fx:id="qualityLabel" text="Quality: --" style="-fx-font-size: 18px;"/>
+                <Label fx:id="confidenceLabel" text="Category: --"/>
+                <Label fx:id="hashLabel" text="Hash: --" style="-fx-font-family: monospace; -fx-font-size: 10px;"/>
+            </VBox>
+
+            <Separator/>
+
+            <Label text="2. Create Blockchain Batch" style="-fx-font-weight: bold; -fx-font-size: 16px;"/>
+
+            <TextField fx:id="batchNameField" promptText="Enter batch name (e.g., Summer_Apples_001)"/>
+
+            <Button fx:id="createBatchButton" text="🔄 Create Blockchain Record" onAction="#handleCreateBatch" disable="true" style="-fx-background-color: #2196F3; -fx-text-fill: white;"/>
+
+            <Button text="🔍 Validate Chain" onAction="#handleValidateChain" style="-fx-background-color: #FF9800; -fx-text-fill: white;"/>
         </VBox>
-    </center>
-</BorderPane>
+
+        <!-- Right Panel - Blockchain Display -->
+        <VBox spacing="10" VBox.vgrow="ALWAYS">
+            <Label text="📜 Live Blockchain" style="-fx-font-weight: bold; -fx-font-size: 16px;"/>
+            <TextArea fx:id="blockchainArea" editable="false" style="-fx-font-family: monospace; -fx-font-size: 12px;" VBox.vgrow="ALWAYS"/>
+        </VBox>
+    </HBox>
+
+    <!-- Status Bar -->
+    <HBox spacing="10" style="-fx-background-color: #e0e0e0; -fx-padding: 10;">
+        <Label text="Status:"/>
+        <Label text="✅ Ready" fx:id="statusLabel"/>
+        <Label text="| ML Service: http://localhost:8000" style="-fx-text-fill: #666;"/>
+    </HBox>
+</VBox>
