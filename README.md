@@ -12,24 +12,24 @@
 
 ## 📑 Table of Contents
 
-- [Background and Motivation](#-background-and-motivation)
-- [Key Features](#-key-features)
-- [Technologies and Dependencies](#-technologies-and-dependencies)
-- [System Architecture](#-system-architecture)
-- [Installation](#-installation)
-- [Usage](#-usage)
-- [Running Tests](#-running-tests)
-- [Core Components](#-core-components)
-- [API Endpoints](#-api-endpoints)
-- [Machine Learning Model](#-machine-learning-model)
-- [Blockchain Implementation](#-blockchain-implementation)
-- [Database Schema](#-database-schema)
-- [Deployment](#-deployment)
-- [Contributing](#-contributing)
-- [Code of Conduct](#-code-of-conduct)
-- [License](#-license)
-- [Maintainers and Contact](#-maintainers-and-contact)
-- [Acknowledgements](#-acknowledgements)
+- [Background and Motivation](#background-and-motivation)
+- [Key Features](#key-features)
+- [Technologies and Dependencies](#technologies-and-dependencies)
+- [System Architecture](#system-architecture)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Running Tests](#running-tests)
+- [Core Components](#core-components)
+- [API Endpoints](#api-endpoints)
+- [Machine Learning Model](#machine-learning-model)
+- [Blockchain Implementation](#blockchain-implementation)
+- [Database Schema](#database-schema)
+- [Deployment](#deployment)
+- [Contributing](#contributing)
+- [Code of Conduct](#code-of-conduct)
+- [License](#license)
+- [Maintainers and Contact](#maintainers-and-contact)
+- [Acknowledgements](#acknowledgements)
 
 ## 🌱 Background and Motivation
 
@@ -398,7 +398,7 @@ The test suite covers:
 │  └─────────────┘  └─────────────┘  └─────────────┘              │
 └─────────────────────────────────────────────────────────────────┘
 
-# 📋 Core Components
+## 📋 Core Components
 
 ## 🎛️ Dashboards
 
