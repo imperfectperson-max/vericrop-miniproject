@@ -1,57 +1,80 @@
 version: '3.8'
 
-# VeriCrop End-to-End Orchestration Stack
-# Includes: Kafka, Zookeeper, Airflow, ML Service, Java Services (vericrop-core, vericrop-gui)
-
-networks:
-  vericrop-network:
-    driver: bridge
-
-volumes:
-  postgres_data:
-  postgres_airflow_data:
-  kafka_data:
-  zookeeper_data:
-  ledger_data:
-
 services:
-  # ========================================
-  # Zookeeper - Kafka Coordination
-  # ========================================
-  zookeeper:
-    image: confluentinc/cp-zookeeper:7.4.0
-    container_name: vericrop-zookeeper
-    networks:
-      - vericrop-network
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-untitled}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
+      POSTGRES_DB: ${POSTGRES_DB:-untitled}
     ports:
-      - "2181:2181"
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # Airflow Services
+  postgres-airflow:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: ${AIRFLOW_DB_USER:-airflow}
+      POSTGRES_PASSWORD: ${AIRFLOW_DB_PASSWORD:-}
+      POSTGRES_DB: ${AIRFLOW_DB_NAME:-airflow}
+    volumes:
+      - postgres_airflow_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:latest
+
+  airflow-webserver:
+    image: apache/airflow:2.7.1
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${AIRFLOW_DB_USER}:${AIRFLOW_DB_PASSWORD}@postgres-airflow:5432/${AIRFLOW_DB_NAME}
+      - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=true
+      - AIRFLOW__CORE__LOAD_EXAMPLES=false
+      - AIRFLOW__WEBSERVER__EXPOSE_CONFIG=true
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./airflow/plugins:/opt/airflow/plugins
+    ports:
+      - "8080:8080"
+    command: webserver
+    depends_on:
+      - postgres-airflow
+    restart: always
+
+  airflow-scheduler:
+    image: apache/airflow:2.7.1
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${AIRFLOW_DB_USER}:${AIRFLOW_DB_PASSWORD}@postgres-airflow:5432/${AIRFLOW_DB_NAME}
+      - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=true
+      - AIRFLOW__CORE__LOAD_EXAMPLES=false
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./airflow/plugins:/opt/airflow/plugins
+    command: scheduler
+    depends_on:
+      - postgres-airflow
+    restart: always
+
+  # Kafka Services
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
-      ZOOKEEPER_LOG4J_ROOT_LOGLEVEL: WARN
-    volumes:
-      - zookeeper_data:/var/lib/zookeeper/data
-    healthcheck:
-      test: ["CMD", "nc", "-z", "localhost", "2181"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
+    ports:
+      - "2181:2181"
 
-  # ========================================
-  # Kafka Broker
-  # ========================================
   kafka:
-    image: confluentinc/cp-kafka:7.4.0
-    container_name: vericrop-kafka
-    networks:
-      - vericrop-network
+    image: confluentinc/cp-kafka:latest
+    depends_on:
+      - zookeeper
     ports:
       - "9092:9092"
-      - "29092:29092"
-    depends_on:
-      zookeeper:
-        condition: service_healthy
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
@@ -59,305 +82,14 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-      KAFKA_LOG4J_ROOT_LOGLEVEL: WARN
-    volumes:
-      - kafka_data:/var/lib/kafka/data
-    healthcheck:
-      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
-      interval: 10s
-      timeout: 10s
-      retries: 10
-      start_period: 40s
 
-  # ========================================
-  # Kafka Init - Create Required Topics
-  # ========================================
-  kafka-init:
-    image: confluentinc/cp-kafka:7.4.0
-    container_name: vericrop-kafka-init
-    networks:
-      - vericrop-network
-    depends_on:
-      kafka:
-        condition: service_healthy
-    entrypoint: ["/bin/sh", "-c"]
-    command: |
-      "
-      echo 'Creating Kafka topics...'
-      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic vericrop-input --partitions 3 --replication-factor 1
-      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic vericrop-output --partitions 3 --replication-factor 1
-      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic vericrop-events --partitions 3 --replication-factor 1
-      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic evaluation-requests --partitions 3 --replication-factor 1
-      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic evaluation-results --partitions 3 --replication-factor 1
-      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic shipment-records --partitions 3 --replication-factor 1
-      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic quality-alerts --partitions 3 --replication-factor 1
-      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic logistics-events --partitions 3 --replication-factor 1
-      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic blockchain-events --partitions 3 --replication-factor 1
-      echo 'Kafka topics created successfully!'
-      kafka-topics --bootstrap-server kafka:29092 --list
-      "
-
-  # ========================================
-  # Kafka UI - Monitoring
-  # ========================================
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
-    container_name: vericrop-kafka-ui
-    networks:
-      - vericrop-network
     ports:
       - "8081:8080"
-    depends_on:
-      kafka:
-        condition: service_healthy
-    environment:
-      KAFKA_CLUSTERS_0_NAME: vericrop-cluster
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
-      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
 
-  # ========================================
-  # VeriCrop GUI (Spring Boot REST API)
-  # ========================================
-  vericrop-gui:
-    build:
-      context: .
-      dockerfile: vericrop-gui/Dockerfile
-    container_name: vericrop-gui
-    networks:
-      - vericrop-network
-    ports:
-      - "8080:8080"
-    depends_on:
-      kafka:
-        condition: service_healthy
-      ml-service:
-        condition: service_healthy
-    environment:
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-      KAFKA_ENABLED: "true"
-      LEDGER_PATH: /app/ledger
-      ML_SERVICE_URL: http://ml-service:8000
-    volumes:
-      - ledger_data:/app/ledger
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
-    restart: unless-stopped
+volumes:
+  postgres_data:
+  postgres_airflow_data:
 
-  # ========================================
-  # ML Service (Python FastAPI)
-  # ========================================
-  ml-service:
-    build: ./docker/ml-service
-    container_name: vericrop-ml-service
-    networks:
-      - vericrop-network
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./docker/ml-service/model:/app/model:ro
-    environment:
-      PYTHONUNBUFFERED: "1"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
-    restart: unless-stopped
-
-  # ========================================
-  # PostgreSQL for Application Data
-  # ========================================
-  postgres:
-    image: postgres:15
-    container_name: vericrop-postgres
-    networks:
-      - vericrop-network
-    ports:
-      - "5432:5432"
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-vericrop}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vericrop123}
-      POSTGRES_DB: ${POSTGRES_DB:-vericrop}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vericrop}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # ========================================
-  # PostgreSQL for Airflow Metadata
-  # ========================================
-  postgres-airflow:
-    image: postgres:13
-    container_name: vericrop-postgres-airflow
-    networks:
-      - vericrop-network
-    environment:
-      POSTGRES_USER: airflow
-      POSTGRES_PASSWORD: airflow
-      POSTGRES_DB: airflow
-    volumes:
-      - postgres_airflow_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U airflow"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # ========================================
-  # Redis for Airflow Celery (Optional)
-  # ========================================
-  redis:
-    image: redis:7-alpine
-    container_name: vericrop-redis
-    networks:
-      - vericrop-network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # ========================================
-  # Airflow Init - Database Initialization
-  # ========================================
-  airflow-init:
-    build:
-      context: ./airflow
-      dockerfile: Dockerfile
-    container_name: vericrop-airflow-init
-    networks:
-      - vericrop-network
-    depends_on:
-      postgres-airflow:
-        condition: service_healthy
-    environment:
-      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres-airflow:5432/airflow
-      - AIRFLOW__CORE__LOAD_EXAMPLES=false
-      - _AIRFLOW_DB_MIGRATE=true
-      - _AIRFLOW_WWW_USER_CREATE=true
-      - _AIRFLOW_WWW_USER_USERNAME=admin
-      - _AIRFLOW_WWW_USER_PASSWORD=admin
-    volumes:
-      - ./airflow/dags:/opt/airflow/dags
-      - ./airflow/logs:/opt/airflow/logs
-      - ./airflow/plugins:/opt/airflow/plugins
-    entrypoint: /bin/bash
-    command:
-      - -c
-      - |
-        airflow db migrate
-        airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@vericrop.com || true
-        echo "Airflow database initialized successfully!"
-
-  # ========================================
-  # Airflow Webserver
-  # ========================================
-  airflow-webserver:
-    build:
-      context: ./airflow
-      dockerfile: Dockerfile
-    container_name: vericrop-airflow-webserver
-    networks:
-      - vericrop-network
-    ports:
-      - "8082:8080"
-    depends_on:
-      postgres-airflow:
-        condition: service_healthy
-      airflow-init:
-        condition: service_completed_successfully
-      kafka:
-        condition: service_healthy
-      vericrop-gui:
-        condition: service_healthy
-    environment:
-      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres-airflow:5432/airflow
-      - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=true
-      - AIRFLOW__CORE__LOAD_EXAMPLES=false
-      - AIRFLOW__WEBSERVER__EXPOSE_CONFIG=true
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
-      - VERICROP_API_URL=http://vericrop-gui:8080
-    volumes:
-      - ./airflow/dags:/opt/airflow/dags
-      - ./airflow/logs:/opt/airflow/logs
-      - ./airflow/plugins:/opt/airflow/plugins
-    command: webserver
-    healthcheck:
-      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
-    restart: always
-
-  # ========================================
-  # Airflow Scheduler
-  # ========================================
-  airflow-scheduler:
-    build:
-      context: ./airflow
-      dockerfile: Dockerfile
-    container_name: vericrop-airflow-scheduler
-    networks:
-      - vericrop-network
-    depends_on:
-      postgres-airflow:
-        condition: service_healthy
-      airflow-init:
-        condition: service_completed_successfully
-      kafka:
-        condition: service_healthy
-      vericrop-gui:
-        condition: service_healthy
-    environment:
-      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres-airflow:5432/airflow
-      - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=true
-      - AIRFLOW__CORE__LOAD_EXAMPLES=false
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
-      - VERICROP_API_URL=http://vericrop-gui:8080
-    volumes:
-      - ./airflow/dags:/opt/airflow/dags
-      - ./airflow/logs:/opt/airflow/logs
-      - ./airflow/plugins:/opt/airflow/plugins
-    command: scheduler
-    healthcheck:
-      test: ["CMD-SHELL", "airflow jobs check --job-type SchedulerJob --hostname \"$${HOSTNAME}\""]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
-    restart: always
-
-  # ========================================
-  # Mosquitto MQTT Broker (Optional)
-  # ========================================
-  mosquitto:
-    image: eclipse-mosquitto:2.0
-    container_name: vericrop-mosquitto
-    networks:
-      - vericrop-network
-    ports:
-      - "1883:1883"
-    restart: unless-stopped
+# NOTE: Database passwords and other sensitive values must be provided via environment variables or a separate secrets backend. See .env.sample for placeholders.
