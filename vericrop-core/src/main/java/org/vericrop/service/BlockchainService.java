@@ -1,127 +1,49 @@
 package org.vericrop.service;
 
-import org.vericrop.blockchain.Blockchain;
 import org.vericrop.blockchain.Block;
+import org.vericrop.blockchain.Blockchain;
 import org.vericrop.blockchain.Transaction;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class BlockchainService {
     private final Blockchain blockchain;
-    private final MLServiceClient mlClient;
+    private final ExecutorService executor;
 
-    public BlockchainService() {
-        this.blockchain = new Blockchain();
-        this.mlClient = new MLServiceClient();
+    public BlockchainService(Blockchain blockchain) {
+        this.blockchain = blockchain;
+        this.executor = Executors.newFixedThreadPool(2); // Dedicated thread pool for blockchain ops
     }
 
-    public Block addQualityCheck(String batchId, String participant,
-                                 MLServiceClient.MLPrediction prediction) {
-        if (batchId == null || batchId.trim().isEmpty()) {
-            throw new IllegalArgumentException("Batch ID cannot be null or empty");
-        }
-        if (participant == null || participant.trim().isEmpty()) {
-            throw new IllegalArgumentException("Participant cannot be null or empty");
-        }
-        if (prediction == null) {
-            throw new IllegalArgumentException("Prediction cannot be null");
-        }
-
-        List<Transaction> transactions = new ArrayList<>();
-
-        Transaction qualityTx = new Transaction(
-                "QUALITY_CHECK",
-                participant,
-                "blockchain",
-                batchId,
-                prediction.getReport()
-        );
-
-        if (!qualityTx.isValid()) {
-            throw new IllegalArgumentException("Invalid quality check transaction");
-        }
-
-        transactions.add(qualityTx);
-
-        return blockchain.addBlock(transactions, prediction.getData_hash(), participant);
+    public CompletableFuture<Block> addBlockAsync(List<Transaction> transactions, String dataHash, String participant) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                System.out.println("⛓️ Starting blockchain operation...");
+                Block newBlock = blockchain.addBlock(transactions, dataHash, participant);
+                System.out.println("✅ Blockchain operation completed - Block #" + newBlock.getIndex());
+                return newBlock;
+            } catch (Exception e) {
+                System.err.println("❌ Blockchain operation failed: " + e.getMessage());
+                throw new RuntimeException("Blockchain operation failed", e);
+            }
+        }, executor);
     }
 
-    public Block createBatch(String batchId, String farmerId, String initialData) {
-        if (batchId == null || batchId.trim().isEmpty()) {
-            throw new IllegalArgumentException("Batch ID cannot be null or empty");
-        }
-        if (farmerId == null || farmerId.trim().isEmpty()) {
-            throw new IllegalArgumentException("Farmer ID cannot be null or empty");
-        }
-
-        List<Transaction> transactions = new ArrayList<>();
-
-        Transaction createTx = new Transaction(
-                "CREATE_BATCH",
-                farmerId,
-                "blockchain",
-                batchId,
-                initialData != null ? initialData : "{}"
-        );
-
-        if (!createTx.isValid()) {
-            throw new IllegalArgumentException("Invalid create batch transaction");
-        }
-
-        transactions.add(createTx);
-
-        String dataHash = initialData != null ?
-                String.valueOf(initialData.hashCode()) : "empty_data";
-
-        return blockchain.addBlock(transactions, dataHash, farmerId);
+    public CompletableFuture<Boolean> validateChainAsync() {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                return blockchain.isChainValid();
+            } catch (Exception e) {
+                throw new RuntimeException("Chain validation failed", e);
+            }
+        }, executor);
     }
 
-    public Block transferBatch(String batchId, String from, String to, String transferData) {
-        if (batchId == null || batchId.trim().isEmpty()) {
-            throw new IllegalArgumentException("Batch ID cannot be null or empty");
+    public void shutdown() {
+        if (executor != null && !executor.isShutdown()) {
+            executor.shutdown();
         }
-        if (from == null || from.trim().isEmpty()) {
-            throw new IllegalArgumentException("From cannot be null or empty");
-        }
-        if (to == null || to.trim().isEmpty()) {
-            throw new IllegalArgumentException("To cannot be null or empty");
-        }
-
-        List<Transaction> transactions = new ArrayList<>();
-
-        Transaction transferTx = new Transaction(
-                "TRANSFER",
-                from,
-                to,
-                batchId,
-                transferData != null ? transferData : "{}"
-        );
-
-        if (!transferTx.isValid()) {
-            throw new IllegalArgumentException("Invalid transfer transaction");
-        }
-
-        transactions.add(transferTx);
-
-        String dataHash = transferData != null ?
-                String.valueOf(transferData.hashCode()) : "empty_transfer";
-
-        return blockchain.addBlock(transactions, dataHash, from);
-    }
-
-    public Blockchain getBlockchain() {
-        return blockchain;
-    }
-
-    public MLServiceClient getMlClient() {
-        return mlClient;
-    }
-
-    public boolean validateBlockchain() {
-        return blockchain.isChainValid();
-    }
-
-    public int getBlockCount() {
-        return blockchain.getBlockCount();
     }
 }

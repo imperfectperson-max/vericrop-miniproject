@@ -19,7 +19,20 @@ public class MainApp extends Application {
         this.primaryStage = primaryStage;
 
         try {
-            // Start with the producer screen
+            primaryStage.setTitle("VeriCrop - Supply Chain Management");
+
+            try {
+                URL iconUrl = getClass().getResource("/images/vericrop-icon.png");
+                if (iconUrl != null) {
+                    Image icon = new Image(iconUrl.toString());
+                    primaryStage.getIcons().add(icon);
+                } else {
+                    System.out.println("⚠️  Icon not found, continuing without icon");
+                }
+            } catch (Exception e) {
+                System.out.println("⚠️  Could not load icon: " + e.getMessage());
+            }
+
             showProducerScreen();
 
         } catch (Exception e) {
@@ -38,7 +51,6 @@ public class MainApp extends Application {
 
     public void switchToScreen(String fxmlFile) {
         try {
-            // Try multiple possible locations for FXML files
             URL fxmlUrl = getClass().getResource("/fxml/" + fxmlFile);
             if (fxmlUrl == null) {
                 fxmlUrl = getClass().getResource("fxml/" + fxmlFile);
@@ -53,10 +65,8 @@ public class MainApp extends Application {
             FXMLLoader loader = new FXMLLoader(fxmlUrl);
             Parent root = loader.load();
 
-            // Set up the scene with CSS
             Scene scene = new Scene(root, 1400, 900);
 
-            // Add CSS styling
             try {
                 URL cssUrl = getClass().getResource("/css/styles.css");
                 if (cssUrl == null) {
@@ -79,7 +89,6 @@ public class MainApp extends Application {
         } catch (Exception e) {
             System.err.println("Error switching to screen " + fxmlFile + ": " + e.getMessage());
             e.printStackTrace();
-            // Fallback to producer screen
             showProducerScreen();
         }
     }
@@ -111,7 +120,6 @@ public class MainApp extends Application {
     public static void main(String[] args) {
         System.out.println("=== DEBUG: Launching JavaFX ===");
         try {
-            // Set better exception handling for JavaFX
             Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> {
                 System.err.println("Uncaught exception in thread " + thread.getName() + ": " + throwable.getMessage());
                 throwable.printStackTrace();

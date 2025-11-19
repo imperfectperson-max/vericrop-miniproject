@@ -10,27 +10,27 @@ import java.util.Objects;
 public class ShipmentRecord {
     @JsonProperty("shipment_id")
     private String shipmentId;
-    
+
     @JsonProperty("batch_id")
     private String batchId;
-    
+
     @JsonProperty("from_party")
     private String fromParty;
-    
+
     @JsonProperty("to_party")
     private String toParty;
-    
+
     private String status;
-    
+
     @JsonProperty("quality_score")
     private double qualityScore;
-    
+
     @JsonProperty("ledger_id")
     private String ledgerId;
-    
+
     @JsonProperty("ledger_hash")
     private String ledgerHash;
-    
+
     private long timestamp;
 
     public ShipmentRecord() {

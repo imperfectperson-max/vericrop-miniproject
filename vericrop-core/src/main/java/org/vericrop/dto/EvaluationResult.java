@@ -12,22 +12,22 @@ import java.util.Objects;
 public class EvaluationResult {
     @JsonProperty("batch_id")
     private String batchId;
-    
+
     @JsonProperty("quality_score")
     private double qualityScore;
-    
+
     @JsonProperty("pass_fail")
     private String passFail;
-    
+
     private String prediction;
-    
+
     private double confidence;
-    
+
     @JsonProperty("data_hash")
     private String dataHash;
-    
+
     private Map<String, Object> metadata;
-    
+
     private long timestamp;
 
     public EvaluationResult() {

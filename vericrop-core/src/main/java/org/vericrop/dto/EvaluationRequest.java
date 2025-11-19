@@ -10,19 +10,19 @@ import java.util.Objects;
 public class EvaluationRequest {
     @JsonProperty("batch_id")
     private String batchId;
-    
+
     @JsonProperty("image_path")
     private String imagePath;
-    
+
     @JsonProperty("image_base64")
     private String imageBase64;
-    
+
     @JsonProperty("product_type")
     private String productType;
-    
+
     @JsonProperty("farmer_id")
     private String farmerId;
-    
+
     private long timestamp;
 
     public EvaluationRequest() {

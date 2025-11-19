@@ -1,31 +1,29 @@
 [ {
   "index" : 0,
-  "timestamp" : 1763467499891,
+  "timestamp" : 1763575277888,
   "previousHash" : "0",
   "transactions" : [ {
     "type" : "GENESIS",
     "from" : "system",
     "to" : "system",
     "batchId" : "0",
-    "data" : "{}",
-    "valid" : true
+    "data" : "{}"
   } ],
   "dataHash" : "genesis_hash",
   "participant" : "system",
-  "hash" : "f930705716e3ff8142e354a104248b3a68f3268e63674757542d661d03ba4aa8"
+  "hash" : "ab4085d1613053858faa2d94d5981f40dec1679de8be90451fd7328054b9cd60"
 }, {
   "index" : 1,
-  "timestamp" : 1763467584140,
-  "previousHash" : "f930705716e3ff8142e354a104248b3a68f3268e63674757542d661d03ba4aa8",
+  "timestamp" : 1763575323648,
+  "previousHash" : "ab4085d1613053858faa2d94d5981f40dec1679de8be90451fd7328054b9cd60",
   "transactions" : [ {
     "type" : "CREATE_BATCH",
-    "from" : "Austin",
+    "from" : "f1",
     "to" : "system",
-    "batchId" : "BATCH_1763467584_5337",
-    "data" : "{\"batch_name\":\"Cherry Bloosom\",\"product_type\":\"Cherry\",\"quantity\":9,\"farmer\":\"Austin\",\"quality_data\":{\"quality_score\":0.8640874028205872,\"label\":\"low_quality\",\"report\":\"{\\\"class_id\\\": 1, \\\"confidence\\\": 0.8640874028205872, \\\"model_accuracy\\\": \\\"99.06%\\\", \\\"prediction\\\": \\\"low_quality\\\", \\\"timestamp\\\": 1763467523, \\\"top_predictions\\\": {\\\"fresh\\\": 0.1289674937725067, \\\"low_quality\\\": 0.8640874028205872, \\\"rotten\\\": 0.00694503728300333}}\",\"data_hash\":\"534cad166152fe2c3a779cc4a0c1688f0bc19387d4e3484f0e01ee4b57b4b56a\",\"model_accuracy\":\"99.06%\",\"all_predictions\":{\"low_quality\":0.8640874028205872,\"fresh\":0.1289674937725067,\"rotten\":0.00694503728300333},\"class_id\":1}}",
-    "valid" : true
+    "batchId" : "BATCH_1763575323_3946",
+    "data" : "{\"batch_name\":\"Green_Valley\",\"product_type\":\"hh\",\"quantity\":11,\"farmer\":\"f1\",\"quality_data\":{\"quality_score\":0.7961191534996033,\"label\":\"fresh\",\"report\":\"{\\\"class_id\\\": 0, \\\"confidence\\\": 0.7961191534996033, \\\"model_accuracy\\\": \\\"99.06%\\\", \\\"prediction\\\": \\\"fresh\\\", \\\"timestamp\\\": 1763575297, \\\"top_predictions\\\": {\\\"fresh\\\": 0.7961191534996033, \\\"low_quality\\\": 0.20130838453769684, \\\"rotten\\\": 0.002572455210611224}}\",\"data_hash\":\"d6940c4399303cdf3ace24212deff8a756ec1bdef4231b61c7f9f3f6af1028c3\",\"model_accuracy\":\"99.06%\",\"all_predictions\":{\"fresh\":0.7961191534996033,\"low_quality\":0.20130838453769684,\"rotten\":0.002572455210611224},\"class_id\":0}}"
   } ],
-  "dataHash" : "534cad166152fe2c3a779cc4a0c1688f0bc19387d4e3484f0e01ee4b57b4b56a",
-  "participant" : "farmer",
-  "hash" : "b0ffbf2364b3e47d512de8fe90dcd9dacad8419a9d33d6e8af85fbff344624c3"
+  "dataHash" : "d6940c4399303cdf3ace24212deff8a756ec1bdef4231b61c7f9f3f6af1028c3",
+  "participant" : "f1",
+  "hash" : "d2b3b449762efabf8511009b0cb14b13c2d1ce623e5d6763523c2f6d6787c314"
 } ]

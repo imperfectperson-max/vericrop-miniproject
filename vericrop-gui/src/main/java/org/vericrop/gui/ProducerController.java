@@ -5,6 +5,11 @@ import javafx.scene.layout.VBox;
 import org.vericrop.blockchain.Block;
 import org.vericrop.blockchain.Blockchain;
 import org.vericrop.blockchain.Transaction;
+import org.vericrop.dto.EvaluationRequest;
+import org.vericrop.dto.EvaluationResult;
+import org.vericrop.dto.ShipmentRecord;
+import org.vericrop.service.BlockchainService;
+import org.vericrop.service.impl.FileLedgerService;
 import okhttp3.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import javafx.application.Platform;
@@ -19,6 +24,9 @@ import javafx.stage.FileChooser;
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 // Kafka imports
@@ -33,8 +41,11 @@ import org.vericrop.kafka.events.QualityAlertEvent;
 
 public class ProducerController {
     private Blockchain blockchain;
+    private BlockchainService blockchainService;
     private ObjectMapper mapper;
     private OkHttpClient httpClient;
+    private FileLedgerService ledgerService;
+    private ExecutorService backgroundExecutor;
 
     // Kafka components
     private KafkaServiceManager kafkaServiceManager;
@@ -86,7 +97,10 @@ public class ProducerController {
 
     public void initialize() {
         blockchain = new Blockchain();
+        blockchainService = new BlockchainService(blockchain);
+        backgroundExecutor = Executors.newFixedThreadPool(4);
         mapper = new ObjectMapper();
+        ledgerService = new FileLedgerService();
 
         // Initialize Kafka services first
         initializeKafkaServices();
@@ -96,6 +110,7 @@ public class ProducerController {
                 .connectTimeout(30, TimeUnit.SECONDS)
                 .readTimeout(30, TimeUnit.SECONDS)
                 .writeTimeout(30, TimeUnit.SECONDS)
+                .callTimeout(60, TimeUnit.SECONDS)
                 .build();
 
         // Apply modern styling
@@ -107,7 +122,6 @@ public class ProducerController {
         updateBlockchainDisplay();
         loadDashboardData();
 
-        // In initialize() method, after other initializations
         if (mainScrollPane != null) {
             mainScrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
             mainScrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
@@ -126,7 +140,6 @@ public class ProducerController {
     }
 
     private void setupNavigationButtons() {
-        // Add navigation buttons to the header if they exist
         if (analyticsButton != null) {
             analyticsButton.setOnAction(e -> handleShowAnalytics());
         }
@@ -140,18 +153,15 @@ public class ProducerController {
 
     private void initializeKafkaServices() {
         try {
-            // Initialize Kafka producers
             this.logisticsProducer = new LogisticsEventProducer();
             this.blockchainProducer = new BlockchainEventProducer();
             this.qualityAlertProducer = new QualityAlertProducer();
 
-            // Initialize and start Kafka consumers
             this.kafkaServiceManager = new KafkaServiceManager();
             kafkaServiceManager.startAllConsumers();
 
             System.out.println("✅ Kafka services initialized successfully");
 
-            // Enable Kafka-related buttons
             Platform.runLater(() -> {
                 if (simulateShipmentButton != null) {
                     simulateShipmentButton.setDisable(false);
@@ -164,17 +174,23 @@ public class ProducerController {
             });
 
         } catch (Exception e) {
-            System.err.println("❌ Failed to initialize Kafka services: " + e.getMessage());
-            // Disable Kafka buttons if initialization fails
+            System.err.println("⚠️ Kafka services unavailable: " + e.getMessage());
+            System.out.println("🔄 Continuing without Kafka functionality");
+
             Platform.runLater(() -> {
-                if (simulateShipmentButton != null) simulateShipmentButton.setDisable(true);
-                if (testAlertButton != null) testAlertButton.setDisable(true);
+                if (simulateShipmentButton != null) {
+                    simulateShipmentButton.setDisable(true);
+                    simulateShipmentButton.setTooltip(new Tooltip("Kafka broker not available"));
+                }
+                if (testAlertButton != null) {
+                    testAlertButton.setDisable(true);
+                    testAlertButton.setTooltip(new Tooltip("Kafka broker not available"));
+                }
             });
         }
     }
 
     private void applyModernStyling() {
-        // Add CSS classes for styling
         if (mainContainer != null) {
             mainContainer.getStyleClass().add("main-container");
         }
@@ -188,12 +204,241 @@ public class ProducerController {
             rightPanel.getStyleClass().add("right-panel");
         }
 
-        // Style buttons with CSS classes
         if (uploadButton != null) uploadButton.getStyleClass().add("primary-button");
         if (createBatchButton != null) createBatchButton.getStyleClass().add("success-button");
         if (simulateShipmentButton != null) simulateShipmentButton.getStyleClass().add("kafka-button");
         if (testAlertButton != null) testAlertButton.getStyleClass().add("kafka-button");
     }
+
+    // OPTIMIZED BATCH CREATION METHODS
+
+    @FXML
+    private void handleCreateBatch() {
+        if (currentPrediction == null || batchNameField.getText().isEmpty()) {
+            showError("Please upload an image and enter batch details first");
+            return;
+        }
+
+        if (!validateBatchInputs()) return;
+
+        Platform.runLater(() -> {
+            createBatchButton.setDisable(true);
+            progressIndicator.setVisible(true);
+            updateStatus("🔄 Creating batch...");
+        });
+
+        // Start async batch creation pipeline
+        CompletableFuture.supplyAsync(this::prepareBatchData, backgroundExecutor)
+                .thenCompose(this::sendBatchToBackend)
+                .thenCompose(this::processBlockchainOperations)
+                .thenCompose(this::sendKafkaEventsAsync)
+                .thenAcceptAsync(this::handleBatchSuccess, Platform::runLater)
+                .exceptionallyAsync(this::handleBatchError, Platform::runLater);
+    }
+
+    private Map<String, Object> prepareBatchData() {
+        String batchName = batchNameField.getText().trim();
+        String farmer = farmerField.getText().isEmpty() ? "Unknown Farmer" : farmerField.getText().trim();
+        String productType = productTypeField.getText().isEmpty() ? "Unknown Product" : productTypeField.getText().trim();
+        int quantity = parseQuantity();
+        String dataHash = safeGetString(currentPrediction, "data_hash");
+
+        Map<String, Object> batchData = new HashMap<>();
+        batchData.put("name", batchName);
+        batchData.put("farmer", farmer);
+        batchData.put("product_type", productType);
+        batchData.put("quantity", quantity);
+        batchData.put("quality_data", currentPrediction);
+        batchData.put("data_hash", dataHash);
+
+        return batchData;
+    }
+
+    private CompletableFuture<Map<String, Object>> sendBatchToBackend(Map<String, Object> batchData) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                Platform.runLater(() -> updateStatus("📡 Sending to backend..."));
+
+                String json = mapper.writeValueAsString(batchData);
+                RequestBody body = RequestBody.create(json, MediaType.parse("application/json"));
+                Request request = new Request.Builder()
+                        .url("http://localhost:8000/batches")
+                        .post(body)
+                        .build();
+
+                try (Response response = httpClient.newCall(request).execute()) {
+                    if (response.isSuccessful() && response.body() != null) {
+                        String responseBody = response.body().string();
+                        Map<String, Object> result = mapper.readValue(responseBody, Map.class);
+                        result.put("batch_data", batchData);
+                        return result;
+                    } else {
+                        throw new IOException("Backend error: " + response.code());
+                    }
+                }
+            } catch (Exception e) {
+                throw new RuntimeException("Backend communication failed", e);
+            }
+        }, backgroundExecutor);
+    }
+
+    private CompletableFuture<Map<String, Object>> processBlockchainOperations(Map<String, Object> result) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                Platform.runLater(() -> updateStatus("⛓️ Adding to blockchain..."));
+
+                Map<String, Object> batchData = (Map<String, Object>) result.get("batch_data");
+                String batchId = safeGetString(result, "batch_id");
+                if (batchId.isEmpty()) {
+                    batchId = "BATCH_" + System.currentTimeMillis();
+                }
+
+                // Prepare transaction
+                List<Transaction> transactions = createBlockchainTransactions(batchData, batchId);
+                String dataHash = (String) batchData.get("data_hash");
+                String farmer = (String) batchData.get("farmer");
+
+                // Add to blockchain asynchronously
+                Block newBlock = blockchainService.addBlockAsync(transactions, dataHash, farmer).join();
+                result.put("blockchain_block", newBlock);
+
+                // Create shipment record
+                createShipmentRecord(batchId, batchData);
+
+                return result;
+            } catch (Exception e) {
+                throw new RuntimeException("Blockchain operation failed", e);
+            }
+        }, backgroundExecutor);
+    }
+
+    private List<Transaction> createBlockchainTransactions(Map<String, Object> batchData, String batchId) {
+        List<Transaction> transactions = new ArrayList<>();
+        Map<String, Object> txData = new HashMap<>();
+
+        txData.put("batch_name", batchData.get("name"));
+        txData.put("farmer", batchData.get("farmer"));
+        txData.put("product_type", batchData.get("product_type"));
+        txData.put("quantity", batchData.get("quantity"));
+        txData.put("quality_data", batchData.get("quality_data"));
+
+        try {
+            transactions.add(new Transaction(
+                    "CREATE_BATCH",
+                    (String) batchData.get("farmer"),
+                    "system",
+                    batchId,
+                    mapper.writeValueAsString(txData)
+            ));
+        } catch (Exception e) {
+            throw new RuntimeException("Transaction creation failed", e);
+        }
+
+        return transactions;
+    }
+
+    private void createShipmentRecord(String batchId, Map<String, Object> batchData) {
+        try {
+            ShipmentRecord shipmentRecord = new ShipmentRecord();
+            shipmentRecord.setShipmentId("SHIP_" + System.currentTimeMillis());
+            shipmentRecord.setBatchId(batchId);
+            shipmentRecord.setFromParty((String) batchData.get("farmer"));
+            shipmentRecord.setToParty("Processing Center");
+            shipmentRecord.setStatus("CREATED");
+
+            Map<String, Object> qualityData = (Map<String, Object>) batchData.get("quality_data");
+            Object qualityScoreObj = qualityData.get("quality_score");
+            if (qualityScoreObj instanceof Number) {
+                shipmentRecord.setQualityScore(((Number) qualityScoreObj).doubleValue() * 100);
+            }
+
+            ShipmentRecord recorded = ledgerService.recordShipment(shipmentRecord);
+            System.out.println("📝 Recorded shipment in ledger: " + recorded.getLedgerId());
+
+        } catch (Exception e) {
+            System.err.println("❌ Failed to create shipment record: " + e.getMessage());
+        }
+    }
+
+    private CompletableFuture<Map<String, Object>> sendKafkaEventsAsync(Map<String, Object> result) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                Platform.runLater(() -> updateStatus("📨 Sending Kafka events..."));
+
+                Map<String, Object> batchData = (Map<String, Object>) result.get("batch_data");
+                Block newBlock = (Block) result.get("blockchain_block");
+                String batchId = safeGetString(result, "batch_id");
+                String batchName = (String) batchData.get("name");
+                String farmer = (String) batchData.get("farmer");
+                String productType = (String) batchData.get("product_type");
+                String dataHash = (String) batchData.get("data_hash");
+
+                sendKafkaEvents(batchId, batchName, farmer, productType, newBlock, dataHash);
+
+                return result;
+            } catch (Exception e) {
+                throw new RuntimeException("Kafka events failed", e);
+            }
+        }, backgroundExecutor);
+    }
+
+    private void handleBatchSuccess(Map<String, Object> result) {
+        String batchId = safeGetString(result, "batch_id");
+        String batchName = (String) ((Map<String, Object>) result.get("batch_data")).get("name");
+
+        updateBlockchainDisplay();
+        loadDashboardData();
+
+        showSuccess("Batch '" + batchName + "' created successfully!\nBatch ID: " + batchId);
+        resetForm();
+        updateStatus("✅ Batch created successfully!");
+
+        Platform.runLater(() -> {
+            progressIndicator.setVisible(false);
+            createBatchButton.setDisable(false);
+        });
+    }
+
+    private Void handleBatchError(Throwable throwable) {
+        System.err.println("❌ Batch creation failed: " + throwable.getMessage());
+
+        Platform.runLater(() -> {
+            showError("Error creating batch: " + throwable.getMessage());
+            updateStatus("❌ Batch creation failed");
+            progressIndicator.setVisible(false);
+            createBatchButton.setDisable(false);
+        });
+
+        return null;
+    }
+
+    private boolean validateBatchInputs() {
+        try {
+            String quantityText = quantityField.getText();
+            if (!quantityText.isEmpty()) {
+                int quantity = Integer.parseInt(quantityText);
+                if (quantity <= 0) {
+                    showError("Quantity must be a positive number");
+                    return false;
+                }
+            }
+            return true;
+        } catch (NumberFormatException e) {
+            showError("Please enter a valid number for quantity");
+            return false;
+        }
+    }
+
+    private int parseQuantity() {
+        try {
+            String quantityText = quantityField.getText();
+            return quantityText.isEmpty() ? 1 : Integer.parseInt(quantityText);
+        } catch (NumberFormatException e) {
+            return 1;
+        }
+    }
+
+    // REST OF THE METHODS (unchanged but included for completeness)
 
     private void loadDashboardData() {
         new Thread(() -> {
@@ -216,7 +461,6 @@ public class ProducerController {
                 }
             } catch (Exception e) {
                 System.err.println("Dashboard load error: " + e.getMessage());
-                // Set default values if dashboard fails
                 Platform.runLater(() -> {
                     if (totalBatchesLabel != null) {
                         totalBatchesLabel.setText("N/A");
@@ -239,7 +483,6 @@ public class ProducerController {
             Map<String, Object> distribution = (Map<String, Object>) dashboardData.get("quality_distribution");
             List<Map<String, Object>> recentBatches = (List<Map<String, Object>>) dashboardData.get("recent_batches");
 
-            // Update KPIs
             if (kpis != null) {
                 if (totalBatchesLabel != null)
                     totalBatchesLabel.setText(String.valueOf(kpis.getOrDefault("total_batches_today", "0")));
@@ -251,21 +494,17 @@ public class ProducerController {
                     rejectionRateLabel.setText(kpis.getOrDefault("rejection_rate", "0") + "%");
             }
 
-            // Update quality distribution chart
             if (qualityDistributionChart != null && distribution != null) {
                 ObservableList<PieChart.Data> pieChartData = FXCollections.observableArrayList(
                         new PieChart.Data("Prime", safeGetDouble(distribution, "prime")),
                         new PieChart.Data("Standard", safeGetDouble(distribution, "standard")),
                         new PieChart.Data("Sub-standard", safeGetDouble(distribution, "sub_standard"))
                 );
-
-                // Style the pie chart segments
                 qualityDistributionChart.setData(pieChartData);
                 qualityDistributionChart.setLegendVisible(false);
                 qualityDistributionChart.setStyle("-fx-font-size: 10px;");
             }
 
-            // Update recent batches list
             if (recentBatchesList != null && recentBatches != null) {
                 ObservableList<String> batches = FXCollections.observableArrayList();
                 for (Map<String, Object> batch : recentBatches) {
@@ -282,27 +521,6 @@ public class ProducerController {
         }
     }
 
-    private double safeGetDouble(Map<String, Object> map, String key) {
-        try {
-            Object value = map.get(key);
-            if (value instanceof Number) {
-                return ((Number) value).doubleValue();
-            }
-            return 0.0;
-        } catch (Exception e) {
-            return 0.0;
-        }
-    }
-
-    private String safeGetString(Map<String, Object> map, String key) {
-        try {
-            Object value = map.get(key);
-            return value != null ? value.toString() : "Unknown";
-        } catch (Exception e) {
-            return "Unknown";
-        }
-    }
-
     @FXML
     private void handleUploadImage() {
         FileChooser fileChooser = new FileChooser();
@@ -314,7 +532,6 @@ public class ProducerController {
         File file = fileChooser.showOpenDialog(null);
         if (file != null) {
             try {
-                // Validate file size (max 10MB)
                 if (file.length() > 10 * 1024 * 1024) {
                     showError("File too large. Maximum size is 10MB.");
                     return;
@@ -401,14 +618,12 @@ public class ProducerController {
                 qualityLabel.setText(String.format("Quality: %.1f%%", qualityScore * 100));
                 confidenceLabel.setText("Category: " + label.toUpperCase());
 
-                // Safe hash display with length check
                 if (dataHash != null && dataHash.length() >= 16) {
                     hashLabel.setText("Hash: " + dataHash.substring(0, 16) + "...");
                 } else {
                     hashLabel.setText("Hash: " + dataHash);
                 }
 
-                // Apply CSS classes based on quality
                 qualityLabel.getStyleClass().removeAll("quality-high", "quality-medium", "quality-low");
                 if (qualityScore > 0.8) {
                     qualityLabel.getStyleClass().add("quality-high");
@@ -421,104 +636,6 @@ public class ProducerController {
                 System.err.println("Error updating prediction UI: " + e.getMessage());
             }
         });
-    }
-
-    @FXML
-    private void handleCreateBatch() {
-        if (currentPrediction == null || batchNameField.getText().isEmpty()) {
-            showError("Please upload an image and enter batch details first");
-            return;
-        }
-
-        // Validate quantity field
-        int quantity;
-        try {
-            String quantityText = quantityField.getText();
-            if (quantityText.isEmpty()) {
-                quantity = 1;
-            } else {
-                quantity = Integer.parseInt(quantityText);
-                if (quantity <= 0) {
-                    showError("Quantity must be a positive number");
-                    return;
-                }
-            }
-        } catch (NumberFormatException e) {
-            showError("Please enter a valid number for quantity");
-            return;
-        }
-
-        try {
-            String batchName = batchNameField.getText().trim();
-            String farmer = farmerField.getText().isEmpty() ? "Unknown Farmer" : farmerField.getText().trim();
-            String productType = productTypeField.getText().isEmpty() ? "Unknown Product" : productTypeField.getText().trim();
-            String dataHash = safeGetString(currentPrediction, "data_hash");
-
-            // Send batch to backend
-            Map<String, Object> batchData = new HashMap<>();
-            batchData.put("name", batchName);
-            batchData.put("farmer", farmer);
-            batchData.put("product_type", productType);
-            batchData.put("quantity", quantity);
-            batchData.put("quality_data", currentPrediction);
-
-            String json = mapper.writeValueAsString(batchData);
-
-            RequestBody body = RequestBody.create(json, MediaType.parse("application/json"));
-            Request request = new Request.Builder()
-                    .url("http://localhost:8000/batches")
-                    .post(body)
-                    .build();
-
-            try (Response response = httpClient.newCall(request).execute()) {
-                if (response.isSuccessful() && response.body() != null) {
-                    String responseBody = response.body().string();
-                    Map<String, Object> result = mapper.readValue(responseBody, Map.class);
-
-                    // Add to blockchain
-                    List<Transaction> transactions = new ArrayList<>();
-                    Map<String, Object> txData = new HashMap<>();
-                    txData.put("batch_name", batchName);
-                    txData.put("farmer", farmer);
-                    txData.put("product_type", productType);
-                    txData.put("quantity", quantity);
-                    txData.put("quality_data", currentPrediction);
-
-                    String batchId = safeGetString(result, "batch_id");
-                    if (batchId.isEmpty()) {
-                        batchId = "BATCH_" + System.currentTimeMillis();
-                    }
-
-                    transactions.add(new Transaction(
-                            "CREATE_BATCH",
-                            farmer,
-                            "system",
-                            batchId,
-                            mapper.writeValueAsString(txData)
-                    ));
-
-                    Block newBlock = blockchain.addBlock(transactions, dataHash, "farmer");
-
-                    // Send Kafka events
-                    sendKafkaEvents(batchId, batchName, farmer, productType, newBlock, dataHash);
-
-                    String finalBatchId = batchId;
-                    Platform.runLater(() -> {
-                        updateBlockchainDisplay();
-                        loadDashboardData(); // Refresh dashboard
-                        showSuccess("Batch '" + batchName + "' created successfully!\nBatch ID: " + finalBatchId);
-                        resetForm();
-                        updateStatus("✅ Batch created successfully!");
-                    });
-                } else {
-                    throw new IOException("Failed to create batch: " + response.code() + " - " + response.body().string());
-                }
-            }
-
-        } catch (Exception e) {
-            showError("Error creating batch: " + e.getMessage());
-            updateStatus("❌ Batch creation failed");
-        }
     }
 
     // Navigation methods
@@ -555,22 +672,19 @@ public class ProducerController {
     private void sendKafkaEvents(String batchId, String batchName, String farmer,
                                  String productType, Block newBlock, String dataHash) {
         try {
-            // Send logistics event
             if (logisticsProducer != null) {
                 LogisticsEvent logisticsEvent = new LogisticsEvent(
                         batchId,
                         "CREATED",
-                        4.2,  // default temperature
-                        65.0, // default humidity
+                        4.2,
+                        65.0,
                         "Farm Location"
                 );
                 logisticsEvent.setRoute("Farm → Processing Center");
-                // Note: productType field not available in LogisticsEvent
                 logisticsProducer.sendLogisticsEvent(logisticsEvent);
                 System.out.println("📦 Logistics event sent for batch: " + batchId);
             }
 
-            // Send blockchain event
             if (blockchainProducer != null) {
                 BlockchainEvent blockchainEvent = new BlockchainEvent(
                         "CREATE_BATCH",
@@ -585,7 +699,6 @@ public class ProducerController {
                 System.out.println("⛓️ Blockchain event sent for batch: " + batchId);
             }
 
-            // Check if we should send quality alert
             Object qualityScoreObj = currentPrediction.get("quality_score");
             if (qualityScoreObj instanceof Number) {
                 double qualityScore = ((Number) qualityScoreObj).doubleValue();
@@ -617,12 +730,9 @@ public class ProducerController {
         }
 
         String batchId = "SIM_" + System.currentTimeMillis();
-        String productType = "Simulated Product";
-
         updateStatus("🔄 Simulating shipment events...");
 
         try {
-            // Simulate different shipment stages
             List<LogisticsEvent> events = Arrays.asList(
                     new LogisticsEvent(batchId, "IN_TRANSIT", 4.5, 68.0, "Highway A - Mile 50"),
                     new LogisticsEvent(batchId, "IN_TRANSIT", 4.8, 67.0, "Highway A - Mile 120"),
@@ -632,12 +742,9 @@ public class ProducerController {
                     new LogisticsEvent(batchId, "DELIVERED", 4.1, 63.0, "FreshMart Downtown - Received")
             );
 
-            // Add details to events
             events.get(0).setVehicleId("TRUCK_001");
             events.get(0).setDriverId("DRIVER_123");
-            // Note: productType field not available in LogisticsEvent
 
-            // Send events with delays to simulate real-time updates
             new Thread(() -> {
                 try {
                     for (int i = 0; i < events.size(); i++) {
@@ -645,13 +752,11 @@ public class ProducerController {
                         logisticsProducer.sendLogisticsEvent(event);
                         System.out.println("📦 Sent shipment update: " + event.getStatus() + " at " + event.getLocation());
 
-                        // Update status
                         final int progress = i + 1;
                         Platform.runLater(() -> {
                             updateStatus("📦 Shipment progress: " + progress + "/" + events.size() + " - " + event.getStatus());
                         });
 
-                        // Wait before sending next event
                         Thread.sleep(2000);
                     }
 
@@ -682,7 +787,6 @@ public class ProducerController {
         String batchId = "TEST_ALERT_" + System.currentTimeMillis();
 
         try {
-            // Test different types of alerts
             QualityAlertEvent tempAlert = new QualityAlertEvent(
                     batchId,
                     "TEMPERATURE_BREACH",
@@ -715,7 +819,6 @@ public class ProducerController {
             humidityAlert.setSensorId("HUMIDITY_SENSOR_002");
             humidityAlert.setLocation("Storage Room B");
 
-            // Send alerts
             qualityAlertProducer.sendQualityAlert(tempAlert);
             qualityAlertProducer.sendQualityAlert(qualityAlert);
             qualityAlertProducer.sendQualityAlert(humidityAlert);
@@ -756,9 +859,6 @@ public class ProducerController {
         });
     }
 
-    /**
-     * Safely get substring without causing StringIndexOutOfBoundsException
-     */
     private String safeSubstring(String str, int maxLength) {
         if (str == null) {
             return "null";
@@ -814,17 +914,17 @@ public class ProducerController {
 
     @FXML
     private void handleValidateChain() {
-        boolean isValid = blockchain.isChainValid();
-        Platform.runLater(() -> {
-            Alert alert = new Alert(isValid ? Alert.AlertType.INFORMATION : Alert.AlertType.ERROR);
-            alert.setTitle("Chain Validation");
-            alert.setHeaderText(null);
-            alert.setContentText(isValid ?
-                    "✅ Blockchain is valid and tamper-free!" :
-                    "❌ Blockchain has been tampered with!");
-            alert.showAndWait();
-            updateBlockchainDisplay();
-        });
+        CompletableFuture.supplyAsync(() -> blockchain.isChainValid(), backgroundExecutor)
+                .thenAcceptAsync(isValid -> {
+                    Alert alert = new Alert(isValid ? Alert.AlertType.INFORMATION : Alert.AlertType.ERROR);
+                    alert.setTitle("Chain Validation");
+                    alert.setHeaderText(null);
+                    alert.setContentText(isValid ?
+                            "✅ Blockchain is valid and tamper-free!" :
+                            "❌ Blockchain has been tampered with!");
+                    alert.showAndWait();
+                    updateBlockchainDisplay();
+                }, Platform::runLater);
     }
 
     @FXML
@@ -837,8 +937,34 @@ public class ProducerController {
         });
     }
 
-    // Cleanup method to be called when controller is destroyed
+    private double safeGetDouble(Map<String, Object> map, String key) {
+        try {
+            Object value = map.get(key);
+            if (value instanceof Number) {
+                return ((Number) value).doubleValue();
+            }
+            return 0.0;
+        } catch (Exception e) {
+            return 0.0;
+        }
+    }
+
+    private String safeGetString(Map<String, Object> map, String key) {
+        try {
+            Object value = map.get(key);
+            return value != null ? value.toString() : "Unknown";
+        } catch (Exception e) {
+            return "Unknown";
+        }
+    }
+
     public void cleanup() {
+        if (blockchainService != null) {
+            blockchainService.shutdown();
+        }
+        if (backgroundExecutor != null && !backgroundExecutor.isShutdown()) {
+            backgroundExecutor.shutdown();
+        }
         if (kafkaServiceManager != null) {
             kafkaServiceManager.stopAllConsumers();
         }
@@ -851,6 +977,6 @@ public class ProducerController {
         if (qualityAlertProducer != null) {
             qualityAlertProducer.close();
         }
-        System.out.println("🔴 Kafka services cleaned up");
+        System.out.println("🔴 All services cleaned up");
     }
 }

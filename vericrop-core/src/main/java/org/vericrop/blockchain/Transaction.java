@@ -1,9 +1,12 @@
 package org.vericrop.blockchain;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Objects;
 
+@JsonIgnoreProperties(ignoreUnknown = true) // Add this to ignore unknown fields
 public class Transaction {
     private final String type; // "CREATE_BATCH", "TRANSFER", "QUALITY_CHECK"
     private final String from;
@@ -31,7 +34,8 @@ public class Transaction {
         this.data = data != null ? data : "{}";
     }
 
-    // Validation method
+    // Validation method - mark as @JsonIgnore to prevent serialization
+    @JsonIgnore
     public boolean isValid() {
         if (type == null || type.trim().isEmpty() || from == null || from.trim().isEmpty()) {
             return false;

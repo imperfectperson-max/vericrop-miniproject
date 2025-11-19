@@ -1,6 +1,8 @@
 package org.vericrop.blockchain;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -8,9 +10,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+@JsonIgnoreProperties(ignoreUnknown = true) // Add this to ignore unknown fields
 public class Block {
     private final int index;
-    private final long timestamp; // Made final to ensure consistency
+    private final long timestamp;
     private final String previousHash;
     private final List<Transaction> transactions;
     private final String dataHash;
@@ -19,26 +22,28 @@ public class Block {
 
     @JsonCreator
     public Block(@JsonProperty("index") int index,
-                 @JsonProperty("timestamp") Long timestamp, // Added timestamp to JSON
+                 @JsonProperty("timestamp") Long timestamp,
                  @JsonProperty("previousHash") String previousHash,
                  @JsonProperty("transactions") List<Transaction> transactions,
                  @JsonProperty("dataHash") String dataHash,
-                 @JsonProperty("participant") String participant) {
+                 @JsonProperty("participant") String participant,
+                 @JsonProperty("hash") String hash) { // Added hash parameter
         this.index = index;
         this.timestamp = timestamp != null ? timestamp : System.currentTimeMillis();
         this.previousHash = previousHash != null ? previousHash : "0";
         this.transactions = transactions != null ? new ArrayList<>(transactions) : new ArrayList<>();
         this.dataHash = dataHash != null ? dataHash : "";
         this.participant = participant != null ? participant : "unknown";
-        this.hash = calculateHash(); // Calculate once during construction
+        this.hash = hash != null ? hash : calculateHash(); // Use provided hash or calculate
     }
 
     // Original constructor for backward compatibility
     public Block(int index, String previousHash, List<Transaction> transactions,
                  String dataHash, String participant) {
-        this(index, System.currentTimeMillis(), previousHash, transactions, dataHash, participant);
+        this(index, System.currentTimeMillis(), previousHash, transactions, dataHash, participant, null);
     }
 
+    @JsonIgnore // Mark as ignore to prevent circular reference in JSON
     public String calculateHash() {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
@@ -46,7 +51,7 @@ public class Block {
 
             // Build deterministic string for hashing - use stored timestamp
             input.append(index);
-            input.append(timestamp); // Use the stored timestamp, not current time
+            input.append(timestamp);
             input.append(previousHash);
             input.append(dataHash != null ? dataHash : "");
             input.append(participant != null ? participant : "");
@@ -86,10 +91,8 @@ public class Block {
     public String getDataHash() { return dataHash; }
     public String getParticipant() { return participant; }
 
-    // Only setter needed for deserialization - fixed logic
+    // Setter for deserialization
     public void setHash(String hash) {
-        // Store the hash directly during deserialization
-        // Validation will happen during chain validation
         this.hash = hash;
     }
 
