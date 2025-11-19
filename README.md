@@ -88,11 +88,99 @@ The project was developed as a comprehensive mini-project demonstrating the inte
 - onnxruntime
 - pytest (testing)
 
-## 🚀 Installation
+## 🚀 Quick Start with Docker Compose (Recommended)
+
+The easiest way to run the complete VeriCrop stack is using Docker Compose, which orchestrates all services:
 
 ### Prerequisites
 
-Before installing VeriCrop, ensure you have the following installed:
+- **Docker** (20.10+) and **Docker Compose** (2.0+)
+  ```bash
+  docker --version
+  docker-compose --version
+  ```
+
+- **Git** (for cloning the repository)
+  ```bash
+  git --version
+  ```
+
+### Launch the Complete Stack
+
+```bash
+# Clone the repository
+git clone https://github.com/imperfectperson-max/vericrop-miniproject.git
+cd vericrop-miniproject
+
+# Start all services
+docker-compose up --build
+
+# Or run in detached mode (background)
+docker-compose up --build -d
+```
+
+This will start:
+- ✅ **Zookeeper** - Kafka coordination (port 2181)
+- ✅ **Kafka** - Message broker (port 9092)
+- ✅ **Kafka UI** - Kafka monitoring (port 8081)
+- ✅ **VeriCrop GUI** - REST API (port 8080)
+- ✅ **ML Service** - Quality prediction (port 8000)
+- ✅ **PostgreSQL** - Application database (port 5432)
+- ✅ **Airflow** - Workflow orchestration (port 8082)
+  - Webserver UI
+  - Scheduler
+  - PostgreSQL metadata DB
+- ✅ **Redis** - Airflow backend
+- ✅ **Mosquitto** - MQTT broker (port 1883)
+
+### Verify the Stack
+
+Wait for all services to be healthy (2-3 minutes), then run the smoke test:
+
+```bash
+./scripts/smoke_test.sh
+```
+
+### Access the Services
+
+| Service | URL | Credentials |
+|---------|-----|-------------|
+| **VeriCrop API** | http://localhost:8080/api/health | - |
+| **Kafka UI** | http://localhost:8081 | - |
+| **Airflow UI** | http://localhost:8082 | admin / admin |
+| **ML Service** | http://localhost:8000/health | - |
+
+### Test the API
+
+```bash
+# Health check
+curl http://localhost:8080/api/health
+
+# Evaluate fruit quality
+curl -X POST http://localhost:8080/api/evaluate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "batch_id": "BATCH_001",
+    "product_type": "apple",
+    "farmer_id": "farmer_001"
+  }'
+```
+
+### Stop the Stack
+
+```bash
+# Stop all services
+docker-compose down
+
+# Stop and remove volumes (clean slate)
+docker-compose down -v
+```
+
+## 🚀 Installation
+
+### Prerequisites (for local development without Docker)
+
+Before installing VeriCrop locally, ensure you have the following installed:
 
 - **Java Development Kit (JDK) 17 or higher**
   ```bash
@@ -104,7 +192,7 @@ Before installing VeriCrop, ensure you have the following installed:
   python3 --version  # Should show version 3.11.x
   ```
 
-- **Docker and Docker Compose** (for ML service containerization)
+- **Docker and Docker Compose** (optional, for ML service only)
   ```bash
   docker --version
   docker-compose --version
@@ -306,16 +394,84 @@ curl http://localhost:8000/batches
 
 **📚 For comprehensive API documentation, examples, and Kafka integration guide, see [KAFKA_INTEGRATION.md](KAFKA_INTEGRATION.md)**
 
+### End-to-End Workflow with Airflow
+
+The VeriCrop platform includes an Airflow DAG that demonstrates the complete pipeline:
+
+1. **Access Airflow UI**: http://localhost:8082
+   - Login: `admin` / `admin`
+
+2. **Enable the DAG**: Find `vericrop_evaluation_pipeline` and toggle it on
+
+3. **Trigger the DAG**: Click the "play" button to manually trigger
+
+4. **Monitor Execution**:
+   - The DAG produces evaluation requests to Kafka
+   - Calls the VeriCrop REST API for quality evaluation
+   - Verifies ledger records
+   - Generates a pipeline summary
+
+5. **View Kafka Messages**: http://localhost:8081
+   - Monitor topics: `evaluation-requests`, `evaluation-results`, `shipment-records`
+
+#### Kafka Topics
+
+The platform uses the following Kafka topics:
+
+| Topic | Purpose | Producer | Consumer |
+|-------|---------|----------|----------|
+| `evaluation-requests` | Quality evaluation requests | Airflow DAG | VeriCrop GUI |
+| `evaluation-results` | Quality evaluation results | VeriCrop GUI | Analytics |
+| `shipment-records` | Ledger records | VeriCrop GUI | Analytics |
+| `quality-alerts` | Quality threshold alerts | VeriCrop GUI | Logistics |
+| `logistics-events` | Shipment tracking events | Logistics | Analytics |
+| `blockchain-events` | Blockchain transactions | VeriCrop GUI | Audit |
+
 ### Configuration
 
-The application can be configured via `vericrop-gui/src/main/resources/application.yml`:
+#### Docker Compose Configuration
+
+The application is configured via environment variables in `docker-compose.yml`. To customize:
+
+1. Copy `.env.example` to `.env`:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Edit `.env` with your settings:
+   ```bash
+   # PostgreSQL Configuration
+   POSTGRES_USER=vericrop
+   POSTGRES_PASSWORD=vericrop123
+   POSTGRES_DB=vericrop
+   
+   # Kafka Configuration
+   KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+   
+   # VeriCrop API Configuration
+   VERICROP_API_URL=http://vericrop-gui:8080
+   ML_SERVICE_URL=http://ml-service:8000
+   
+   # Quality Evaluation
+   QUALITY_PASS_THRESHOLD=0.7
+   ```
+
+3. Restart services:
+   ```bash
+   docker-compose down
+   docker-compose up -d
+   ```
+
+#### Local Development Configuration
+
+For local development without Docker, configure via `vericrop-gui/src/main/resources/application.yml`:
 
 ```yaml
 server:
   port: 8080  # REST API port
 
 kafka:
-  enabled: false  # Set to true when Kafka is available
+  enabled: true  # Set to true when Kafka is available
   
 spring:
   kafka:
@@ -327,9 +483,13 @@ ledger:
 quality:
   evaluation:
     pass-threshold: 0.7
+
+ml:
+  service:
+    url: http://localhost:8000
 ```
 
-**Note:** See [KAFKA_INTEGRATION.md](KAFKA_INTEGRATION.md) for detailed configuration options.
+**Note:** See [KAFKA_INTEGRATION.md](KAFKA_INTEGRATION.md) for detailed configuration options and advanced setup.
 
 ## 🧪 Running Tests
 

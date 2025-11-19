@@ -1,5 +1,5 @@
 server:
-  port: 8080
+  port: ${SERVER_PORT:8080}
   servlet:
     context-path: /
 
@@ -14,7 +14,7 @@ spring:
       max-request-size: 10MB
   
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}}
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
@@ -32,18 +32,23 @@ kafka:
     evaluation-request: evaluation-requests
     evaluation-result: evaluation-results
     shipment-record: shipment-records
-  enabled: false  # Set to true when Kafka is available
+  enabled: ${KAFKA_ENABLED:false}  # Set to true when Kafka is available
 
 # Ledger configuration
 ledger:
-  path: ledger
+  path: ${LEDGER_PATH:ledger}
   file: shipment_ledger.jsonl
 
 # Quality evaluation configuration
 quality:
   evaluation:
-    pass-threshold: 0.7
+    pass-threshold: ${QUALITY_PASS_THRESHOLD:0.7}
     evaluation-method: deterministic_stub
+
+# ML Service configuration
+ml:
+  service:
+    url: ${ML_SERVICE_URL:http://localhost:8000}
 
 # Logging configuration
 logging:
