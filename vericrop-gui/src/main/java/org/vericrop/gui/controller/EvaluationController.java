@@ -85,6 +85,9 @@ public class EvaluationController {
             // Publish result to Kafka
             kafkaProducer.sendEvaluationResult(result);
             
+            // Publish fruit quality event to Kafka (new integration point)
+            kafkaProducer.sendFruitQualityEvent(result);
+            
             // Record in ledger
             ShipmentRecord shipmentRecord = new ShipmentRecord();
             shipmentRecord.setShipmentId("SHIP_" + System.currentTimeMillis());
@@ -95,6 +98,14 @@ public class EvaluationController {
             shipmentRecord.setQualityScore(result.getQualityScore());
             
             ledgerService.recordShipment(shipmentRecord);
+            
+            // Publish supply chain event for quality check
+            Map<String, Object> qualityCheckEvent = new HashMap<>();
+            qualityCheckEvent.put("batch_id", result.getBatchId());
+            qualityCheckEvent.put("quality_score", result.getQualityScore());
+            qualityCheckEvent.put("timestamp", result.getTimestamp());
+            qualityCheckEvent.put("pass_fail", result.getPassFail());
+            kafkaProducer.sendSupplyChainEvent("QUALITY_CHECK", qualityCheckEvent);
             
             // Build response
             Map<String, Object> response = new HashMap<>();
@@ -140,6 +151,9 @@ public class EvaluationController {
             
             // Publish result to Kafka
             kafkaProducer.sendEvaluationResult(result);
+            
+            // Publish fruit quality event to Kafka (new integration point)
+            kafkaProducer.sendFruitQualityEvent(result);
             
             // Build response
             Map<String, Object> response = new HashMap<>();

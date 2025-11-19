@@ -1,0 +1,211 @@
+version: '3.8'
+
+services:
+  # Zookeeper for Kafka coordination
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: vericrop-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_LOG4J_ROOT_LOGLEVEL: WARN
+    ports:
+      - "2181:2181"
+    networks:
+      - vericrop-network
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "2181"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Kafka message broker
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: vericrop-kafka
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG4J_ROOT_LOGLEVEL: WARN
+    ports:
+      - "9092:9092"
+    networks:
+      - vericrop-network
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  # Kafka UI for monitoring
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: vericrop-kafka-ui
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      KAFKA_CLUSTERS_0_NAME: vericrop-cluster
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+    ports:
+      - "8090:8080"
+    networks:
+      - vericrop-network
+
+  # PostgreSQL database for Airflow
+  postgres-airflow:
+    image: postgres:13
+    container_name: vericrop-postgres-airflow
+    environment:
+      POSTGRES_USER: ${AIRFLOW_DB_USER:-airflow}
+      POSTGRES_PASSWORD: ${AIRFLOW_DB_PASSWORD:-airflow}
+      POSTGRES_DB: ${AIRFLOW_DB_NAME:-airflow}
+    volumes:
+      - postgres_airflow_data:/var/lib/postgresql/data
+    networks:
+      - vericrop-network
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Redis for Airflow Celery executor (optional, using LocalExecutor for simplicity)
+  redis:
+    image: redis:7-alpine
+    container_name: vericrop-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - vericrop-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Airflow webserver
+  airflow-webserver:
+    image: apache/airflow:2.7.1-python3.11
+    container_name: vericrop-airflow-webserver
+    depends_on:
+      postgres-airflow:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres-airflow:5432/airflow
+      - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=true
+      - AIRFLOW__CORE__LOAD_EXAMPLES=false
+      - AIRFLOW__WEBSERVER__EXPOSE_CONFIG=true
+      - KAFKA_BOOTSTRAP_SERVERS=${KAFKA_BOOTSTRAP_SERVERS:-kafka:29092}
+      - JAVA_SERVICE_URL=${JAVA_SERVICE_URL:-http://host.docker.internal:8080}
+      - _AIRFLOW_DB_UPGRADE=true
+      - _AIRFLOW_WWW_USER_CREATE=true
+      - _AIRFLOW_WWW_USER_USERNAME=${AIRFLOW_USERNAME:-admin}
+      - _AIRFLOW_WWW_USER_PASSWORD=${AIRFLOW_PASSWORD:-admin}
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./airflow/plugins:/opt/airflow/plugins
+      - airflow_data:/opt/airflow
+    ports:
+      - "8081:8080"
+    command: >
+      bash -c "
+      pip install kafka-python requests &&
+      airflow db init &&
+      airflow users create --username admin --firstname Admin --lastname User --role Admin --email admin@vericrop.com --password admin || true &&
+      airflow webserver
+      "
+    networks:
+      - vericrop-network
+    restart: always
+
+  # Airflow scheduler
+  airflow-scheduler:
+    image: apache/airflow:2.7.1-python3.11
+    container_name: vericrop-airflow-scheduler
+    depends_on:
+      postgres-airflow:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres-airflow:5432/airflow
+      - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=true
+      - AIRFLOW__CORE__LOAD_EXAMPLES=false
+      - KAFKA_BOOTSTRAP_SERVERS=${KAFKA_BOOTSTRAP_SERVERS:-kafka:29092}
+      - JAVA_SERVICE_URL=${JAVA_SERVICE_URL:-http://host.docker.internal:8080}
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./airflow/plugins:/opt/airflow/plugins
+      - airflow_data:/opt/airflow
+    command: >
+      bash -c "
+      pip install kafka-python requests &&
+      airflow scheduler
+      "
+    networks:
+      - vericrop-network
+    restart: always
+
+  # VeriCrop Java Service (optional - can run locally or in container)
+  # Uncomment to run Java service in Docker
+  # vericrop-java:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.java
+  #   container_name: vericrop-java-service
+  #   environment:
+  #     - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+  #     - KAFKA_ENABLED=true
+  #     - DATABASE_URL=jdbc:h2:mem:vericrop
+  #   ports:
+  #     - "8080:8080"
+  #   networks:
+  #     - vericrop-network
+  #   depends_on:
+  #     kafka:
+  #       condition: service_healthy
+
+  # ML Service (Python FastAPI)
+  ml-service:
+    build: ./docker/ml-service
+    container_name: vericrop-ml-service
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./docker/ml-service:/app
+    networks:
+      - vericrop-network
+    restart: on-failure
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+networks:
+  vericrop-network:
+    driver: bridge
+
+volumes:
+  postgres_airflow_data:
+  airflow_data:

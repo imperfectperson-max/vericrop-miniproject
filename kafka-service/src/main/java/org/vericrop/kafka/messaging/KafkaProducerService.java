@@ -24,6 +24,8 @@ public class KafkaProducerService {
     public static final String TOPIC_EVALUATION_REQUEST = "evaluation-requests";
     public static final String TOPIC_EVALUATION_RESULT = "evaluation-results";
     public static final String TOPIC_SHIPMENT_RECORD = "shipment-records";
+    public static final String TOPIC_FRUIT_QUALITY = KafkaConfig.TOPIC_FRUIT_QUALITY;
+    public static final String TOPIC_SUPPLYCHAIN_EVENTS = KafkaConfig.TOPIC_SUPPLYCHAIN_EVENTS;
     
     private final KafkaProducer<String, String> producer;
     private final ObjectMapper objectMapper;
@@ -202,6 +204,93 @@ public class KafkaProducerService {
         if (kafkaEnabled && producer != null) {
             producer.close();
             logger.info("Kafka producer closed");
+        }
+    }
+    
+    /**
+     * Send a fruit quality event to Kafka.
+     * This is triggered after quality assessment is complete.
+     * 
+     * @param result The evaluation result containing quality metrics
+     * @return true if message was sent successfully
+     */
+    public boolean sendFruitQualityEvent(EvaluationResult result) {
+        if (result == null) {
+            logger.error("Cannot send null fruit quality event");
+            return false;
+        }
+        
+        try {
+            String json = objectMapper.writeValueAsString(result);
+            
+            if (kafkaEnabled && producer != null) {
+                ProducerRecord<String, String> record = new ProducerRecord<>(
+                    TOPIC_FRUIT_QUALITY,
+                    result.getBatchId(),
+                    json
+                );
+                
+                Future<RecordMetadata> future = producer.send(record);
+                RecordMetadata metadata = future.get();
+                
+                logger.info("Sent fruit quality event for batch {} to topic {} partition {} offset {}",
+                    result.getBatchId(), metadata.topic(), metadata.partition(), metadata.offset());
+                    
+                return true;
+            } else {
+                // In-memory mode - just log
+                logger.info("In-memory mode: Would send fruit quality event for batch {} (score: {})", 
+                    result.getBatchId(), result.getQualityScore());
+                return true;
+            }
+            
+        } catch (Exception e) {
+            logger.error("Failed to send fruit quality event for batch {}: {}", 
+                result.getBatchId(), e.getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Send a supply chain event to Kafka.
+     * Used for tracking shipment status changes, transfers, deliveries, etc.
+     * 
+     * @param eventType The type of event (e.g., "TRANSFER", "DELIVERY", "QUALITY_CHECK")
+     * @param eventData The event data as a map
+     * @return true if message was sent successfully
+     */
+    public boolean sendSupplyChainEvent(String eventType, Object eventData) {
+        if (eventType == null || eventData == null) {
+            logger.error("Cannot send null supply chain event");
+            return false;
+        }
+        
+        try {
+            String json = objectMapper.writeValueAsString(eventData);
+            
+            if (kafkaEnabled && producer != null) {
+                ProducerRecord<String, String> record = new ProducerRecord<>(
+                    TOPIC_SUPPLYCHAIN_EVENTS,
+                    eventType,
+                    json
+                );
+                
+                Future<RecordMetadata> future = producer.send(record);
+                RecordMetadata metadata = future.get();
+                
+                logger.info("Sent supply chain event {} to topic {} partition {} offset {}",
+                    eventType, metadata.topic(), metadata.partition(), metadata.offset());
+                    
+                return true;
+            } else {
+                // In-memory mode - just log
+                logger.info("In-memory mode: Would send supply chain event {}", eventType);
+                return true;
+            }
+            
+        } catch (Exception e) {
+            logger.error("Failed to send supply chain event {}: {}", eventType, e.getMessage());
+            return false;
         }
     }
     
