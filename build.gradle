@@ -41,6 +41,7 @@ project(':vericrop-core') {
         implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.2'
         implementation 'org.slf4j:slf4j-api:2.0.7'
         implementation 'org.apache.kafka:kafka-clients:3.4.0'
+        implementation 'com.squareup.okhttp3:okhttp:4.11.0'
         testImplementation 'org.junit.jupiter:junit-jupiter-api:5.9.3'
         testImplementation 'org.junit.jupiter:junit-jupiter-engine:5.9.3'
     }
@@ -48,6 +49,14 @@ project(':vericrop-core') {
 
 project(':kafka-service') {
     apply plugin: 'org.springframework.boot'
+
+    // This is a library module, not an application, so disable bootJar
+    tasks.named('bootJar') {
+        enabled = false
+    }
+    tasks.named('jar') {
+        enabled = true
+    }
 
     dependencies {
         implementation 'org.springframework.boot:spring-boot-starter'
@@ -73,10 +82,6 @@ project(':vericrop-gui') {
     apply plugin: 'application'
     apply plugin: 'org.openjfx.javafxplugin'
 
-    // detect platform for JavaFX classifiers
-    def currentOs = org.gradle.internal.os.OperatingSystem.current()
-    def javafxPlatform = currentOs.isWindows() ? 'win' : (currentOs.isMacOsX() ? 'mac' : 'linux')
-
     javafx {
         version = '17.0.6'
         modules = [
@@ -89,13 +94,7 @@ project(':vericrop-gui') {
     dependencies {
         implementation project(':vericrop-core')
         implementation project(':ml-client')
-
-        // JavaFX platform-specific deps (note the classifier)
-        implementation "org.openjfx:javafx-controls:17.0.6:${javafxPlatform}"
-        implementation "org.openjfx:javafx-fxml:17.0.6:${javafxPlatform}"
-        implementation "org.openjfx:javafx-web:17.0.6:${javafxPlatform}"
-        implementation "org.openjfx:javafx-graphics:17.0.6:${javafxPlatform}"
-        implementation "org.openjfx:javafx-charts:17.0.6:${javafxPlatform}"
+        implementation project(':kafka-service')
 
         implementation 'com.squareup.okhttp3:okhttp:4.11.0'
         implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.2'

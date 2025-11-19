@@ -532,7 +532,7 @@ public class ProducerController {
                         "Farm Location"
                 );
                 logisticsEvent.setRoute("Farm → Processing Center");
-                logisticsEvent.setProductType(productType);
+                // Note: productType field not available in LogisticsEvent
                 logisticsProducer.sendLogisticsEvent(logisticsEvent);
                 System.out.println("📦 Logistics event sent for batch: " + batchId);
             }
@@ -602,10 +602,7 @@ public class ProducerController {
             // Add details to events
             events.get(0).setVehicleId("TRUCK_001");
             events.get(0).setDriverId("DRIVER_123");
-            events.get(0).setProductType(productType);
-
-            events.get(3).setProductType(productType);
-            events.get(5).setProductType(productType);
+            // Note: productType field not available in LogisticsEvent
 
             // Send events with delays to simulate real-time updates
             new Thread(() -> {

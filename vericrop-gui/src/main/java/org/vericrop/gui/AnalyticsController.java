@@ -79,14 +79,14 @@ public class AnalyticsController {
     @FXML
     private void handleGenerateReport() {
         System.out.println("Generating analytics report...");
-        showAlert(Alert.AlertType.INFORMATION, "Report Generated",
+        showAlert(javafx.scene.control.Alert.AlertType.INFORMATION, "Report Generated",
                 "Analytics report has been generated successfully.");
     }
 
     @FXML
     private void handleSetAlerts() {
         System.out.println("Opening alert configuration...");
-        showAlert(Alert.AlertType.INFORMATION, "Alert Settings",
+        showAlert(javafx.scene.control.Alert.AlertType.INFORMATION, "Alert Settings",
                 "Alert configuration panel would open here.");
     }
 
@@ -102,8 +102,8 @@ public class AnalyticsController {
         }
     }
 
-    private void showAlert(Alert.AlertType type, String title, String message) {
-        Alert alert = new Alert(type);
+    private void showAlert(javafx.scene.control.Alert.AlertType type, String title, String message) {
+        javafx.scene.control.Alert alert = new javafx.scene.control.Alert(type);
         alert.setTitle(title);
         alert.setHeaderText(null);
         alert.setContentText(message);
