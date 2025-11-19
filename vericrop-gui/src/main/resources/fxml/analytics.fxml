@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.chart.*?>
+<?import javafx.scene.text.*?>
+
+<VBox xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="org.vericrop.gui.AnalyticsController"
+      styleClass="main-container" spacing="20"
+      stylesheets="@../css/styles.css">
+
+    <padding>
+        <Insets top="20" right="20" bottom="20" left="20"/>
+    </padding>
+
+    <!-- Header -->
+    <HBox spacing="20" alignment="CENTER_LEFT">
+        <Label text="SUPPLY CHAIN ANALYTICS - METRO FRESH STORAGE" styleClass="title-label"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Label text="System Health: ✅ Optimal" styleClass="status-label" style="-fx-text-fill: #10b981; -fx-font-weight: bold;"/>
+        <Button text="Generate Report" styleClass="primary-button" onAction="#handleGenerateReport"/>
+        <Button text="Set Alerts" styleClass="warning-button" onAction="#handleSetAlerts"/>
+    </HBox>
+
+    <!-- Navigation Tabs -->
+    <TabPane styleClass="tab-pane">
+        <tabs>
+            <Tab text="Real-time">
+                <ScrollPane styleClass="scroll-pane" fitToWidth="true">
+                    <VBox spacing="20">
+                        <!-- KPI Overview -->
+                        <VBox spacing="15">
+                            <Label text="KPI Overview" styleClass="subtitle-label"/>
+                            <HBox spacing="15" styleClass="kpi-container">
+                                <VBox styleClass="kpi-card" spacing="5" alignment="CENTER" prefWidth="200">
+                                    <Label fx:id="totalBatchesLabel" text="1,247" styleClass="kpi-label"/>
+                                    <Label text="Total Batches" styleClass="kpi-title"/>
+                                </VBox>
+                                <VBox styleClass="kpi-card" spacing="5" alignment="CENTER" prefWidth="200">
+                                    <Label fx:id="avgQualityLabel" text="87% ↑2%" styleClass="kpi-label" style="-fx-text-fill: #10b981;"/>
+                                    <Label text="Avg Quality" styleClass="kpi-title"/>
+                                </VBox>
+                                <VBox styleClass="kpi-card" spacing="5" alignment="CENTER" prefWidth="200">
+                                    <Label fx:id="spoilageRateLabel" text="2% ↓1%" styleClass="kpi-label" style="-fx-text-fill: #ef4444;"/>
+                                    <Label text="Spoilage Rate" styleClass="kpi-title"/>
+                                </VBox>
+                                <VBox styleClass="kpi-card" spacing="5" alignment="CENTER" prefWidth="200">
+                                    <Label fx:id="onTimeDeliveryLabel" text="96%" styleClass="kpi-label" style="-fx-text-fill: #10b981;"/>
+                                    <Label text="On-Time Delivery" styleClass="kpi-title"/>
+                                </VBox>
+                            </HBox>
+                        </VBox>
+
+                        <!-- Charts Row -->
+                        <HBox spacing="20">
+                            <!-- Quality Trend -->
+                            <VBox styleClass="dashboard-card" spacing="10" prefWidth="400">
+                                <Label text="Quality Trend (30 Days)" styleClass="subtitle-label"/>
+                                <LineChart fx:id="qualityTrendChart" prefHeight="250">
+                                    <xAxis>
+                                        <CategoryAxis label="Date" />
+                                    </xAxis>
+                                    <yAxis>
+                                        <NumberAxis label="Quality %" lowerBound="0" upperBound="100" tickUnit="20"/>
+                                    </yAxis>
+                                </LineChart>
+                            </VBox>
+
+                            <!-- Supplier Performance -->
+                            <VBox styleClass="dashboard-card" spacing="10" prefWidth="400">
+                                <Label text="Supplier Performance" styleClass="subtitle-label"/>
+                                <TableView fx:id="supplierTable" prefHeight="250">
+                                    <columns>
+                                        <TableColumn text="Supplier" prefWidth="120"/>
+                                        <TableColumn text="Quality" prefWidth="80"/>
+                                        <TableColumn text="Spoilage" prefWidth="80"/>
+                                    </columns>
+                                </TableView>
+                            </VBox>
+                        </HBox>
+
+                        <!-- Second Charts Row -->
+                        <HBox spacing="20">
+                            <!-- Temperature Compliance -->
+                            <VBox styleClass="dashboard-card" spacing="10" prefWidth="400">
+                                <Label text="Temperature Compliance" styleClass="subtitle-label"/>
+                                <PieChart fx:id="temperatureComplianceChart" prefHeight="200"/>
+                            </VBox>
+
+                            <!-- Recent Alerts -->
+                            <VBox styleClass="dashboard-card" spacing="10" prefWidth="400">
+                                <Label text="Recent Alerts" styleClass="subtitle-label"/>
+                                <TableView fx:id="alertsTable" prefHeight="200">
+                                    <columns>
+                                        <TableColumn text="Date" prefWidth="80"/>
+                                        <TableColumn text="Alert Type" prefWidth="120"/>
+                                        <TableColumn text="Details" prefWidth="200"/>
+                                    </columns>
+                                </TableView>
+                            </VBox>
+                        </HBox>
+                    </VBox>
+                </ScrollPane>
+            </Tab>
+
+            <Tab text="Daily">
+                <VBox spacing="15">
+                    <Label text="Daily Reports and Summaries" styleClass="subtitle-label"/>
+                    <!-- Daily report content would go here -->
+                </VBox>
+            </Tab>
+
+            <Tab text="Weekly">
+                <VBox spacing="15">
+                    <Label text="Weekly Analytics and Trends" styleClass="subtitle-label"/>
+                    <!-- Weekly report content would go here -->
+                </VBox>
+            </Tab>
+
+            <Tab text="Export Reports">
+                <VBox spacing="15">
+                    <HBox spacing="10">
+                        <ComboBox fx:id="exportTypeCombo" promptText="Select Report Type" prefWidth="200"/>
+                        <DatePicker fx:id="exportStartDate" promptText="Start Date"/>
+                        <DatePicker fx:id="exportEndDate" promptText="End Date"/>
+                        <ComboBox fx:id="formatCombo" promptText="Format" prefWidth="100"/>
+                        <Button text="Export" styleClass="success-button" onAction="#handleExportData"/>
+                    </HBox>
+                    <TextArea fx:id="exportPreview" styleClass="text-area" VBox.vgrow="ALWAYS"/>
+                </VBox>
+            </Tab>
+        </tabs>
+    </TabPane>
+
+</VBox>

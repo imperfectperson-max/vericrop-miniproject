@@ -1,0 +1,31 @@
+[ {
+  "index" : 0,
+  "timestamp" : 1763467499891,
+  "previousHash" : "0",
+  "transactions" : [ {
+    "type" : "GENESIS",
+    "from" : "system",
+    "to" : "system",
+    "batchId" : "0",
+    "data" : "{}",
+    "valid" : true
+  } ],
+  "dataHash" : "genesis_hash",
+  "participant" : "system",
+  "hash" : "f930705716e3ff8142e354a104248b3a68f3268e63674757542d661d03ba4aa8"
+}, {
+  "index" : 1,
+  "timestamp" : 1763467584140,
+  "previousHash" : "f930705716e3ff8142e354a104248b3a68f3268e63674757542d661d03ba4aa8",
+  "transactions" : [ {
+    "type" : "CREATE_BATCH",
+    "from" : "Austin",
+    "to" : "system",
+    "batchId" : "BATCH_1763467584_5337",
+    "data" : "{\"batch_name\":\"Cherry Bloosom\",\"product_type\":\"Cherry\",\"quantity\":9,\"farmer\":\"Austin\",\"quality_data\":{\"quality_score\":0.8640874028205872,\"label\":\"low_quality\",\"report\":\"{\\\"class_id\\\": 1, \\\"confidence\\\": 0.8640874028205872, \\\"model_accuracy\\\": \\\"99.06%\\\", \\\"prediction\\\": \\\"low_quality\\\", \\\"timestamp\\\": 1763467523, \\\"top_predictions\\\": {\\\"fresh\\\": 0.1289674937725067, \\\"low_quality\\\": 0.8640874028205872, \\\"rotten\\\": 0.00694503728300333}}\",\"data_hash\":\"534cad166152fe2c3a779cc4a0c1688f0bc19387d4e3484f0e01ee4b57b4b56a\",\"model_accuracy\":\"99.06%\",\"all_predictions\":{\"low_quality\":0.8640874028205872,\"fresh\":0.1289674937725067,\"rotten\":0.00694503728300333},\"class_id\":1}}",
+    "valid" : true
+  } ],
+  "dataHash" : "534cad166152fe2c3a779cc4a0c1688f0bc19387d4e3484f0e01ee4b57b4b56a",
+  "participant" : "farmer",
+  "hash" : "b0ffbf2364b3e47d512de8fe90dcd9dacad8419a9d33d6e8af85fbff344624c3"
+} ]

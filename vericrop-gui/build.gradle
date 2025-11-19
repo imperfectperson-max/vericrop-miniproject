@@ -5,30 +5,44 @@ plugins {
 }
 
 group = 'org.vericrop'
-version = '0.1.0'
-sourceCompatibility = '17'
-targetCompatibility = '17'
+version = '1.0.0'
 
 repositories {
     mavenCentral()
 }
 
+// detect platform for JavaFX classifiers
+def currentOs = org.gradle.internal.os.OperatingSystem.current()
+def javafxPlatform = currentOs.isWindows() ? 'win' : (currentOs.isMacOsX() ? 'mac' : 'linux')
+
+javafx {
+    version = '17.0.6'
+    modules = [ 'javafx.controls', 'javafx.fxml', 'javafx.web', 'javafx.graphics']
+}
+
 dependencies {
     implementation project(':vericrop-core')
+    implementation project(':ml-client')
+
+    implementation "org.openjfx:javafx-controls:17.0.6:${javafxPlatform}"
+    implementation "org.openjfx:javafx-fxml:17.0.6:${javafxPlatform}"
+    implementation "org.openjfx:javafx-web:17.0.6:${javafxPlatform}"
+    implementation "org.openjfx:javafx-graphics:17.0.6:${javafxPlatform}"
+    implementation "org.openjfx:javafx-charts:17.0.6:${javafxPlatform}"
+
     implementation 'com.squareup.okhttp3:okhttp:4.11.0'
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.2'
+    implementation 'org.slf4j:slf4j-api:2.0.7'
+    implementation 'ch.qos.logback:logback-classic:1.4.8'
+
     testImplementation 'org.junit.jupiter:junit-jupiter:5.9.3'
 }
 
 application {
-    mainClass = 'org.untitled.gui.Main'
-}
-
-javafx {
-    version = "20"
-    modules = [ 'javafx.controls', 'javafx.fxml' ]
-}
-
-test {
-    useJUnitPlatform()
+    mainClass = 'org.vericrop.gui.MainApp'
+    applicationDefaultJvmArgs = [
+            '--add-opens=javafx.controls/javafx.scene.control=ALL-UNNAMED',
+            '--add-opens=javafx.graphics/javafx.scene=ALL-UNNAMED',
+            '--add-modules=javafx.controls,javafx.fxml,javafx.web,javafx.graphics,javafx.charts'
+    ]
 }

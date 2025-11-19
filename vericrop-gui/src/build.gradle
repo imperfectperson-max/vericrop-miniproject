@@ -1,0 +1,30 @@
+plugins {
+    id 'java'
+    id 'application'
+    id 'org.openjfx.javafxplugin' version '0.0.13'
+}
+
+group = 'org.vericrop'
+version = '1.0.0'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation project(':vericrop-core')
+}
+
+javafx {
+    version = "17.0.6"
+    modules = [
+            'javafx.controls',
+            'javafx.fxml',
+            'javafx.web',
+            'javafx.graphics'
+    ]
+}
+
+application {
+    mainClass = "org.vericrop.gui.MainApp"
+}

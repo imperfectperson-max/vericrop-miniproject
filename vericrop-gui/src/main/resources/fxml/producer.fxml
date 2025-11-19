@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.chart.PieChart?>
+<?import javafx.scene.chart.BarChart?>
+<?import javafx.scene.chart.CategoryAxis?>
+<?import javafx.scene.chart.NumberAxis?>
+
+<?import javafx.scene.shape.Circle?>
+<ScrollPane fx:id="mainScrollPane" fitToWidth="true" style="-fx-background-color: transparent; -fx-border-color: transparent;" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="org.vericrop.gui.ProducerController">
+    <content>
+        <VBox fx:id="mainContainer" spacing="20" style="-fx-background-color: linear-gradient(to bottom, #f8f9fa, #e9ecef);">
+            <padding><Insets top="20" right="20" bottom="20" left="20"/></padding>
+
+            <!-- Header -->
+            <HBox spacing="15" alignment="CENTER_LEFT">
+                <HBox spacing="10" alignment="CENTER">
+                    <Circle radius="25" fill="linear-gradient(to right, #2E8B57, #3CB371)"/>
+                    <VBox spacing="2">
+                        <Label text="VeriCrop" style="-fx-font-size: 28px; -fx-font-weight: bold; -fx-text-fill: #2E8B57;"/>
+                        <Label text="Farm Management Dashboard" style="-fx-font-size: 14px; -fx-text-fill: #666;"/>
+                    </VBox>
+                </HBox>
+                <Region HBox.hgrow="ALWAYS"/>
+                <Label text="🌱 Smart Farming • 🔗 Blockchain • 🤖 AI Powered" style="-fx-text-fill: #666; -fx-font-size: 12px; -fx-font-style: italic;"/>
+            </HBox>
+
+            <!-- Dashboard KPIs - Modern Cards -->
+            <HBox fx:id="kpiContainer" spacing="15" alignment="CENTER">
+                <VBox spacing="8" style="-fx-background-color: white; -fx-padding: 15; -fx-background-radius: 10; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 10, 0, 0, 2); -fx-pref-width: 140;">
+                    <Label text="📦 Total Batches" style="-fx-font-weight: bold; -fx-font-size: 12px; -fx-text-fill: #555;"/>
+                    <Label fx:id="totalBatchesLabel" text="0" style="-fx-font-size: 24px; -fx-text-fill: #2E8B57; -fx-font-weight: bold; -fx-alignment: center;"/>
+                    <Label text="Today" style="-fx-font-size: 10px; -fx-text-fill: #888; -fx-alignment: center;"/>
+                </VBox>
+                <VBox spacing="8" style="-fx-background-color: white; -fx-padding: 15; -fx-background-radius: 10; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 10, 0, 0, 2); -fx-pref-width: 140;">
+                    <Label text="⭐ Avg Quality" style="-fx-font-weight: bold; -fx-font-size: 12px; -fx-text-fill: #555;"/>
+                    <Label fx:id="avgQualityLabel" text="0%" style="-fx-font-size: 24px; -fx-text-fill: #FFA500; -fx-font-weight: bold; -fx-alignment: center;"/>
+                    <Label text="Overall" style="-fx-font-size: 10px; -fx-text-fill: #888; -fx-alignment: center;"/>
+                </VBox>
+                <VBox spacing="8" style="-fx-background-color: white; -fx-padding: 15; -fx-background-radius: 10; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 10, 0, 0, 2); -fx-pref-width: 140;">
+                    <Label text="👑 Prime %" style="-fx-font-weight: bold; -fx-font-size: 12px; -fx-text-fill: #555;"/>
+                    <Label fx:id="primePercentageLabel" text="0%" style="-fx-font-size: 24px; -fx-text-fill: #2196F3; -fx-font-weight: bold; -fx-alignment: center;"/>
+                    <Label text="Premium" style="-fx-font-size: 10px; -fx-text-fill: #888; -fx-alignment: center;"/>
+                </VBox>
+                <VBox spacing="8" style="-fx-background-color: white; -fx-padding: 15; -fx-background-radius: 10; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 10, 0, 0, 2); -fx-pref-width: 140;">
+                    <Label text="❌ Rejection Rate" style="-fx-font-weight: bold; -fx-font-size: 12px; -fx-text-fill: #555;"/>
+                    <Label fx:id="rejectionRateLabel" text="0%" style="-fx-font-size: 24px; -fx-text-fill: #d32f2f; -fx-font-weight: bold; -fx-alignment: center;"/>
+                    <Label text="To improve" style="-fx-font-size: 10px; -fx-text-fill: #888; -fx-alignment: center;"/>
+                </VBox>
+            </HBox>
+
+            <!-- Main Content Area -->
+            <HBox spacing="20" VBox.vgrow="ALWAYS">
+                <!-- Left Panel - Image Upload & Batch Creation -->
+                <VBox fx:id="leftPanel" spacing="15" style="-fx-background-color: white; -fx-padding: 20; -fx-background-radius: 15; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 15, 0, 0, 3); -fx-pref-width: 380;">
+                    <Label text="🌾 Batch Creation" style="-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #2E8B57; -fx-padding: 0 0 10 0;"/>
+
+                    <!-- Image Upload Section -->
+                    <VBox spacing="10">
+                        <Label text="📸 1. Upload Food Image" style="-fx-font-weight: bold; -fx-font-size: 14px; -fx-text-fill: #555;"/>
+                        <ImageView fx:id="imageView" fitHeight="180" fitWidth="180"
+                                   style="-fx-border-color: #e0e0e0; -fx-border-width: 2; -fx-border-radius: 10; -fx-background-color: #fafafa;"
+                                   preserveRatio="true"/>
+                        <Button fx:id="uploadButton" text="📁 Select Image" onAction="#handleUploadImage"
+                                style="-fx-background-color: linear-gradient(to right, #4CAF50, #45a049); -fx-text-fill: white; -fx-font-weight: bold; -fx-pref-width: 180; -fx-background-radius: 8; -fx-padding: 8;"/>
+                        <ProgressIndicator fx:id="progressIndicator" visible="false" prefWidth="30" prefHeight="30"/>
+                    </VBox>
+
+                    <!-- Quality Results -->
+                    <VBox spacing="8" style="-fx-padding: 15; -fx-background-color: #f8f9fa; -fx-background-radius: 10; -fx-border-color: #e9ecef; -fx-border-radius: 10;">
+                        <Label text="🔍 Analysis Results" style="-fx-font-weight: bold; -fx-font-size: 14px; -fx-text-fill: #555;"/>
+                        <Label fx:id="qualityLabel" text="Quality: --" style="-fx-font-size: 16px; -fx-font-weight: bold;"/>
+                        <Label fx:id="confidenceLabel" text="Category: --" style="-fx-font-size: 12px; -fx-text-fill: #666;"/>
+                        <Label fx:id="hashLabel" text="Hash: --" style="-fx-font-family: 'Monaco', 'Consolas', monospace; -fx-font-size: 10px; -fx-text-fill: #888;"/>
+                    </VBox>
+
+                    <!-- Batch Details -->
+                    <VBox spacing="12">
+                        <Label text="📋 2. Batch Details" style="-fx-font-weight: bold; -fx-font-size: 14px; -fx-text-fill: #555;"/>
+                        <TextField fx:id="batchNameField" promptText="Batch Name*" style="-fx-background-radius: 8; -fx-pref-width: 340; -fx-padding: 8;"/>
+                        <TextField fx:id="farmerField" promptText="Farmer Name" style="-fx-background-radius: 8; -fx-pref-width: 340; -fx-padding: 8;"/>
+                        <TextField fx:id="productTypeField" promptText="Product Type" style="-fx-background-radius: 8; -fx-pref-width: 340; -fx-padding: 8;"/>
+                        <TextField fx:id="quantityField" promptText="Quantity" style="-fx-background-radius: 8; -fx-pref-width: 340; -fx-padding: 8;"/>
+                    </VBox>
+
+                    <!-- Action Buttons -->
+                    <VBox spacing="10" style="-fx-padding: 10 0 0 0;">
+                        <Button fx:id="createBatchButton" text="🔄 Create Blockchain Record"
+                                onAction="#handleCreateBatch" disable="true"
+                                style="-fx-background-color: linear-gradient(to right, #2196F3, #1976D2); -fx-text-fill: white; -fx-font-weight: bold; -fx-pref-width: 340; -fx-background-radius: 8; -fx-padding: 10;"/>
+                        <HBox spacing="10">
+                            <Button text="🔍 Validate Chain" onAction="#handleValidateChain"
+                                    style="-fx-background-color: linear-gradient(to right, #FF9800, #F57C00); -fx-text-fill: white; -fx-font-weight: bold; -fx-pref-width: 165; -fx-background-radius: 8; -fx-padding: 8;"/>
+                            <Button text="🔄 Refresh" onAction="#handleRefreshDashboard"
+                                    style="-fx-background-color: linear-gradient(to right, #9C27B0, #7B1FA2); -fx-text-fill: white; -fx-font-weight: bold; -fx-pref-width: 165; -fx-background-radius: 8; -fx-padding: 8;"/>
+                        </HBox>
+                    </VBox>
+                </VBox>
+
+                <!-- Right Panel - Charts & Blockchain -->
+                <VBox fx:id="rightPanel" spacing="15" VBox.vgrow="ALWAYS">
+                    <!-- Top: Charts -->
+                    <HBox spacing="15" VBox.vgrow="ALWAYS">
+                        <!-- Quality Distribution -->
+                        <VBox spacing="8" style="-fx-background-color: white; -fx-padding: 15; -fx-background-radius: 15; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 10, 0, 0, 2); -fx-pref-width: 280;">
+                            <Label text="📊 Quality Distribution" style="-fx-font-weight: bold; -fx-font-size: 14px; -fx-text-fill: #555;"/>
+                            <PieChart fx:id="qualityDistributionChart" prefHeight="200" legendVisible="false"/>
+                        </VBox>
+
+                        <!-- Recent Batches -->
+                        <VBox spacing="8" style="-fx-background-color: white; -fx-padding: 15; -fx-background-radius: 15; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 10, 0, 0, 2);" VBox.vgrow="ALWAYS">
+                            <Label text="📋 Recent Batches" style="-fx-font-weight: bold; -fx-font-size: 14px; -fx-text-fill: #555;"/>
+                            <ListView fx:id="recentBatchesList" prefHeight="200" style="-fx-font-size: 11px; -fx-background-radius: 8; -fx-border-radius: 8;"/>
+                        </VBox>
+                    </HBox>
+
+                    <!-- Blockchain Display -->
+                    <VBox spacing="8" style="-fx-background-color: white; -fx-padding: 15; -fx-background-radius: 15; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 10, 0, 0, 2);" VBox.vgrow="ALWAYS">
+                        <HBox spacing="10" alignment="CENTER_LEFT">
+                            <Label text="⛓️ Live Blockchain" style="-fx-font-weight: bold; -fx-font-size: 14px; -fx-text-fill: #555;"/>
+                            <Region HBox.hgrow="ALWAYS"/>
+                            <Label text="🔒 Immutable • 📝 Transparent" style="-fx-font-size: 10px; -fx-text-fill: #888; -fx-font-style: italic;"/>
+                        </HBox>
+                        <TextArea fx:id="blockchainArea" editable="false"
+                                  style="-fx-font-family: 'Monaco', 'Consolas', monospace; -fx-font-size: 10px; -fx-background-radius: 8; -fx-border-radius: 8;"
+                                  VBox.vgrow="ALWAYS"/>
+                    </VBox>
+                </VBox>
+            </HBox>
+
+            <!-- Status Bar -->
+            <HBox spacing="12" style="-fx-background-color: white; -fx-padding: 12; -fx-background-radius: 10; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.05), 5, 0, 0, 1);">
+                <Label text="Status:" style="-fx-font-weight: bold; -fx-text-fill: #555;"/>
+                <Label text="✅ Ready" fx:id="statusLabel" style="-fx-text-fill: #2E8B57; -fx-font-weight: bold;"/>
+                <Region HBox.hgrow="ALWAYS"/>
+                <Label text="🤖 ML Service: http://localhost:8000" style="-fx-text-fill: #666; -fx-font-size: 11px;"/>
+                <Label text="🔗 Blockchain: Active" style="-fx-text-fill: #666; -fx-font-size: 11px;"/>
+                <Label text="🌐 Online" style="-fx-text-fill: #4CAF50; -fx-font-size: 11px; -fx-font-weight: bold;"/>
+            </HBox>
+        </VBox>
+    </content>
+</ScrollPane>

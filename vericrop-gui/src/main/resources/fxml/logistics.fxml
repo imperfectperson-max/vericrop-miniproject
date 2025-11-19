@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.chart.*?>
+<?import javafx.scene.text.*?>
+<?import javafx.scene.image.ImageView?>
+
+<VBox xmlns="http://javafx.com/javafx/11.0.1" xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="org.vericrop.gui.LogisticsController"
+      styleClass="main-container" spacing="20"
+      stylesheets="@../css/styles.css">
+
+    <padding>
+        <Insets top="20" right="20" bottom="20" left="20"/>
+    </padding>
+
+    <!-- Header -->
+    <HBox spacing="20" alignment="CENTER_LEFT">
+        <Label text="LOGISTICS MONITORING - BATCH A2386" styleClass="title-label"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Button text="Refresh" styleClass="primary-button" onAction="#handleRefresh"/>
+        <Button text="Export Report" styleClass="success-button" onAction="#handleExportReport"/>
+    </HBox>
+
+    <!-- Navigation Tabs -->
+    <TabPane styleClass="tab-pane">
+        <tabs>
+            <Tab text="Dashboard">
+                <VBox spacing="15">
+                    <!-- Batch Info Card -->
+                    <HBox styleClass="dashboard-card" spacing="20">
+                        <VBox spacing="8">
+                            <Label text="Farm: Sunny Valley → Warehouse: Metro Fresh (ETA: 17:30)" styleClass="subtitle-label"/>
+                            <HBox spacing="20" alignment="CENTER_LEFT">
+                                <Label text="Status: IN TRANSIT" styleClass="status-label" style="-fx-text-fill: #f59e0b; -fx-font-weight: bold;"/>
+                                <Label text="Temperature: 4.2°C ✅" styleClass="status-label" style="-fx-text-fill: #10b981;"/>
+                                <Label text="Humidity: 65% ✅" styleClass="status-label" style="-fx-text-fill: #10b981;"/>
+                            </HBox>
+                        </VBox>
+                    </HBox>
+
+                    <!-- Main Content -->
+                    <HBox spacing="20">
+                        <!-- Left Column -->
+                        <VBox spacing="15" styleClass="left-panel" prefWidth="400">
+                            <Label text="🗺️ Route Map" styleClass="subtitle-label"/>
+                            <Pane styleClass="map-container" prefHeight="200">
+                                <Label text="Interactive Map View\n(Real-time GPS Tracking)"
+                                       style="-fx-text-alignment: center; -fx-text-fill: #64748b;"/>
+                            </Pane>
+
+                            <Label text="Timeline" styleClass="subtitle-label"/>
+                            <VBox styleClass="timeline-container" spacing="10">
+                                <HBox styleClass="timeline-item" spacing="10" alignment="CENTER_LEFT">
+                                    <Label text="●" style="-fx-text-fill: #10b981; -fx-font-weight: bold;"/>
+                                    <VBox>
+                                        <Label text="Created" style="-fx-font-weight: bold;"/>
+                                        <Label text="14:30 - Batch created at Sunny Valley"/>
+                                    </VBox>
+                                </HBox>
+                                <HBox styleClass="timeline-item" spacing="10" alignment="CENTER_LEFT">
+                                    <Label text="●" style="-fx-text-fill: #3b82f6; -fx-font-weight: bold;"/>
+                                    <VBox>
+                                        <Label text="In Transit" style="-fx-font-weight: bold;"/>
+                                        <Label text="15:45 - Currently on Highway A"/>
+                                    </VBox>
+                                </HBox>
+                                <HBox styleClass="timeline-item" spacing="10" alignment="CENTER_LEFT">
+                                    <Label text="○" style="-fx-text-fill: #64748b;"/>
+                                    <VBox>
+                                        <Label text="At Warehouse" style="-fx-text-fill: #64748b;"/>
+                                        <Label text="ETA: 17:30 - Metro Fresh Storage"/>
+                                    </VBox>
+                                </HBox>
+                            </VBox>
+                        </VBox>
+
+                        <!-- Right Column -->
+                        <VBox spacing="15" styleClass="right-panel" VBox.vgrow="ALWAYS">
+                            <Label text="📊 Environmental Data" styleClass="subtitle-label"/>
+
+                            <!-- Temperature Chart -->
+                            <VBox spacing="10">
+                                <Label text="Temperature History"/>
+                                <LineChart fx:id="temperatureChart" prefHeight="150">
+                                    <xAxis>
+                                        <CategoryAxis label="Time" />
+                                    </xAxis>
+                                    <yAxis>
+                                        <NumberAxis label="°C" lowerBound="0" upperBound="10" tickUnit="2"/>
+                                    </yAxis>
+                                </LineChart>
+                            </VBox>
+
+                            <!-- Alerts Panel -->
+                            <VBox styleClass="alert-panel success" spacing="8">
+                                <Label text="🚨 Alerts Panel" style="-fx-font-weight: bold;"/>
+                                <Label text="✓ No active alerts"/>
+                                <Label text="✓ Last 24h: 0 temperature breaches"/>
+                            </VBox>
+
+                            <!-- Quality Tracking -->
+                            <HBox spacing="15" alignment="CENTER_LEFT">
+                                <Label text="📋 Quality Tracking:" styleClass="status-label"/>
+                                <Label text="Prime (82%) → Current: Stable"
+                                       style="-fx-text-fill: #10b981; -fx-font-weight: bold;"/>
+                            </HBox>
+                        </VBox>
+                    </HBox>
+                </VBox>
+            </Tab>
+
+            <Tab text="Active Shipments">
+                <VBox spacing="15">
+                    <TableView fx:id="shipmentsTable" styleClass="table-view" VBox.vgrow="ALWAYS">
+                        <columns>
+                            <TableColumn text="Batch ID" prefWidth="120"/>
+                            <TableColumn text="Status" prefWidth="100"/>
+                            <TableColumn text="Current Location" prefWidth="200"/>
+                            <TableColumn text="Temperature" prefWidth="80"/>
+                            <TableColumn text="Humidity" prefWidth="80"/>
+                            <TableColumn text="ETA" prefWidth="120"/>
+                            <TableColumn text="Vehicle" prefWidth="100"/>
+                        </columns>
+                    </TableView>
+                </VBox>
+            </Tab>
+
+            <Tab text="Alerts">
+                <VBox spacing="15">
+                    <ListView fx:id="alertsList" styleClass="modern-list" VBox.vgrow="ALWAYS"/>
+                    <HBox spacing="10">
+                        <Button text="Acknowledge All" styleClass="primary-button" onAction="#handleAcknowledgeAlerts"/>
+                        <Button text="Simulate Alert" styleClass="warning-button" onAction="#handleSimulateAlert"/>
+                    </HBox>
+                </VBox>
+            </Tab>
+
+            <Tab text="Reports">
+                <VBox spacing="15">
+                    <HBox spacing="10">
+                        <ComboBox fx:id="reportTypeCombo" promptText="Select Report Type"/>
+                        <DatePicker fx:id="startDatePicker" promptText="Start Date"/>
+                        <DatePicker fx:id="endDatePicker" promptText="End Date"/>
+                        <Button text="Generate Report" styleClass="primary-button" onAction="#handleGenerateReport"/>
+                    </HBox>
+                    <TextArea fx:id="reportArea" styleClass="text-area" VBox.vgrow="ALWAYS"/>
+                </VBox>
+            </Tab>
+        </tabs>
+    </TabPane>
+
+</VBox>

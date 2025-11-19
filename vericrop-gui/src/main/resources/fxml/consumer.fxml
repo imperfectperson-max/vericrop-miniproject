@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.*?>
+
+<VBox xmlns="http://javafx.com/javafx/11.0.1" xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="org.vericrop.gui.ConsumerController"
+      styleClass="main-container" spacing="20"
+      stylesheets="@../css/styles.css">
+
+    <padding>
+        <Insets top="20" right="20" bottom="20" left="20"/>
+    </padding>
+
+    <!-- Header -->
+    <HBox spacing="20" alignment="CENTER_LEFT">
+        <Label text="VERICROP - PRODUCT VERIFICATION" styleClass="title-label"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Button text="Scan QR" styleClass="primary-button" onAction="#handleScanQR"/>
+        <Button text="Verify Another" styleClass="success-button" onAction="#handleVerifyAnother"/>
+    </HBox>
+
+    <!-- Navigation Tabs -->
+    <TabPane styleClass="tab-pane">
+        <tabs>
+            <Tab text="Scan QR">
+                <VBox spacing="20" alignment="CENTER">
+                    <VBox styleClass="verification-card" spacing="15" alignment="CENTER" prefWidth="500">
+                        <Label text="✅ VERIFIED: Genuine Product" styleClass="verification-success"/>
+                        <Label text="🍎 Summer Apples - A2386" styleClass="subtitle-label"/>
+
+                        <!-- QR Scanner Placeholder -->
+                        <Pane style="-fx-background-color: #f1f5f9; -fx-border-radius: 8; -fx-pref-height: 200; -fx-pref-width: 200;"
+                              alignment="CENTER">
+                            <Label text="QR Scanner\nPlaceholder"
+                                   style="-fx-text-alignment: center; -fx-text-fill: #64748b;"/>
+                        </Pane>
+
+                        <TextArea promptText="Or enter Batch ID manually..."
+                                  styleClass="text-field" prefWidth="300"/>
+                        <Button text="Verify Product" styleClass="success-button" onAction="#handleVerifyProduct"/>
+                    </VBox>
+                </VBox>
+            </Tab>
+
+            <Tab text="Enter Batch ID">
+                <VBox spacing="20" alignment="CENTER">
+                    <VBox styleClass="dashboard-card" spacing="15" alignment="CENTER" prefWidth="400">
+                        <Label text="Manual Verification" styleClass="subtitle-label"/>
+                        <TextField fx:id="batchIdField" promptText="Enter Batch ID" styleClass="text-field" prefWidth="300"/>
+                        <Button text="Verify" styleClass="primary-button" onAction="#handleManualVerify" defaultButton="true"/>
+                    </VBox>
+                </VBox>
+            </Tab>
+
+            <Tab text="Verification History">
+                <VBox spacing="15">
+                    <ListView fx:id="verificationHistoryList" styleClass="modern-list" VBox.vgrow="ALWAYS"/>
+                    <HBox spacing="10">
+                        <Button text="Clear History" styleClass="primary-button" onAction="#handleClearHistory"/>
+                        <Button text="Export History" styleClass="success-button" onAction="#handleExportHistory"/>
+                    </HBox>
+                </VBox>
+            </Tab>
+        </tabs>
+    </TabPane>
+
+    <!-- Product Journey -->
+    <VBox styleClass="dashboard-card" spacing="15">
+        <Label text="📋 Product Journey" styleClass="subtitle-label"/>
+        <VBox style="-fx-border-color: #e2e8f0; -fx-border-radius: 8; -fx-padding: 15; -fx-spacing: 12;">
+            <HBox spacing="15" alignment="CENTER_LEFT">
+                <Label text="✅" style="-fx-font-size: 16;"/>
+                <VBox>
+                    <Label text="MAR 07, 14:30 - Harvested at Sunny Valley Orchards" style="-fx-font-weight: bold;"/>
+                    <Label text="Quality: PRIME (82%) | Certified Organic" style="-fx-text-fill: #64748b;"/>
+                </VBox>
+            </HBox>
+            <HBox spacing="15" alignment="CENTER_LEFT">
+                <Label text="✅" style="-fx-font-size: 16;"/>
+                <VBox>
+                    <Label text="MAR 07, 15:45 - Shipped via GlobalLog Transport" style="-fx-font-weight: bold;"/>
+                    <Label text="Avg Temp: 4.2°C | Perfect Transport Conditions" style="-fx-text-fill: #64748b;"/>
+                </VBox>
+            </HBox>
+            <HBox spacing="15" alignment="CENTER_LEFT">
+                <Label text="✅" style="-fx-font-size: 16;"/>
+                <VBox>
+                    <Label text="MAR 07, 17:30 - Received at Metro Fresh Storage" style="-fx-font-weight: bold;"/>
+                    <Label text="Spoilage Risk: LOW (8%) | Stored in Cell 4B" style="-fx-text-fill: #64748b;"/>
+                </VBox>
+            </HBox>
+            <HBox spacing="15" alignment="CENTER_LEFT">
+                <Label text="✅" style="-fx-font-size: 16;"/>
+                <VBox>
+                    <Label text="MAR 08, 09:15 - Delivered to FreshMart Downtown" style="-fx-font-weight: bold;"/>
+                    <Label text="Shelf Life: 12 days remaining" style="-fx-text-fill: #64748b;"/>
+                </VBox>
+            </HBox>
+        </VBox>
+    </VBox>
+
+    <!-- Quality Metrics -->
+    <VBox styleClass="dashboard-card" spacing="15">
+        <Label text="🎯 Quality Metrics" styleClass="subtitle-label"/>
+        <HBox spacing="20" alignment="CENTER">
+            <VBox styleClass="metric-card" spacing="5" alignment="CENTER" prefWidth="120">
+                <Label text="92%" styleClass="metric-value" style="-fx-text-fill: #10b981;"/>
+                <Label text="Color Consistency" styleClass="metric-label"/>
+            </VBox>
+            <VBox styleClass="metric-card" spacing="5" alignment="CENTER" prefWidth="120">
+                <Label text="87%" styleClass="metric-value" style="-fx-text-fill: #3b82f6;"/>
+                <Label text="Size Uniformity" styleClass="metric-label"/>
+            </VBox>
+            <VBox styleClass="metric-card" spacing="5" alignment="CENTER" prefWidth="120">
+                <Label text="3%" styleClass="metric-value" style="-fx-text-fill: #f59e0b;"/>
+                <Label text="Defect Density" styleClass="metric-label"/>
+            </VBox>
+        </HBox>
+    </VBox>
+
+    <!-- Action Buttons -->
+    <HBox spacing="15" alignment="CENTER">
+        <Button text="📱 Share Verification" styleClass="primary-button" onAction="#handleShareVerification"/>
+        <Button text="🔄 Verify Another Product" styleClass="success-button" onAction="#handleVerifyAnother"/>
+    </HBox>
+
+</VBox>

@@ -1,58 +1,114 @@
 package org.vericrop.blockchain;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 public class Block {
-    private int index;
-    private long timestamp;
-    private String previousHash;
+    private final int index;
+    private final long timestamp; // Made final to ensure consistency
+    private final String previousHash;
+    private final List<Transaction> transactions;
+    private final String dataHash;
+    private final String participant;
     private String hash;
-    private List<Transaction> transactions;
-    private String dataHash; // Hash of ML report data
-    private String participant; // "farmer", "transporter", "warehouse"
 
+    @JsonCreator
+    public Block(@JsonProperty("index") int index,
+                 @JsonProperty("timestamp") Long timestamp, // Added timestamp to JSON
+                 @JsonProperty("previousHash") String previousHash,
+                 @JsonProperty("transactions") List<Transaction> transactions,
+                 @JsonProperty("dataHash") String dataHash,
+                 @JsonProperty("participant") String participant) {
+        this.index = index;
+        this.timestamp = timestamp != null ? timestamp : System.currentTimeMillis();
+        this.previousHash = previousHash != null ? previousHash : "0";
+        this.transactions = transactions != null ? new ArrayList<>(transactions) : new ArrayList<>();
+        this.dataHash = dataHash != null ? dataHash : "";
+        this.participant = participant != null ? participant : "unknown";
+        this.hash = calculateHash(); // Calculate once during construction
+    }
+
+    // Original constructor for backward compatibility
     public Block(int index, String previousHash, List<Transaction> transactions,
                  String dataHash, String participant) {
-        this.index = index;
-        this.timestamp = System.currentTimeMillis();
-        this.previousHash = previousHash;
-        this.transactions = transactions != null ? transactions : new ArrayList<>();
-        this.dataHash = dataHash;
-        this.participant = participant;
-        this.hash = calculateHash();
+        this(index, System.currentTimeMillis(), previousHash, transactions, dataHash, participant);
     }
 
     public String calculateHash() {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            String input = index + timestamp + previousHash +
-                    transactions.hashCode() + dataHash + participant;
-            byte[] hash = digest.digest(input.getBytes());
+            StringBuilder input = new StringBuilder();
 
-            StringBuilder hexString = new StringBuilder();
-            for (byte b : hash) {
-                String hex = Integer.toHexString(0xff & b);
-                if (hex.length() == 1) hexString.append('0');
-                hexString.append(hex);
+            // Build deterministic string for hashing - use stored timestamp
+            input.append(index);
+            input.append(timestamp); // Use the stored timestamp, not current time
+            input.append(previousHash);
+            input.append(dataHash != null ? dataHash : "");
+            input.append(participant != null ? participant : "");
+
+            // Include all transactions in hash calculation
+            for (Transaction tx : transactions) {
+                input.append(tx.getType());
+                input.append(tx.getFrom());
+                input.append(tx.getTo() != null ? tx.getTo() : "");
+                input.append(tx.getBatchId() != null ? tx.getBatchId() : "");
+                input.append(tx.getData() != null ? tx.getData() : "");
             }
-            return hexString.toString();
+
+            byte[] hashBytes = digest.digest(input.toString().getBytes());
+            return bytesToHex(hashBytes);
         } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException(e);
+            throw new RuntimeException("SHA-256 algorithm not available", e);
         }
     }
 
-    // Getters and setters
+    private String bytesToHex(byte[] hash) {
+        StringBuilder hexString = new StringBuilder();
+        for (byte b : hash) {
+            String hex = Integer.toHexString(0xff & b);
+            if (hex.length() == 1) hexString.append('0');
+            hexString.append(hex);
+        }
+        return hexString.toString();
+    }
+
+    // Getters
     public int getIndex() { return index; }
     public long getTimestamp() { return timestamp; }
     public String getPreviousHash() { return previousHash; }
     public String getHash() { return hash; }
-    public List<Transaction> getTransactions() { return transactions; }
+    public List<Transaction> getTransactions() { return new ArrayList<>(transactions); }
     public String getDataHash() { return dataHash; }
     public String getParticipant() { return participant; }
 
-    public void setHash(String hash) { this.hash = hash; }
+    // Only setter needed for deserialization - fixed logic
+    public void setHash(String hash) {
+        // Store the hash directly during deserialization
+        // Validation will happen during chain validation
+        this.hash = hash;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Block block = (Block) o;
+        return index == block.index &&
+                timestamp == block.timestamp &&
+                Objects.equals(previousHash, block.previousHash) &&
+                Objects.equals(transactions, block.transactions) &&
+                Objects.equals(dataHash, block.dataHash) &&
+                Objects.equals(participant, block.participant) &&
+                Objects.equals(hash, block.hash);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(index, timestamp, previousHash, transactions, dataHash, participant, hash);
+    }
 }

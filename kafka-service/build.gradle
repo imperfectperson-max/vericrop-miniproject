@@ -1,0 +1,16 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot'
+}
+
+dependencies {
+    // Spring Boot
+    implementation 'org.springframework.boot:spring-boot-starter'
+    implementation 'org.springframework.kafka:spring-kafka'
+
+    // JSON
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.2'
+
+    // HTTP Client
+    implementation 'com.squareup.okhttp3:okhttp:4.11.0'
+}

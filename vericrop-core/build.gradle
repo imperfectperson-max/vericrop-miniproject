@@ -1,21 +1,3 @@
-plugins {
-    id 'java'
-}
+// This module's configuration is in the root build.gradle
 
-group = 'org.vericrop'
-version = '1.0.0'
-
-repositories {
-    mavenCentral()
-}
-
-dependencies {
-    implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.2'
-    implementation 'com.fasterxml.jackson.core:jackson-core:2.15.2'
-
-    testImplementation 'org.junit.jupiter:junit-jupiter:5.9.2'
-}
-
-test {
-    useJUnitPlatform()
-}
+// Keeping this file minimal as it inherits from root configuration

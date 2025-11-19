@@ -1,2 +1,5 @@
-rootProject.name = 'vericrop'
-include 'vericrop-core', 'vericrop-gui'
+rootProject.name = 'untitled'
+include 'vericrop-core'
+include 'kafka-service'
+include 'ml-client'
+include 'vericrop-gui'
