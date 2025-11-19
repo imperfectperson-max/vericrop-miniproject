@@ -1,0 +1,11 @@
+# Airflow DAG dependencies for VeriCrop
+# These packages are needed by the vericrop_dag.py and other DAGs
+
+# Kafka integration
+kafka-python==2.0.2
+
+# HTTP requests
+requests==2.31.0
+
+# JSON handling (usually included, but explicit for clarity)
+python-dateutil==2.8.2

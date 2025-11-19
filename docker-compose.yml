@@ -1,27 +1,12 @@
 version: '3.8'
-services:
-  ml-service:
-    build: ./docker/ml-service
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./models:/app/models
-      - ./docker/ml-service:/app
-      - ./docker/ml-service/vericrop_models:/app/models:ro
-    restart: on-failure
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 5s
 
+services:
   postgres:
     image: postgres:15
     environment:
-      POSTGRES_USER: untitled
-      POSTGRES_PASSWORD: untitled
-      POSTGRES_DB: untitled
+      POSTGRES_USER: ${POSTGRES_USER:-untitled}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
+      POSTGRES_DB: ${POSTGRES_DB:-untitled}
     ports:
       - "5432:5432"
     volumes:
@@ -31,9 +16,9 @@ services:
   postgres-airflow:
     image: postgres:13
     environment:
-      POSTGRES_USER: airflow
-      POSTGRES_PASSWORD: airflow
-      POSTGRES_DB: airflow
+      POSTGRES_USER: ${AIRFLOW_DB_USER:-airflow}
+      POSTGRES_PASSWORD: ${AIRFLOW_DB_PASSWORD:-}
+      POSTGRES_DB: ${AIRFLOW_DB_NAME:-airflow}
     volumes:
       - postgres_airflow_data:/var/lib/postgresql/data
 
@@ -44,7 +29,7 @@ services:
     image: apache/airflow:2.7.1
     environment:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres-airflow:5432/airflow
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${AIRFLOW_DB_USER}:${AIRFLOW_DB_PASSWORD}@postgres-airflow:5432/${AIRFLOW_DB_NAME}
       - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=true
       - AIRFLOW__CORE__LOAD_EXAMPLES=false
       - AIRFLOW__WEBSERVER__EXPOSE_CONFIG=true
@@ -63,7 +48,7 @@ services:
     image: apache/airflow:2.7.1
     environment:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres-airflow:5432/airflow
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${AIRFLOW_DB_USER}:${AIRFLOW_DB_PASSWORD}@postgres-airflow:5432/${AIRFLOW_DB_NAME}
       - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=true
       - AIRFLOW__CORE__LOAD_EXAMPLES=false
     volumes:
@@ -102,18 +87,9 @@ services:
     image: provectuslabs/kafka-ui:latest
     ports:
       - "8081:8080"
-    environment:
-      KAFKA_CLUSTERS_0_NAME: local
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
-      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
-    depends_on:
-      - kafka
-
-  mosquitto:
-    image: eclipse-mosquitto:2.0
-    ports:
-      - "1883:1883"
 
 volumes:
   postgres_data:
   postgres_airflow_data:
+
+# NOTE: Database passwords and other sensitive values must be provided via environment variables or a separate secrets backend. See .env.sample for placeholders.
