@@ -308,18 +308,23 @@ curl http://localhost:8000/batches
 
 ### Configuration
 
-The application can be configured via `vericrop-gui/src/main/resources/application.yml`:
+The application can be configured via `vericrop-gui/src/main/resources/application.yml` or environment variables:
 
 ```yaml
 server:
   port: 8080  # REST API port
 
 kafka:
-  enabled: false  # Set to true when Kafka is available
+  enabled: ${KAFKA_ENABLED:false}  # Set to true when Kafka is available
+  topics:
+    fruit-quality: vericrop.fruit-quality
+    supplychain-events: vericrop.supplychain-events
   
 spring:
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: ${KAFKA_GROUP_ID:vericrop-evaluation-group}
 
 ledger:
   path: ledger  # Path to store shipment records
@@ -328,6 +333,13 @@ quality:
   evaluation:
     pass-threshold: 0.7
 ```
+
+**Environment Variables:**
+- `KAFKA_BOOTSTRAP_SERVERS` - Kafka broker address (default: `localhost:9092`)
+- `KAFKA_GROUP_ID` - Kafka consumer group ID (default: `vericrop-consumer-group`)
+- `KAFKA_ENABLED` - Enable/disable Kafka integration (default: `false`)
+- `JAVA_SERVICE_URL` - Java REST API URL for Airflow integration (default: `http://localhost:8080`)
+- `DATABASE_URL` - Database connection URL (default: H2 in-memory)
 
 **Note:** See [KAFKA_INTEGRATION.md](KAFKA_INTEGRATION.md) for detailed configuration options.
 
@@ -445,6 +457,186 @@ The DAG performs:
 python airflow/dags/vericrop_dag.py
 ```
 
+## 🔗 Kafka & Airflow Integration
+
+VeriCrop now includes full Kafka messaging integration and Airflow orchestration for end-to-end supply chain workflows.
+
+### Quick Start with Docker Compose
+
+The easiest way to run the complete stack (Kafka, Airflow, and Java services) is using Docker Compose:
+
+```bash
+# 1. Copy environment variables
+cp .env.sample .env
+
+# 2. Start all services (Kafka, Zookeeper, Airflow, PostgreSQL, ML Service)
+docker-compose -f docker-compose-kafka-airflow.yml up -d
+
+# 3. Wait for services to be healthy (~30 seconds)
+docker-compose -f docker-compose-kafka-airflow.yml ps
+
+# 4. Build and run the Java service locally
+./gradlew :vericrop-gui:bootRun
+
+# Or run Java service in Docker (uncomment vericrop-java service in docker-compose file)
+```
+
+**Access the services:**
+- Kafka UI: http://localhost:8090
+- Airflow Web UI: http://localhost:8081 (user: `admin`, password: `admin`)
+- Java REST API: http://localhost:8080/api/health
+- ML Service: http://localhost:8000/health
+
+### Kafka Topics
+
+VeriCrop uses the following Kafka topics for event-driven communication:
+
+| Topic Name | Purpose | Producer | Consumer |
+|------------|---------|----------|----------|
+| `vericrop.fruit-quality` | Quality assessment results | Java Service | Analytics, Dashboard |
+| `vericrop.supplychain-events` | Supply chain status updates | Java Service, Airflow | Java Service, Monitoring |
+| `evaluation-requests` | Quality evaluation requests | Airflow | Java Service |
+| `evaluation-results` | Evaluation completion events | Java Service | Airflow, Dashboard |
+| `shipment-records` | Ledger records | Java Service | Blockchain, Audit |
+
+### Airflow DAGs
+
+Two DAGs are available for orchestration:
+
+1. **vericrop_evaluation_pipeline** (`vericrop_dag.py`)
+   - Original DAG for basic evaluation workflow
+   - Publishes to Kafka and calls REST API
+   - Runs every hour
+
+2. **vericrop_java_integration** (`vericrop_integration_dag.py`)
+   - Complete integration pipeline
+   - Health checks, Kafka messaging, Customer creation
+   - Runs every 2 hours
+
+**Trigger a DAG manually:**
+```bash
+# From Airflow UI: Navigate to DAGs → Select DAG → Click "Trigger DAG"
+
+# Or via CLI:
+docker exec vericrop-airflow-scheduler airflow dags trigger vericrop_java_integration
+```
+
+### Running Kafka and Java Service Together
+
+**Option 1: Docker Compose (Recommended)**
+```bash
+# Start infrastructure
+docker-compose -f docker-compose-kafka-airflow.yml up -d kafka zookeeper kafka-ui
+
+# Set environment variables
+export KAFKA_ENABLED=true
+export KAFKA_BOOTSTRAP_SERVERS=localhost:9092
+
+# Run Java service
+./gradlew :vericrop-gui:bootRun
+```
+
+**Option 2: Standalone Kafka**
+```bash
+# Using existing docker-compose-kafka.yml
+docker-compose -f docker-compose-kafka.yml up -d
+
+# Run Java service with Kafka enabled
+KAFKA_ENABLED=true KAFKA_BOOTSTRAP_SERVERS=localhost:9092 ./gradlew :vericrop-gui:bootRun
+```
+
+### Testing Kafka Integration
+
+**1. Verify Kafka is running:**
+```bash
+# Check Kafka UI
+open http://localhost:8090
+
+# Or use kafka-topics command
+docker exec vericrop-kafka kafka-topics --bootstrap-server localhost:9092 --list
+```
+
+**2. Test quality evaluation with Kafka:**
+```bash
+# Submit evaluation request
+curl -X POST http://localhost:8080/api/evaluate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "batch_id": "TEST_BATCH_001",
+    "product_type": "apple",
+    "farmer_id": "farmer_001"
+  }'
+
+# Check Kafka UI to see messages in vericrop.fruit-quality topic
+```
+
+**3. View supply chain events:**
+```bash
+# Consume supply chain events
+docker exec vericrop-kafka kafka-console-consumer \
+  --bootstrap-server localhost:9092 \
+  --topic vericrop.supplychain-events \
+  --from-beginning
+```
+
+### Customer Management API
+
+New REST endpoints for customer management:
+
+```bash
+# Create a customer
+curl -X POST http://localhost:8080/api/customers \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "John Farmer",
+    "email": "john@farm.com",
+    "phone": "+1234567890",
+    "customerType": "FARMER",
+    "address": "123 Farm Road",
+    "active": true
+  }'
+
+# List all customers
+curl http://localhost:8080/api/customers
+
+# Get customer by ID
+curl http://localhost:8080/api/customers/1
+
+# Filter by customer type
+curl http://localhost:8080/api/customers?type=FARMER
+
+# Update customer
+curl -X PUT http://localhost:8080/api/customers/1 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "John Updated",
+    "email": "john@farm.com",
+    "customerType": "FARMER",
+    "active": true
+  }'
+
+# Delete customer
+curl -X DELETE http://localhost:8080/api/customers/1
+```
+
+**Customer Types:**
+- `FARMER` - Agricultural producers
+- `LOGISTICS` - Transportation providers
+- `RETAILER` - Wholesale/retail distributors
+- `CONSUMER` - End consumers
+
+### Stopping Services
+
+```bash
+# Stop all Docker Compose services
+docker-compose -f docker-compose-kafka-airflow.yml down
+
+# Stop and remove volumes (clean slate)
+docker-compose -f docker-compose-kafka-airflow.yml down -v
+
+# Stop Java service (Ctrl+C if running in foreground)
+```
+
 ## 🏗️ System Architecture
 ```bash
 ┌─────────────────────────────────────────────────────────────────┐
@@ -517,7 +709,26 @@ python airflow/dags/vericrop_dag.py
 
 ## 🛠️ API Endpoints
 
-### ML Service Endpoints
+### VeriCrop Java REST API (Port 8080)
+
+**Quality Evaluation:**
+```
+POST /api/evaluate         # Evaluate fruit quality (multipart or JSON)
+GET  /api/shipments/{id}   # Get shipment record by ledger ID
+GET  /api/shipments        # Get all shipments (optional: ?batch_id=XXX)
+GET  /api/health          # Service health check
+```
+
+**Customer Management:**
+```
+GET    /api/customers           # List all customers (optional: ?type=FARMER)
+GET    /api/customers/{id}      # Get customer by ID
+POST   /api/customers           # Create new customer
+PUT    /api/customers/{id}      # Update existing customer
+DELETE /api/customers/{id}      # Delete customer
+```
+
+### ML Service Endpoints (Port 8000)
 
 ```
 POST /predict              # Fruit quality prediction
@@ -529,6 +740,26 @@ GET  /batches             # Batch management
 
 ### Example Usage
 
+**Java REST API:**
+```bash
+# Health check
+curl http://localhost:8080/api/health
+
+# Evaluate quality
+curl -X POST http://localhost:8080/api/evaluate \
+  -H "Content-Type: application/json" \
+  -d '{"batch_id": "BATCH_001", "product_type": "apple", "farmer_id": "farmer_001"}'
+
+# Create customer
+curl -X POST http://localhost:8080/api/customers \
+  -H "Content-Type: application/json" \
+  -d '{"name": "John Doe", "email": "john@farm.com", "customerType": "FARMER"}'
+
+# List customers
+curl http://localhost:8080/api/customers
+```
+
+**ML Service:**
 ```bash
 # Test prediction
 curl -X POST -F "file=@fruit.jpg" http://localhost:8000/predict
