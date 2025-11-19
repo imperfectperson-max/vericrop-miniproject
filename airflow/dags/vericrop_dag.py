@@ -229,29 +229,25 @@ with DAG(
     # Step 1: Produce evaluation request to Kafka
     produce_kafka = PythonOperator(
         task_id='produce_kafka_message',
-        python_callable=produce_evaluation_request_to_kafka,
-        provide_context=True
+        python_callable=produce_evaluation_request_to_kafka
     )
 
     # Step 2: Call REST API for evaluation
     call_api = PythonOperator(
         task_id='call_rest_api',
-        python_callable=call_rest_api_evaluation,
-        provide_context=True
+        python_callable=call_rest_api_evaluation
     )
 
     # Step 3: Verify ledger record
     verify_ledger = PythonOperator(
         task_id='verify_ledger',
-        python_callable=verify_ledger_record,
-        provide_context=True
+        python_callable=verify_ledger_record
     )
 
     # Step 4: Generate summary
     generate_summary = PythonOperator(
         task_id='generate_summary',
-        python_callable=generate_pipeline_summary,
-        provide_context=True
+        python_callable=generate_pipeline_summary
     )
 
     end = DummyOperator(task_id='end')

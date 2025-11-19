@@ -38,6 +38,7 @@ import org.vericrop.kafka.producers.QualityAlertProducer;
 import org.vericrop.kafka.events.LogisticsEvent;
 import org.vericrop.kafka.events.BlockchainEvent;
 import org.vericrop.kafka.events.QualityAlertEvent;
+import org.vericrop.gui.util.BlockchainInitializer;
 
 public class ProducerController {
     private Blockchain blockchain;
@@ -46,6 +47,7 @@ public class ProducerController {
     private OkHttpClient httpClient;
     private FileLedgerService ledgerService;
     private ExecutorService backgroundExecutor;
+    private boolean blockchainReady = false;
 
     // Kafka components
     private KafkaServiceManager kafkaServiceManager;
@@ -96,11 +98,12 @@ public class ProducerController {
     private Map<String, Object> currentPrediction;
 
     public void initialize() {
-        blockchain = new Blockchain();
-        blockchainService = new BlockchainService(blockchain);
         backgroundExecutor = Executors.newFixedThreadPool(4);
         mapper = new ObjectMapper();
         ledgerService = new FileLedgerService();
+
+        // Initialize blockchain asynchronously based on mode
+        initializeBlockchainAsync();
 
         // Initialize Kafka services first
         initializeKafkaServices();
@@ -149,6 +152,54 @@ public class ProducerController {
         if (consumerButton != null) {
             consumerButton.setOnAction(e -> handleShowConsumer());
         }
+    }
+
+    private void initializeBlockchainAsync() {
+        // Determine mode from environment
+        BlockchainInitializer.Mode mode = BlockchainInitializer.getModeFromEnvironment();
+        
+        Platform.runLater(() -> {
+            updateStatus("⏳ Initializing blockchain (" + mode + " mode)...");
+            if (progressIndicator != null) {
+                progressIndicator.setVisible(true);
+            }
+        });
+        
+        // Initialize blockchain asynchronously
+        BlockchainInitializer.initializeAsync(mode, message -> {
+            Platform.runLater(() -> updateStatus(message));
+        }).thenAccept(initializedBlockchain -> {
+            blockchain = initializedBlockchain;
+            blockchainService = new BlockchainService(blockchain);
+            blockchainReady = true;
+            
+            Platform.runLater(() -> {
+                updateStatus("✅ Blockchain ready (" + mode + " mode)");
+                updateBlockchainDisplay();
+                if (progressIndicator != null) {
+                    progressIndicator.setVisible(false);
+                }
+            });
+            
+            System.out.println("✅ Blockchain initialized in " + mode + " mode with " + 
+                blockchain.getChain().size() + " blocks");
+        }).exceptionally(ex -> {
+            System.err.println("❌ Blockchain initialization failed: " + ex.getMessage());
+            
+            // Fallback to simple blockchain
+            Platform.runLater(() -> {
+                blockchain = new Blockchain();
+                blockchainService = new BlockchainService(blockchain);
+                blockchainReady = true;
+                updateStatus("⚠️ Using fallback blockchain");
+                updateBlockchainDisplay();
+                if (progressIndicator != null) {
+                    progressIndicator.setVisible(false);
+                }
+            });
+            
+            return null;
+        });
     }
 
     private void initializeKafkaServices() {

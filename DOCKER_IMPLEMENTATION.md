@@ -41,13 +41,19 @@ Created a comprehensive `docker-compose.yml` (350+ lines) that orchestrates 13 s
 
 #### Created New Dockerfiles
 
-**vericrop-gui/Dockerfile**
-- Base image: `eclipse-temurin:17-jre-jammy`
-- Copies pre-built Spring Boot JAR
+**vericrop-gui/Dockerfile** (Multi-stage Build)
+- **Build stage**: Uses `eclipse-temurin:17-jdk-jammy` to compile with Gradle
+- **Runtime stage**: Uses `eclipse-temurin:17-jre-jammy` minimal JRE image
+- Multi-stage build reduces final image size by ~300MB
 - Includes curl for health checks
-- Health check on `/api/health` endpoint
-- Creates ledger directory
+- Health check on `/api/health` endpoint with 90s start period
+- Creates ledger and data directories
 - Exposes port 8080
+- **Important**: Blockchain initialization happens at **container startup**, not build time
+  - Build time: No blockchain creation (faster, more consistent images)
+  - Runtime: Blockchain initialized based on `VERICROP_MODE` environment variable
+  - Dev mode: Fast initialization (< 1 second)
+  - Prod mode: Full initialization with validation (5-10 seconds)
 
 **kafka-service/Dockerfile**
 - Base image: `eclipse-temurin:17-jre-jammy`
@@ -155,6 +161,8 @@ POSTGRES_USER=vericrop
 POSTGRES_PASSWORD=vericrop123
 POSTGRES_DB=vericrop
 KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+KAFKA_ENABLED=false  # Set to true to enable Kafka (safe default for dev)
+VERICROP_MODE=dev  # dev or prod - controls blockchain initialization
 AIRFLOW_ADMIN_USERNAME=admin
 AIRFLOW_ADMIN_PASSWORD=admin
 VERICROP_API_URL=http://vericrop-gui:8080
@@ -162,6 +170,14 @@ ML_SERVICE_URL=http://ml-service:8000
 LEDGER_PATH=/app/ledger
 QUALITY_PASS_THRESHOLD=0.7
 ```
+
+**New Configuration Options**:
+- `VERICROP_MODE`: Controls blockchain initialization speed
+  - `dev` (default): Fast mode with lightweight blockchain (< 1s startup)
+  - `prod`: Full mode with complete validation (5-10s startup)
+- `KAFKA_ENABLED`: Controls Kafka integration
+  - `false` (default): In-memory stub mode, no Kafka dependencies
+  - `true`: Full Kafka integration with event publishing
 
 ### 9. Automation Scripts
 
