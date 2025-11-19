@@ -16,6 +16,11 @@ public class LogisticsController {
     @FXML private TextArea reportArea;
     @FXML private LineChart<String, Number> temperatureChart;
 
+    // Navigation buttons
+    @FXML private Button backToProducerButton;
+    @FXML private Button analyticsButton;
+    @FXML private Button consumerButton;
+
     private ObservableList<Shipment> shipments = FXCollections.observableArrayList();
     private ObservableList<String> alerts = FXCollections.observableArrayList();
 
@@ -25,6 +30,19 @@ public class LogisticsController {
         setupAlertsList();
         setupReportCombo();
         setupTemperatureChart();
+        setupNavigationButtons();
+    }
+
+    private void setupNavigationButtons() {
+        if (backToProducerButton != null) {
+            backToProducerButton.setOnAction(e -> handleBackToProducer());
+        }
+        if (analyticsButton != null) {
+            analyticsButton.setOnAction(e -> handleShowAnalytics());
+        }
+        if (consumerButton != null) {
+            consumerButton.setOnAction(e -> handleShowConsumer());
+        }
     }
 
     private void setupShipmentsTable() {
@@ -57,6 +75,31 @@ public class LogisticsController {
 
     private void setupTemperatureChart() {
         // Chart would be populated with real data in implementation
+    }
+
+    // Navigation methods
+    @FXML
+    private void handleBackToProducer() {
+        MainApp mainApp = MainApp.getInstance();
+        if (mainApp != null) {
+            mainApp.showProducerScreen();
+        }
+    }
+
+    @FXML
+    private void handleShowAnalytics() {
+        MainApp mainApp = MainApp.getInstance();
+        if (mainApp != null) {
+            mainApp.showAnalyticsScreen();
+        }
+    }
+
+    @FXML
+    private void handleShowConsumer() {
+        MainApp mainApp = MainApp.getInstance();
+        if (mainApp != null) {
+            mainApp.showConsumerScreen();
+        }
     }
 
     // Action methods

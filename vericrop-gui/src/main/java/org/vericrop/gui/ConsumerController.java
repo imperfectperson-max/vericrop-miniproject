@@ -9,12 +9,28 @@ public class ConsumerController {
 
     @FXML private TextField batchIdField;
     @FXML private ListView<String> verificationHistoryList;
+    @FXML private Button backToProducerButton;
+    @FXML private Button analyticsButton;
+    @FXML private Button logisticsButton;
 
     private ObservableList<String> verificationHistory = FXCollections.observableArrayList();
 
     @FXML
     public void initialize() {
         setupVerificationHistory();
+        setupNavigationButtons();
+    }
+
+    private void setupNavigationButtons() {
+        if (backToProducerButton != null) {
+            backToProducerButton.setOnAction(e -> handleBackToProducer());
+        }
+        if (analyticsButton != null) {
+            analyticsButton.setOnAction(e -> handleShowAnalytics());
+        }
+        if (logisticsButton != null) {
+            logisticsButton.setOnAction(e -> handleShowLogistics());
+        }
     }
 
     private void setupVerificationHistory() {
@@ -66,6 +82,30 @@ public class ConsumerController {
     @FXML
     private void handleShareVerification() {
         showAlert(Alert.AlertType.INFORMATION, "Share", "Verification details shared successfully");
+    }
+
+    @FXML
+    private void handleBackToProducer() {
+        MainApp mainApp = MainApp.getInstance();
+        if (mainApp != null) {
+            mainApp.showProducerScreen();
+        }
+    }
+
+    @FXML
+    private void handleShowAnalytics() {
+        MainApp mainApp = MainApp.getInstance();
+        if (mainApp != null) {
+            mainApp.showAnalyticsScreen();
+        }
+    }
+
+    @FXML
+    private void handleShowLogistics() {
+        MainApp mainApp = MainApp.getInstance();
+        if (mainApp != null) {
+            mainApp.showLogisticsScreen();
+        }
     }
 
     private void verifyBatch(String batchId) {

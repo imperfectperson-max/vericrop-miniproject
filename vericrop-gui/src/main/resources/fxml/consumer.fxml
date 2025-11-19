@@ -16,8 +16,25 @@
 
     <!-- Header -->
     <HBox spacing="20" alignment="CENTER_LEFT">
-        <Label text="VERICROP - PRODUCT VERIFICATION" styleClass="title-label"/>
+        <VBox spacing="2">
+            <Label text="VERICROP - PRODUCT VERIFICATION" styleClass="title-label"/>
+            <Label text="Consumer Portal - Verify Product Authenticity" style="-fx-text-fill: #666; -fx-font-size: 12px;"/>
+        </VBox>
         <Region HBox.hgrow="ALWAYS"/>
+
+        <!-- Navigation Buttons -->
+        <HBox spacing="10" alignment="CENTER">
+            <Button fx:id="backToProducerButton" text="🏠 Producer"
+                    style="-fx-background-color: #2E8B57; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8; -fx-padding: 8 12;"
+                    onAction="#handleBackToProducer"/>
+            <Button fx:id="analyticsButton" text="📊 Analytics"
+                    style="-fx-background-color: #6B7280; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8; -fx-padding: 8 12;"
+                    onAction="#handleShowAnalytics"/>
+            <Button fx:id="logisticsButton" text="🚚 Logistics"
+                    style="-fx-background-color: #F59E0B; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8; -fx-padding: 8 12;"
+                    onAction="#handleShowLogistics"/>
+        </HBox>
+
         <Button text="Scan QR" styleClass="primary-button" onAction="#handleScanQR"/>
         <Button text="Verify Another" styleClass="success-button" onAction="#handleVerifyAnother"/>
     </HBox>
@@ -33,7 +50,7 @@
 
                         <!-- QR Scanner Placeholder -->
                         <Pane style="-fx-background-color: #f1f5f9; -fx-border-radius: 8; -fx-pref-height: 200; -fx-pref-width: 200;"
-                              alignment="CENTER">
+                        >
                             <Label text="QR Scanner\nPlaceholder"
                                    style="-fx-text-alignment: center; -fx-text-fill: #64748b;"/>
                         </Pane>

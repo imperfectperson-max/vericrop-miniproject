@@ -18,12 +18,30 @@
 
     <!-- Header -->
     <HBox spacing="20" alignment="CENTER_LEFT">
-        <Label text="LOGISTICS MONITORING - BATCH A2386" styleClass="title-label"/>
+        <VBox spacing="2">
+            <Label text="LOGISTICS MONITORING - BATCH A2386" styleClass="title-label"/>
+            <Label text="Real-time Shipment Tracking And Monitoring" style="-fx-text-fill: #666; -fx-font-size: 12px;"/>
+        </VBox>
         <Region HBox.hgrow="ALWAYS"/>
+
+        <!-- Navigation Buttons -->
+        <HBox spacing="10" alignment="CENTER">
+            <Button fx:id="backToProducerButton" text="🏠 Producer"
+                    style="-fx-background-color: #2E8B57; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8; -fx-padding: 8 12;"
+                    onAction="#handleBackToProducer"/>
+            <Button fx:id="analyticsButton" text="📊 Analytics"
+                    style="-fx-background-color: #6B7280; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8; -fx-padding: 8 12;"
+                    onAction="#handleShowAnalytics"/>
+            <Button fx:id="consumerButton" text="👥 Consumer"
+                    style="-fx-background-color: #10B981; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8; -fx-padding: 8 12;"
+                    onAction="#handleShowConsumer"/>
+        </HBox>
+
         <Button text="Refresh" styleClass="primary-button" onAction="#handleRefresh"/>
         <Button text="Export Report" styleClass="success-button" onAction="#handleExportReport"/>
     </HBox>
 
+    <!-- Rest of the logistics.fxml content remains the same -->
     <!-- Navigation Tabs -->
     <TabPane styleClass="tab-pane">
         <tabs>
