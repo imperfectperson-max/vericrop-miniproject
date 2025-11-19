@@ -16,6 +16,7 @@
 - [Key Features](#key-features)
 - [Technologies and Dependencies](#technologies-and-dependencies)
 - [System Architecture](#system-architecture)
+- [**Building and Docker** (see BUILD.md)](#building-and-docker)
 - [Installation](#installation)
 - [Usage](#usage)
 - [Running Tests](#running-tests)
@@ -73,6 +74,23 @@ The project was developed as a comprehensive mini-project demonstrating the inte
 - **pytest** - Python testing framework
 - **Docker** - Containerization for ML service
 - **Docker Compose** - Multi-container orchestration
+
+## 🔨 Building and Docker
+
+For detailed instructions on building the project with Gradle and creating Docker images, see **[BUILD.md](BUILD.md)**.
+
+**Quick Start:**
+```bash
+# Build all Java modules
+./gradlew clean build
+
+# Build Docker images
+./gradlew build -x test
+docker compose -f docker-compose-java.yml build
+
+# Run with Docker Compose
+docker compose -f docker-compose-java.yml up
+```
 
 ### Key Dependencies
 **Java (build.gradle):**
