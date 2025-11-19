@@ -9,8 +9,13 @@ from airflow.operators.python import PythonOperator
 from airflow.operators.dummy import DummyOperator
 import json
 import logging
+import os
 
 logger = logging.getLogger(__name__)
+
+# Configuration from environment variables
+KAFKA_BOOTSTRAP_SERVERS = os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'localhost:9092')
+VERICROP_API_URL = os.getenv('VERICROP_API_URL', 'http://localhost:8080')
 
 default_args = {
     'owner': 'vericrop',
@@ -49,7 +54,7 @@ def produce_evaluation_request_to_kafka(**context):
         if kafka_available:
             # Configure Kafka producer
             producer = KafkaProducer(
-                bootstrap_servers=['localhost:9092'],
+                bootstrap_servers=[KAFKA_BOOTSTRAP_SERVERS],
                 value_serializer=lambda v: json.dumps(v).encode('utf-8'),
                 key_serializer=lambda k: k.encode('utf-8') if k else None,
                 acks='all',
@@ -104,7 +109,7 @@ def call_rest_api_evaluation(**context):
         batch_id = context['task_instance'].xcom_pull(task_ids='produce_kafka_message', key='batch_id')
         
         # Prepare API request
-        api_url = 'http://localhost:8080/api/evaluate'
+        api_url = f'{VERICROP_API_URL}/api/evaluate'
         payload = {
             'batch_id': batch_id,
             'product_type': 'apple',
@@ -151,7 +156,7 @@ def verify_ledger_record(**context):
         
         if result and 'ledger_id' in result:
             ledger_id = result['ledger_id']
-            api_url = f'http://localhost:8080/api/shipments/{ledger_id}'
+            api_url = f'{VERICROP_API_URL}/api/shipments/{ledger_id}'
             
             logger.info(f"Verifying ledger record: {ledger_id}")
             

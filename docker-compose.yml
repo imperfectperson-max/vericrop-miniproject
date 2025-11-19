@@ -240,7 +240,9 @@ services:
   # Airflow Init - Database Initialization
   # ========================================
   airflow-init:
-    image: apache/airflow:2.7.1-python3.11
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
     container_name: vericrop-airflow-init
     networks:
       - vericrop-network
@@ -271,7 +273,9 @@ services:
   # Airflow Webserver
   # ========================================
   airflow-webserver:
-    image: apache/airflow:2.7.1-python3.11
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
     container_name: vericrop-airflow-webserver
     networks:
       - vericrop-network
@@ -311,7 +315,9 @@ services:
   # Airflow Scheduler
   # ========================================
   airflow-scheduler:
-    image: apache/airflow:2.7.1-python3.11
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
     container_name: vericrop-airflow-scheduler
     networks:
       - vericrop-network
