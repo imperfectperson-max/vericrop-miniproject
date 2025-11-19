@@ -76,6 +76,11 @@ public class ProducerController {
     @FXML private VBox leftPanel;
     @FXML private VBox rightPanel;
 
+    // Navigation buttons
+    @FXML private Button analyticsButton;
+    @FXML private Button logisticsButton;
+    @FXML private Button consumerButton;
+
     private String currentImagePath;
     private Map<String, Object> currentPrediction;
 
@@ -96,6 +101,9 @@ public class ProducerController {
         // Apply modern styling
         applyModernStyling();
 
+        // Setup navigation buttons
+        setupNavigationButtons();
+
         updateBlockchainDisplay();
         loadDashboardData();
 
@@ -115,6 +123,19 @@ public class ProducerController {
                 rejectionRateLabel.setText("0%");
             }
         });
+    }
+
+    private void setupNavigationButtons() {
+        // Add navigation buttons to the header if they exist
+        if (analyticsButton != null) {
+            analyticsButton.setOnAction(e -> handleShowAnalytics());
+        }
+        if (logisticsButton != null) {
+            logisticsButton.setOnAction(e -> handleShowLogistics());
+        }
+        if (consumerButton != null) {
+            consumerButton.setOnAction(e -> handleShowConsumer());
+        }
     }
 
     private void initializeKafkaServices() {
@@ -500,23 +521,35 @@ public class ProducerController {
         }
     }
 
+    // Navigation methods
     @FXML
     private void handleShowAnalytics() {
-        // Get main app instance and switch screen
         MainApp mainApp = MainApp.getInstance();
-        mainApp.switchToScreen("analytics.fxml");
+        if (mainApp != null) {
+            mainApp.showAnalyticsScreen();
+        } else {
+            System.err.println("MainApp instance is null");
+        }
     }
 
     @FXML
     private void handleShowLogistics() {
         MainApp mainApp = MainApp.getInstance();
-        mainApp.switchToScreen("logistics.fxml");
+        if (mainApp != null) {
+            mainApp.showLogisticsScreen();
+        } else {
+            System.err.println("MainApp instance is null");
+        }
     }
 
     @FXML
     private void handleShowConsumer() {
         MainApp mainApp = MainApp.getInstance();
-        mainApp.switchToScreen("consumer.fxml");
+        if (mainApp != null) {
+            mainApp.showConsumerScreen();
+        } else {
+            System.err.println("MainApp instance is null");
+        }
     }
 
     private void sendKafkaEvents(String batchId, String batchName, String farmer,

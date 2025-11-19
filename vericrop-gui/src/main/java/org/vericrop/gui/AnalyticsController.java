@@ -25,6 +25,9 @@ public class AnalyticsController {
     @FXML private ComboBox<String> formatCombo;
     @FXML private TextArea exportPreview;
 
+    // Navigation button
+    @FXML private Button backToProducerButton;
+
     private ObservableList<Supplier> suppliers = FXCollections.observableArrayList();
     private ObservableList<Alert> alerts = FXCollections.observableArrayList();
 
@@ -35,6 +38,13 @@ public class AnalyticsController {
         setupAlertsTable();
         setupExportCombo();
         setupCharts();
+        setupNavigation();
+    }
+
+    private void setupNavigation() {
+        if (backToProducerButton != null) {
+            backToProducerButton.setOnAction(e -> handleBackToProducer());
+        }
     }
 
     private void setupKPIs() {
@@ -99,6 +109,14 @@ public class AnalyticsController {
                     "• Format: " + formatCombo.getValue() + "\n" +
                     "• Records: 1,247 batches\n" +
                     "• Generated: " + java.time.LocalDateTime.now());
+        }
+    }
+
+    @FXML
+    private void handleBackToProducer() {
+        MainApp mainApp = MainApp.getInstance();
+        if (mainApp != null) {
+            mainApp.showProducerScreen();
         }
     }
 

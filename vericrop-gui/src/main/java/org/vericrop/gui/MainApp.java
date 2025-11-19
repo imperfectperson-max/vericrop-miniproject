@@ -19,55 +19,8 @@ public class MainApp extends Application {
         this.primaryStage = primaryStage;
 
         try {
-            // Load FXML with multiple fallback options
-            URL fxmlUrl = getClass().getResource("/fxml/producer.fxml");
-            if (fxmlUrl == null) {
-                fxmlUrl = getClass().getResource("fxml/producer.fxml");
-            }
-            if (fxmlUrl == null) {
-                throw new RuntimeException("FXML file not found. Checked: /fxml/producer.fxml and fxml/producer.fxml");
-            }
-
-            FXMLLoader loader = new FXMLLoader(fxmlUrl);
-            Parent root = loader.load();
-
-            // Set application icon (optional)
-            try {
-                URL iconUrl = getClass().getResource("/images/icon.png");
-                if (iconUrl == null) {
-                    iconUrl = getClass().getResource("images/icon.png");
-                }
-                if (iconUrl != null) {
-                    primaryStage.getIcons().add(new Image(iconUrl.toString()));
-                }
-            } catch (Exception e) {
-                System.out.println("Icon not found, using default");
-            }
-
-            primaryStage.setTitle("VeriCrop - Farm Management Dashboard");
-            Scene scene = new Scene(root, 1400, 900);
-
-            // Add CSS styling if available
-            try {
-                URL cssUrl = getClass().getResource("/css/styles.css");
-                if (cssUrl == null) {
-                    cssUrl = getClass().getResource("css/styles.css");
-                }
-                if (cssUrl != null) {
-                    scene.getStylesheets().add(cssUrl.toExternalForm());
-                } else {
-                    // Create basic CSS programmatically as fallback
-                    scene.getStylesheets().add(createFallbackCSS());
-                }
-            } catch (Exception e) {
-                System.out.println("CSS file not found, using default styling");
-                scene.getStylesheets().add(createFallbackCSS());
-            }
-
-            primaryStage.setScene(scene);
-            primaryStage.setMinWidth(1200);
-            primaryStage.setMinHeight(800);
-            primaryStage.show();
+            // Start with the producer screen
+            showProducerScreen();
 
         } catch (Exception e) {
             System.err.println("Failed to start application: " + e.getMessage());
@@ -85,15 +38,49 @@ public class MainApp extends Application {
 
     public void switchToScreen(String fxmlFile) {
         try {
+            // Try multiple possible locations for FXML files
             URL fxmlUrl = getClass().getResource("/fxml/" + fxmlFile);
+            if (fxmlUrl == null) {
+                fxmlUrl = getClass().getResource("fxml/" + fxmlFile);
+            }
+            if (fxmlUrl == null) {
+                fxmlUrl = getClass().getResource(fxmlFile);
+            }
             if (fxmlUrl == null) {
                 throw new RuntimeException("FXML file not found: " + fxmlFile);
             }
-            Parent root = FXMLLoader.load(fxmlUrl);
-            primaryStage.getScene().setRoot(root);
+
+            FXMLLoader loader = new FXMLLoader(fxmlUrl);
+            Parent root = loader.load();
+
+            // Set up the scene with CSS
+            Scene scene = new Scene(root, 1400, 900);
+
+            // Add CSS styling
+            try {
+                URL cssUrl = getClass().getResource("/css/styles.css");
+                if (cssUrl == null) {
+                    cssUrl = getClass().getResource("css/styles.css");
+                }
+                if (cssUrl != null) {
+                    scene.getStylesheets().add(cssUrl.toExternalForm());
+                } else {
+                    scene.getStylesheets().add(createFallbackCSS());
+                }
+            } catch (Exception e) {
+                scene.getStylesheets().add(createFallbackCSS());
+            }
+
+            primaryStage.setScene(scene);
+            primaryStage.setMinWidth(1200);
+            primaryStage.setMinHeight(800);
+            primaryStage.show();
+
         } catch (Exception e) {
-            System.err.println("Error switching to screen: " + e.getMessage());
+            System.err.println("Error switching to screen " + fxmlFile + ": " + e.getMessage());
             e.printStackTrace();
+            // Fallback to producer screen
+            showProducerScreen();
         }
     }
 
@@ -115,6 +102,10 @@ public class MainApp extends Application {
 
     public static MainApp getInstance() {
         return instance;
+    }
+
+    public Stage getPrimaryStage() {
+        return primaryStage;
     }
 
     public static void main(String[] args) {
