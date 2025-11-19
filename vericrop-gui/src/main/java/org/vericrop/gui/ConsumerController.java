@@ -1,5 +1,6 @@
 package org.vericrop.gui;
 
+import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.collections.FXCollections;
@@ -57,7 +58,7 @@ public class ConsumerController {
     private void handleVerifyProduct() {
         String batchId = batchIdField.getText();
         if (batchId != null && !batchId.trim().isEmpty()) {
-            verifyBatch(batchId);
+            verifyBatch(batchId.trim());
         } else {
             showAlert(Alert.AlertType.WARNING, "Input Required", "Please enter a Batch ID or scan QR code");
         }
@@ -109,17 +110,58 @@ public class ConsumerController {
     }
 
     private void verifyBatch(String batchId) {
-        // Simulate verification process
+        // Mock validation logic: if batchId non-empty -> verified, otherwise show warning
+        if (batchId == null || batchId.trim().isEmpty()) {
+            showAlert(Alert.AlertType.WARNING, "Invalid Input", "Batch ID cannot be empty");
+            return;
+        }
+
+        // Simulate verification process with mock data
+        String productName;
+        String quality;
+        String origin;
+        int qualityScore;
+        
+        // Mock different products based on batch ID pattern for variety
+        if (batchId.toUpperCase().contains("A")) {
+            productName = "Summer Apples";
+            quality = "PRIME";
+            qualityScore = 92;
+            origin = "Sunny Valley Orchards";
+        } else if (batchId.toUpperCase().contains("B")) {
+            productName = "Organic Carrots";
+            quality = "PRIME";
+            qualityScore = 88;
+            origin = "Green Fields Farm";
+        } else if (batchId.toUpperCase().contains("C")) {
+            productName = "Fresh Lettuce";
+            quality = "STANDARD";
+            qualityScore = 75;
+            origin = "Riverside Gardens";
+        } else {
+            productName = "Mixed Vegetables";
+            quality = "PRIME";
+            qualityScore = 85;
+            origin = "Valley Fresh Farms";
+        }
+
         String verificationResult = "✅ VERIFIED: Genuine Product - Batch " + batchId +
-                "\nProduct: Summer Apples" +
-                "\nQuality: PRIME (82%)" +
-                "\nOrigin: Sunny Valley Orchards";
+                "\nProduct: " + productName +
+                "\nQuality: " + quality + " (" + qualityScore + "%)" +
+                "\nOrigin: " + origin +
+                "\nVerification Time: " + java.time.LocalDateTime.now().format(
+                        java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
 
         showAlert(Alert.AlertType.INFORMATION, "Verification Complete", verificationResult);
 
-        // Add to history
-        String historyEntry = java.time.LocalDateTime.now() + ": " + batchId + " - ✅ VERIFIED";
-        verificationHistory.add(0, historyEntry);
+        // Add to history with proper formatting
+        String historyEntry = java.time.LocalDateTime.now().format(
+                java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) + 
+                ": " + batchId + " - ✅ VERIFIED (" + productName + ")";
+        
+        Platform.runLater(() -> {
+            verificationHistory.add(0, historyEntry);
+        });
     }
 
     private void showAlert(Alert.AlertType type, String title, String message) {
