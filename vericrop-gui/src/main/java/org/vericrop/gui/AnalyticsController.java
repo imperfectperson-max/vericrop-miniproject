@@ -1,8 +1,10 @@
 package org.vericrop.gui;
 
+import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.chart.LineChart;
 import javafx.scene.chart.PieChart;
+import javafx.scene.chart.XYChart;
 import javafx.scene.control.*;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -83,7 +85,30 @@ public class AnalyticsController {
     }
 
     private void setupCharts() {
-        // Charts would be populated with real data in implementation
+        // Populate quality trend chart with sample data
+        if (qualityTrendChart != null) {
+            XYChart.Series<String, Number> series = new XYChart.Series<>();
+            series.setName("Quality Score");
+            series.getData().add(new XYChart.Data<>("Jan", 82));
+            series.getData().add(new XYChart.Data<>("Feb", 85));
+            series.getData().add(new XYChart.Data<>("Mar", 87));
+            series.getData().add(new XYChart.Data<>("Apr", 86));
+            series.getData().add(new XYChart.Data<>("May", 89));
+            series.getData().add(new XYChart.Data<>("Jun", 91));
+            qualityTrendChart.getData().add(series);
+            qualityTrendChart.setLegendVisible(false);
+        }
+        
+        // Populate temperature compliance pie chart with sample data
+        if (temperatureComplianceChart != null) {
+            ObservableList<PieChart.Data> pieChartData = FXCollections.observableArrayList(
+                    new PieChart.Data("Compliant", 94),
+                    new PieChart.Data("Minor Issues", 4),
+                    new PieChart.Data("Major Issues", 2)
+            );
+            temperatureComplianceChart.setData(pieChartData);
+            temperatureComplianceChart.setLegendVisible(true);
+        }
     }
 
     @FXML
