@@ -34,6 +34,10 @@ kafka:
     shipment-record: shipment-records
   enabled: ${KAFKA_ENABLED:false}  # Set to true when Kafka is available
 
+# VeriCrop application mode
+vericrop:
+  mode: ${VERICROP_MODE:dev}  # dev or prod - controls blockchain initialization speed
+
 # Ledger configuration
 ledger:
   path: ${LEDGER_PATH:ledger}
