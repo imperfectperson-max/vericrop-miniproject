@@ -83,3 +83,8 @@ ledger/
 test-ledger-*/
 uploads/
 *.jsonl
+
+# Blockchain files (generated at runtime)
+blockchain.json
+vericrop_chain.json
+dev_blockchain.json
