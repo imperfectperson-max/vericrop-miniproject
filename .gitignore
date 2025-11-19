@@ -75,9 +75,10 @@ bin/
 docker/ml-service/models/
 *.onnx
 *.pth
-# ignore exported model artifacts used for local development
-/docker/ml-service/vericrop_models/
-docker/ml-service/models/
-*.onnx
-*.pth
 __pycache__/
+
+# VeriCrop specific
+ledger/
+test-ledger-*/
+uploads/
+*.jsonl
