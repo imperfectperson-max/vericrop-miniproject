@@ -1,0 +1,78 @@
+version: '3.8'
+
+# Docker Compose configuration for VeriCrop Java services
+# Build JARs first: ./gradlew clean build
+# Then run: docker-compose -f docker-compose-java.yml up --build
+
+services:
+  # VeriCrop GUI Application (Spring Boot + JavaFX)
+  vericrop-gui:
+    build:
+      context: .
+      dockerfile: vericrop-gui/Dockerfile
+    image: vericrop-gui:latest
+    container_name: vericrop-gui
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+    depends_on:
+      - kafka
+    networks:
+      - vericrop-network
+    restart: unless-stopped
+
+  # Kafka Service (Library module - included for completeness)
+  kafka-service:
+    build:
+      context: .
+      dockerfile: kafka-service/Dockerfile
+    image: kafka-service:latest
+    container_name: kafka-service
+    networks:
+      - vericrop-network
+
+  # VeriCrop Core (Library module - included for completeness)
+  vericrop-core:
+    build:
+      context: .
+      dockerfile: vericrop-core/Dockerfile
+    image: vericrop-core:latest
+    container_name: vericrop-core
+    networks:
+      - vericrop-network
+
+  # Kafka broker (from docker-compose-kafka.yml)
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: vericrop-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - vericrop-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: vericrop-kafka
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    ports:
+      - "9092:9092"
+    networks:
+      - vericrop-network
+
+networks:
+  vericrop-network:
+    driver: bridge
