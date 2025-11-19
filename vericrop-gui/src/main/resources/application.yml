@@ -1,0 +1,56 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: vericrop-evaluation-api
+  
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 10MB
+      max-request-size: 10MB
+  
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      retries: 3
+    consumer:
+      group-id: vericrop-evaluation-group
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      auto-offset-reset: earliest
+
+# Kafka topics
+kafka:
+  topics:
+    evaluation-request: evaluation-requests
+    evaluation-result: evaluation-results
+    shipment-record: shipment-records
+  enabled: false  # Set to true when Kafka is available
+
+# Ledger configuration
+ledger:
+  path: ledger
+  file: shipment_ledger.jsonl
+
+# Quality evaluation configuration
+quality:
+  evaluation:
+    pass-threshold: 0.7
+    evaluation-method: deterministic_stub
+
+# Logging configuration
+logging:
+  level:
+    root: INFO
+    org.vericrop: DEBUG
+    org.springframework.web: INFO
+    org.apache.kafka: WARN
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"

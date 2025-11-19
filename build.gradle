@@ -81,6 +81,7 @@ project(':ml-client') {
 project(':vericrop-gui') {
     apply plugin: 'application'
     apply plugin: 'org.openjfx.javafxplugin'
+    apply plugin: 'org.springframework.boot'
 
     javafx {
         version = '17.0.6'
@@ -96,11 +97,13 @@ project(':vericrop-gui') {
         implementation project(':ml-client')
         implementation project(':kafka-service')
 
+        implementation 'org.springframework.boot:spring-boot-starter-web'
         implementation 'com.squareup.okhttp3:okhttp:4.11.0'
         implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.2'
         implementation 'org.slf4j:slf4j-api:2.0.7'
         implementation 'ch.qos.logback:logback-classic:1.4.8'
 
+        testImplementation 'org.springframework.boot:spring-boot-starter-test'
         testImplementation 'org.junit.jupiter:junit-jupiter-api:5.9.3'
         testImplementation 'org.junit.jupiter:junit-jupiter-engine:5.9.3'
     }

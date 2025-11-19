@@ -176,7 +176,52 @@ Expected response: `{"status":"healthy"}`
 
 ### Starting the Application
 
-#### 1. Start the ML Service (if not already running)
+VeriCrop provides two interfaces:
+1. **JavaFX Desktop Application** - Interactive dashboards for farm, logistics, consumer, and analytics
+2. **REST API** - RESTful endpoints for quality evaluation and shipment management
+
+#### Option 1: REST API (Spring Boot)
+
+```bash
+# Build and run the REST API
+./gradlew :vericrop-gui:bootRun
+
+# Or run the JAR directly
+java -jar vericrop-gui/build/libs/vericrop-gui-1.0.0.jar
+```
+
+The API will start on `http://localhost:8080`
+
+**Quick Test:**
+```bash
+# Health check
+curl http://localhost:8080/api/health
+
+# Evaluate fruit quality
+curl -X POST http://localhost:8080/api/evaluate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "batch_id": "BATCH_001",
+    "product_type": "apple",
+    "farmer_id": "farmer_001"
+  }'
+```
+
+#### Option 2: JavaFX Desktop Application
+
+```bash
+# From project root
+./gradlew :vericrop-gui:run
+
+# Or on Windows:
+gradlew.bat :vericrop-gui:run
+```
+
+The JavaFX desktop application will launch with four available dashboards.
+
+#### Option 3: ML Service (Optional)
+
+If you want to use the external ML service:
 
 Using Docker:
 ```bash
@@ -193,18 +238,6 @@ Verify the service is healthy:
 curl http://localhost:8000/health
 # Expected: {"status":"healthy"}
 ```
-
-#### 2. Run the Core Application
-
-```bash
-# From project root
-./gradlew :vericrop-gui:run
-
-# Or on Windows:
-gradlew.bat :vericrop-gui:run
-```
-
-The JavaFX desktop application will launch with four available dashboards.
 
 ### Using the Dashboards
 
@@ -233,55 +266,70 @@ The JavaFX desktop application will launch with four available dashboards.
 
 ### API Usage Examples
 
-#### Test Fruit Quality Prediction
+#### VeriCrop REST API (Port 8080)
 
 ```bash
-# Using curl
+# Health check
+curl http://localhost:8080/api/health
+
+# Evaluate fruit quality
+curl -X POST http://localhost:8080/api/evaluate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "batch_id": "BATCH_001",
+    "product_type": "apple",
+    "farmer_id": "farmer_001"
+  }'
+
+# Get shipment record
+curl http://localhost:8080/api/shipments/550e8400-e29b-41d4-a716-446655440000
+
+# Get all shipments for a batch
+curl http://localhost:8080/api/shipments?batch_id=BATCH_001
+```
+
+#### ML Service API (Port 8000 - Optional)
+
+```bash
+# Test fruit quality prediction
 curl -X POST -F "file=@examples/sample.jpg" http://localhost:8000/predict
 
-# Expected response format:
-# {
-#   "prediction": "Fresh",
-#   "confidence": 0.95,
-#   "quality_score": 0.92,
-#   "metrics": {
-#     "color_consistency": 0.92,
-#     "size_uniformity": 0.87,
-#     "defect_density": 0.03
-#   }
-# }
-```
-
-#### Get Farm Dashboard Data
-
-```bash
+# Get farm dashboard data
 curl http://localhost:8000/dashboard/farm
-```
 
-#### Get Analytics Data
-
-```bash
+# Get analytics data
 curl http://localhost:8000/dashboard/analytics
-```
 
-#### Get Batch Information
-
-```bash
+# Get batch information
 curl http://localhost:8000/batches
 ```
 
+**📚 For comprehensive API documentation, examples, and Kafka integration guide, see [KAFKA_INTEGRATION.md](KAFKA_INTEGRATION.md)**
+
 ### Configuration
 
-The application uses environment-based configuration. You can customize settings through environment variables:
+The application can be configured via `vericrop-gui/src/main/resources/application.yml`:
 
-```bash
-# ML Service Port (default: 8000)
-export PORT=8000
+```yaml
+server:
+  port: 8080  # REST API port
 
-# TODO: Add other configuration variables as needed
+kafka:
+  enabled: false  # Set to true when Kafka is available
+  
+spring:
+  kafka:
+    bootstrap-servers: localhost:9092
+
+ledger:
+  path: ledger  # Path to store shipment records
+
+quality:
+  evaluation:
+    pass-threshold: 0.7
 ```
 
-**Note:** For detailed configuration options, please refer to the application.conf files in the respective modules.
+**Note:** See [KAFKA_INTEGRATION.md](KAFKA_INTEGRATION.md) for detailed configuration options.
 
 ## 🧪 Running Tests
 
@@ -356,19 +404,45 @@ The test suite covers:
 
 **Note:** Currently, some test files may be placeholders. Contributors should add comprehensive tests as features are implemented.
 
+### Airflow DAG Testing
+
+VeriCrop includes an Airflow DAG for end-to-end quality evaluation pipeline:
+
+```bash
+# Install Airflow and dependencies
+pip install apache-airflow kafka-python
+
+# Initialize Airflow
+airflow db init
+
+# Start Airflow webserver
+airflow webserver --port 8081
+
+# Start Airflow scheduler (in another terminal)
+airflow scheduler
+
+# Access UI at http://localhost:8081
+# Enable and trigger: vericrop_evaluation_pipeline
+```
+
+The DAG performs:
+1. Produces evaluation requests to Kafka
+2. Calls REST API for evaluation
+3. Verifies ledger records
+4. Generates pipeline summary
+
 ### Running Linters
 
 **Java:**
 ```bash
-# TODO: Add linter configuration and commands (e.g., Checkstyle, SpotBugs)
-# Example: ./gradlew checkstyleMain
+# Build with warnings
+./gradlew build --warning-mode all
 ```
 
 **Python:**
 ```bash
-# TODO: Add linter commands (e.g., pylint, flake8, black)
-# Example: pylint docker/ml-service/*.py
-# Example: black --check docker/ml-service/
+# Check Airflow DAG syntax
+python airflow/dags/vericrop_dag.py
 ```
 
 ## 🏗️ System Architecture
