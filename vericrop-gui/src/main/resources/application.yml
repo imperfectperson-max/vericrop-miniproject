@@ -14,17 +14,32 @@ spring:
       max-request-size: 10MB
   
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
       acks: all
       retries: 3
     consumer:
-      group-id: vericrop-evaluation-group
+      group-id: ${KAFKA_GROUP_ID:vericrop-evaluation-group}
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       auto-offset-reset: earliest
+
+  # Database configuration
+  datasource:
+    url: ${DATABASE_URL:jdbc:h2:mem:vericrop}
+    driver-class-name: ${DATABASE_DRIVER:org.h2.Driver}
+    username: ${DATABASE_USERNAME:sa}
+    password: ${DATABASE_PASSWORD:}
+  
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: ${HIBERNATE_DIALECT:org.hibernate.dialect.H2Dialect}
 
 # Kafka topics
 kafka:
@@ -32,7 +47,9 @@ kafka:
     evaluation-request: evaluation-requests
     evaluation-result: evaluation-results
     shipment-record: shipment-records
-  enabled: false  # Set to true when Kafka is available
+    fruit-quality: vericrop.fruit-quality
+    supplychain-events: vericrop.supplychain-events
+  enabled: ${KAFKA_ENABLED:false}  # Set to true when Kafka is available
 
 # Ledger configuration
 ledger:

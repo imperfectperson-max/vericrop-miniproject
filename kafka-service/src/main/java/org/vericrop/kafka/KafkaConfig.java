@@ -17,10 +17,22 @@ public class KafkaConfig {
     public static final String TOPIC_BLOCKCHAIN_EVENTS = "blockchain-events";
     public static final String TOPIC_ENVIRONMENTAL_DATA = "environmental-data";
     public static final String TOPIC_CONSUMER_VERIFICATIONS = "consumer-verifications";
+    // New topics for integration
+    public static final String TOPIC_FRUIT_QUALITY = "vericrop.fruit-quality";
+    public static final String TOPIC_SUPPLYCHAIN_EVENTS = "vericrop.supplychain-events";
+
+    // Environment variable support
+    private static String getBootstrapServers() {
+        return System.getenv().getOrDefault("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092");
+    }
+
+    private static String getDefaultGroupId() {
+        return System.getenv().getOrDefault("KAFKA_GROUP_ID", "vericrop-consumer-group");
+    }
 
     public static Properties getProducerProperties() {
         Properties props = new Properties();
-        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
+        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, getBootstrapServers());
         props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
         props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
 
@@ -37,8 +49,8 @@ public class KafkaConfig {
 
     public static Properties getConsumerProperties(String groupId) {
         Properties props = new Properties();
-        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
-        props.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
+        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, getBootstrapServers());
+        props.put(ConsumerConfig.GROUP_ID_CONFIG, groupId != null ? groupId : getDefaultGroupId());
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
 
