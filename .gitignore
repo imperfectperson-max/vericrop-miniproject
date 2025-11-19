@@ -32,6 +32,7 @@ Thumbs.db
 *.pem
 *.key
 kaggle.json
+.env
 ### IntelliJ IDEA ###
 .idea/
 .idea/modules.xml

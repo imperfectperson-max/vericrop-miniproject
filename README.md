@@ -112,11 +112,20 @@ The easiest way to run the complete VeriCrop stack is using Docker Compose, whic
 git clone https://github.com/imperfectperson-max/vericrop-miniproject.git
 cd vericrop-miniproject
 
+# Build Java artifacts first (required before docker-compose)
+./gradlew build
+
 # Start all services
 docker-compose up --build
 
 # Or run in detached mode (background)
 docker-compose up --build -d
+```
+
+**Alternative:** Use the build script to build everything:
+```bash
+./scripts/build-docker.sh
+docker-compose up -d
 ```
 
 This will start:
