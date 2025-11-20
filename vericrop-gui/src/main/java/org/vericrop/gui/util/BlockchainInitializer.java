@@ -56,11 +56,15 @@ public class BlockchainInitializer {
         // Use in-memory blockchain file for dev
         Blockchain blockchain = new Blockchain("dev_blockchain.json");
         
-        // Add a few sample blocks for testing
-        notifyProgress(progressCallback, "Creating sample dev blocks...");
-        addSampleDevBlocks(blockchain);
+        // Only add sample blocks if --load-demo flag is set
+        if (shouldLoadDemoData()) {
+            notifyProgress(progressCallback, "Loading demo blocks (--load-demo flag detected)...");
+            addSampleDevBlocks(blockchain);
+            logger.info("✅ Fast dev blockchain initialized with {} demo blocks", blockchain.getChain().size());
+        } else {
+            logger.info("✅ Fast dev blockchain initialized (empty, no demo data)");
+        }
         
-        logger.info("✅ Fast dev blockchain initialized with {} blocks", blockchain.getChain().size());
         notifyProgress(progressCallback, "Dev blockchain ready!");
         
         return blockchain;
@@ -93,36 +97,57 @@ public class BlockchainInitializer {
     }
     
     /**
+     * Check if demo data should be loaded based on system property or environment variable.
+     * Demo data is only loaded if explicitly requested via --load-demo flag.
+     */
+    private static boolean shouldLoadDemoData() {
+        // Check system property (set via --load-demo in command line)
+        String loadDemo = System.getProperty("vericrop.loadDemo");
+        if ("true".equalsIgnoreCase(loadDemo)) {
+            return true;
+        }
+        
+        // Check environment variable
+        String loadDemoEnv = System.getenv("VERICROP_LOAD_DEMO");
+        if ("true".equalsIgnoreCase(loadDemoEnv)) {
+            return true;
+        }
+        
+        return false;
+    }
+    
+    /**
      * Add sample blocks for development/testing.
+     * Only called when --load-demo flag is explicitly set.
      */
     private static void addSampleDevBlocks(Blockchain blockchain) {
         try {
-            // Add a few lightweight sample transactions
+            // Add a few lightweight sample transactions for demo purposes
             List<Transaction> sampleTx1 = new ArrayList<>();
             sampleTx1.add(new Transaction(
                 "CREATE_BATCH",
-                "dev_farmer_001",
+                "demo_farmer_001",
                 "system",
-                "DEV_BATCH_001",
-                "{\"product\":\"apple\",\"quality\":\"prime\"}"
+                "DEMO_BATCH_001",
+                "{\"product\":\"apple\",\"quality\":\"prime\",\"note\":\"Demo data\"}"
             ));
             
-            blockchain.addBlock(sampleTx1, "dev_hash_001", "dev_farmer_001");
+            blockchain.addBlock(sampleTx1, "demo_hash_001", "demo_farmer_001");
             
             List<Transaction> sampleTx2 = new ArrayList<>();
             sampleTx2.add(new Transaction(
                 "CREATE_BATCH",
-                "dev_farmer_002",
+                "demo_farmer_002",
                 "system",
-                "DEV_BATCH_002",
-                "{\"product\":\"orange\",\"quality\":\"standard\"}"
+                "DEMO_BATCH_002",
+                "{\"product\":\"orange\",\"quality\":\"standard\",\"note\":\"Demo data\"}"
             ));
             
-            blockchain.addBlock(sampleTx2, "dev_hash_002", "dev_farmer_002");
+            blockchain.addBlock(sampleTx2, "demo_hash_002", "demo_farmer_002");
             
-            logger.debug("Added {} sample blocks for dev mode", 2);
+            logger.debug("Added {} demo blocks (--load-demo flag)", 2);
         } catch (Exception e) {
-            logger.warn("Could not add sample blocks: {}", e.getMessage());
+            logger.warn("Could not add demo blocks: {}", e.getMessage());
         }
     }
     

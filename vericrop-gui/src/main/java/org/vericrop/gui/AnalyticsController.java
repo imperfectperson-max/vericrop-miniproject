@@ -50,28 +50,52 @@ public class AnalyticsController {
     }
 
     private void setupKPIs() {
-        totalBatchesLabel.setText("1,247");
-        avgQualityLabel.setText("87% ↑2%");
-        spoilageRateLabel.setText("2% ↓1%");
-        onTimeDeliveryLabel.setText("96%");
+        // Load real data from services or display empty state
+        if (shouldLoadDemoData()) {
+            totalBatchesLabel.setText("1,247 (demo)");
+            avgQualityLabel.setText("87% ↑2% (demo)");
+            spoilageRateLabel.setText("2% ↓1% (demo)");
+            onTimeDeliveryLabel.setText("96% (demo)");
+        } else {
+            totalBatchesLabel.setText("0");
+            avgQualityLabel.setText("--");
+            spoilageRateLabel.setText("--");
+            onTimeDeliveryLabel.setText("--");
+        }
     }
 
     private void setupSupplierTable() {
-        suppliers.addAll(
-                new Supplier("Farm A", 92, 1),
-                new Supplier("Farm B", 85, 3),
-                new Supplier("Farm C", 78, 7)
-        );
+        if (shouldLoadDemoData()) {
+            suppliers.addAll(
+                    new Supplier("Farm A (demo)", 92, 1),
+                    new Supplier("Farm B (demo)", 85, 3),
+                    new Supplier("Farm C (demo)", 78, 7)
+            );
+        }
         supplierTable.setItems(suppliers);
     }
 
     private void setupAlertsTable() {
-        alerts.addAll(
-                new Alert("Mar 07", "Temp Breach", "Temperature exceeded 7°C for 30min"),
-                new Alert("Mar 05", "Delivery Delay", "Shipment delayed by 45 minutes"),
-                new Alert("Mar 01", "Quality Drop", "Quality score dropped to 65%")
-        );
+        if (shouldLoadDemoData()) {
+            alerts.addAll(
+                    new Alert("Mar 07", "Temp Breach (demo)", "Temperature exceeded 7°C for 30min"),
+                    new Alert("Mar 05", "Delivery Delay (demo)", "Shipment delayed by 45 minutes"),
+                    new Alert("Mar 01", "Quality Drop (demo)", "Quality score dropped to 65%")
+            );
+        }
         alertsTable.setItems(alerts);
+    }
+    
+    private boolean shouldLoadDemoData() {
+        // Check system property (set via --load-demo flag)
+        String loadDemo = System.getProperty("vericrop.loadDemo");
+        if ("true".equalsIgnoreCase(loadDemo)) {
+            return true;
+        }
+        
+        // Check environment variable
+        String loadDemoEnv = System.getenv("VERICROP_LOAD_DEMO");
+        return "true".equalsIgnoreCase(loadDemoEnv);
     }
 
     private void setupExportCombo() {
@@ -85,10 +109,10 @@ public class AnalyticsController {
     }
 
     private void setupCharts() {
-        // Populate quality trend chart with sample data
-        if (qualityTrendChart != null) {
+        // Populate quality trend chart with demo data only if flag is set
+        if (qualityTrendChart != null && shouldLoadDemoData()) {
             XYChart.Series<String, Number> series = new XYChart.Series<>();
-            series.setName("Quality Score");
+            series.setName("Quality Score (demo)");
             series.getData().add(new XYChart.Data<>("Jan", 82));
             series.getData().add(new XYChart.Data<>("Feb", 85));
             series.getData().add(new XYChart.Data<>("Mar", 87));
@@ -96,18 +120,28 @@ public class AnalyticsController {
             series.getData().add(new XYChart.Data<>("May", 89));
             series.getData().add(new XYChart.Data<>("Jun", 91));
             qualityTrendChart.getData().add(series);
-            qualityTrendChart.setLegendVisible(false);
+            qualityTrendChart.setLegendVisible(true);
+            qualityTrendChart.setTitle("Quality Trend Over Time");
         }
         
-        // Populate temperature compliance pie chart with sample data
+        // Populate temperature compliance pie chart with labels
         if (temperatureComplianceChart != null) {
-            ObservableList<PieChart.Data> pieChartData = FXCollections.observableArrayList(
-                    new PieChart.Data("Compliant", 94),
-                    new PieChart.Data("Minor Issues", 4),
-                    new PieChart.Data("Major Issues", 2)
-            );
-            temperatureComplianceChart.setData(pieChartData);
+            temperatureComplianceChart.setTitle("Temperature Compliance");
             temperatureComplianceChart.setLegendVisible(true);
+            
+            if (shouldLoadDemoData()) {
+                ObservableList<PieChart.Data> pieChartData = FXCollections.observableArrayList(
+                        new PieChart.Data("Compliant (94%)", 94),
+                        new PieChart.Data("Minor Issues (4%)", 4),
+                        new PieChart.Data("Major Issues (2%)", 2)
+                );
+                temperatureComplianceChart.setData(pieChartData);
+                
+                // Add percentage labels to pie slices
+                pieChartData.forEach(data -> {
+                    data.nameProperty().setValue(data.getName());
+                });
+            }
         }
     }
 
