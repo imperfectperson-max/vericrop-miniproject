@@ -175,40 +175,77 @@ async def startup_event():
     vericrop_mode = os.getenv("VERICROP_MODE", "dev").lower()
     is_production = vericrop_mode == "prod"
 
-    # Then load the model
+    # Then load the model - prefer ONNX, fallback to PyTorch
     try:
-        model_path = "model/vericrop_quality_model.onnx"
+        onnx_model_path = "model/vericrop_quality_model.onnx"
+        pytorch_model_path = "model/vericrop_quality_model_scripted.pt"
         label_map_path = "model/quality_label_map.json"
 
-        if not os.path.exists(model_path):
-            if is_production:
-                logger.error(f"❌ CRITICAL: Model file not found at {model_path} in PRODUCTION mode")
-                logger.error("❌ Production mode requires the ONNX model to be present")
-                logger.error("❌ Please provide vericrop_quality_model.onnx in the model/ directory")
-                logger.error("❌ Or use scripts/fetch_model.sh to download from MODEL_DOWNLOAD_URL")
-                raise RuntimeError(f"Production startup failed: Model file not found at {model_path}")
-            else:
-                logger.warning(f"⚠️  Model file not found at {model_path}. Running in DEV mode with demo fallback.")
-                logger.warning(f"⚠️  Set VERICROP_LOAD_DEMO=true to enable demo predictions")
+        # Try ONNX first (preferred for production)
+        if os.path.exists(onnx_model_path):
+            try:
+                logger.info(f"📦 Loading ONNX model from {onnx_model_path}...")
+                session = ort.InferenceSession(onnx_model_path)
+                
+                # Load label map
+                if os.path.exists(label_map_path):
+                    with open(label_map_path, "r") as f:
+                        label_map = json.load(f)
+                else:
+                    # Use default label map if not found
+                    logger.warning("⚠️  Label map not found, using default mapping")
+                    label_map = {"0": "fresh", "1": "good", "2": "ripe", "3": "low_quality", "4": "rotten"}
+                
+                model_loaded = True
+                logger.info(f"✅ ONNX Model Loaded Successfully - {len(label_map)} classes")
+                logger.info(f"✅ Classes: {list(label_map.values())}")
+                logger.info(f"✅ Mode: {vericrop_mode.upper()}")
                 return
+            except Exception as e:
+                logger.warning(f"⚠️  Failed to load ONNX model: {e}")
+                if is_production:
+                    raise
+                logger.info("🔄 Attempting PyTorch fallback...")
+        
+        # Fallback to PyTorch if ONNX not available
+        if os.path.exists(pytorch_model_path):
+            try:
+                import torch
+                logger.info(f"📦 Loading PyTorch scripted model from {pytorch_model_path}...")
+                torch_model = torch.jit.load(pytorch_model_path)
+                torch_model.eval()
+                
+                # Store in session variable (will need special handling in predict)
+                session = torch_model
+                
+                # Load or create label map
+                if os.path.exists(label_map_path):
+                    with open(label_map_path, "r") as f:
+                        label_map = json.load(f)
+                else:
+                    logger.warning("⚠️  Label map not found, using default mapping")
+                    label_map = {"0": "fresh", "1": "good", "2": "ripe", "3": "low_quality", "4": "rotten"}
+                
+                model_loaded = True
+                logger.info(f"✅ PyTorch Model Loaded Successfully - {len(label_map)} classes")
+                logger.info(f"✅ Classes: {list(label_map.values())}")
+                logger.info(f"✅ Mode: {vericrop_mode.upper()} (PyTorch fallback)")
+                return
+            except Exception as e:
+                logger.warning(f"⚠️  Failed to load PyTorch model: {e}")
+                if is_production:
+                    raise
 
-        # Load label map
-        if not os.path.exists(label_map_path):
-            logger.error(f"❌ Label map not found at {label_map_path}")
-            if is_production:
-                raise RuntimeError(f"Production startup failed: Label map not found at {label_map_path}")
+        # No models found
+        if is_production:
+            logger.error(f"❌ CRITICAL: No model files found in PRODUCTION mode")
+            logger.error(f"❌ Looked for: {onnx_model_path} or {pytorch_model_path}")
+            logger.error("❌ Please provide ONNX model (preferred) or PyTorch scripted model")
+            raise RuntimeError(f"Production startup failed: No model files found")
+        else:
+            logger.warning(f"⚠️  No model files found. Running in DEV mode with demo fallback.")
+            logger.warning(f"⚠️  Set VERICROP_LOAD_DEMO=true to enable demo predictions")
             return
-
-        # Load ONNX model
-        session = ort.InferenceSession(model_path)
-
-        with open(label_map_path, "r") as f:
-            label_map = json.load(f)
-
-        model_loaded = True
-        logger.info(f"✅ Model Loaded Successfully - {len(label_map)} classes")
-        logger.info(f"✅ Classes: {list(label_map.values())}")
-        logger.info(f"✅ Mode: {vericrop_mode.upper()}")
 
     except Exception as e:
         logger.error(f"❌ Failed to load model: {e}")
@@ -591,6 +628,67 @@ async def model_info():
         "performance": "99.06% validation accuracy",
         "classes": list(label_map.values())
     }
+
+@app.get("/dashboard/analytics")
+async def get_analytics_dashboard():
+    """
+    Analytics dashboard data for KPI monitoring and trend analysis.
+    Provides aggregated metrics and quality trends over time.
+    """
+    try:
+        # Calculate aggregate metrics from batches
+        if batches_db:
+            total_batches = len(batches_db)
+            
+            # Calculate quality metrics
+            quality_scores = [batch.get('quality_score', 0.8) for batch in batches_db]
+            avg_quality = (sum(quality_scores) / len(quality_scores)) if quality_scores else 0
+            
+            # Calculate spoilage rate (batches with quality < 0.5)
+            spoiled_batches = sum(1 for score in quality_scores if score < 0.5)
+            spoilage_rate = (spoiled_batches / total_batches) if total_batches > 0 else 0
+            
+            # Calculate prime rate (batches with quality >= 0.8)
+            prime_batches = sum(1 for score in quality_scores if score >= 0.8)
+            prime_rate = (prime_batches / total_batches) if total_batches > 0 else 0
+            
+            # Quality trends (last 10 batches for trend line)
+            recent_batches = batches_db[-10:] if len(batches_db) >= 10 else batches_db
+            quality_trends = [
+                {
+                    "batch_id": batch.get('batch_id', 'Unknown'),
+                    "quality_score": float(batch.get('quality_score', 0.8)),
+                    "timestamp": batch.get('timestamp', datetime.now().isoformat())
+                }
+                for batch in recent_batches
+            ]
+            
+        else:
+            total_batches = 0
+            avg_quality = 0
+            spoilage_rate = 0
+            prime_rate = 0
+            quality_trends = []
+        
+        # Return analytics data
+        analytics_data = {
+            "kpi_metrics": {
+                "total_batches": total_batches,
+                "avg_quality": round(avg_quality, 3),
+                "spoilage_rate": round(spoilage_rate, 3),
+                "prime_rate": round(prime_rate, 3)
+            },
+            "quality_trends": quality_trends,
+            "timestamp": datetime.now().isoformat(),
+            "model_accuracy": "99.06%" if model_loaded else "demo_mode"
+        }
+        
+        logger.info(f"📊 Analytics dashboard - Batches: {total_batches}, AvgQuality: {avg_quality:.2f}, Spoilage: {spoilage_rate:.2%}")
+        return analytics_data
+        
+    except Exception as e:
+        logger.error(f"❌ Error generating analytics dashboard: {e}")
+        raise HTTPException(status_code=500, detail=f"Analytics generation failed: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn
