@@ -13,18 +13,48 @@ spring:
       max-file-size: 10MB
       max-request-size: 10MB
   
+  # PostgreSQL DataSource configuration
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:vericrop}
+    username: ${POSTGRES_USER:vericrop}
+    password: ${POSTGRES_PASSWORD:vericrop123}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      pool-name: VeriCropHikariPool
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+      connection-timeout: ${DB_CONNECTION_TIMEOUT:30000}
+      idle-timeout: ${DB_IDLE_TIMEOUT:600000}
+      max-lifetime: ${DB_MAX_LIFETIME:1800000}
+      minimum-idle: 2
+      connection-test-query: SELECT 1
+  
+  # Flyway configuration for database migrations
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    validate-on-migrate: true
+    locations: classpath:db/migration
+    schemas: public
+    baseline-version: 0
+  
   kafka:
     bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}}
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
-      acks: all
-      retries: 3
+      acks: ${KAFKA_ACKS:all}
+      retries: ${KAFKA_RETRIES:3}
+      properties:
+        enable.idempotence: ${KAFKA_IDEMPOTENCE:true}
+        max.in.flight.requests.per.connection: 5
     consumer:
       group-id: vericrop-evaluation-group
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       auto-offset-reset: earliest
+      enable-auto-commit: false
+      properties:
+        isolation.level: read_committed
 
 # Kafka topics
 kafka:
@@ -37,6 +67,7 @@ kafka:
 # VeriCrop application mode
 vericrop:
   mode: ${VERICROP_MODE:dev}  # dev or prod - controls blockchain initialization speed
+  load-demo: ${VERICROP_LOAD_DEMO:false}  # Demo mode disabled by default in production
 
 # Ledger configuration
 ledger:
@@ -54,12 +85,84 @@ ml:
   service:
     url: ${ML_SERVICE_URL:http://localhost:8000}
 
+# Spring Boot Actuator configuration
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus,info
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: ${ACTUATOR_SHOW_DETAILS:always}
+      probes:
+        enabled: true
+  health:
+    db:
+      enabled: true
+    kafka:
+      enabled: ${KAFKA_ENABLED:false}
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    tags:
+      application: ${spring.application.name}
+      environment: ${VERICROP_MODE:dev}
+
+# Resilience4j Circuit Breaker configuration
+resilience4j:
+  circuitbreaker:
+    instances:
+      mlService:
+        register-health-indicator: true
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+      kafkaProducer:
+        register-health-indicator: true
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 60
+        wait-duration-in-open-state: 20s
+  
+  retry:
+    instances:
+      mlService:
+        max-attempts: ${ML_SERVICE_RETRIES:3}
+        wait-duration: ${ML_SERVICE_RETRY_DELAY:1000}ms
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        retry-exceptions:
+          - java.net.ConnectException
+          - java.net.SocketTimeoutException
+      database:
+        max-attempts: 3
+        wait-duration: 500ms
+  
+  timelimiter:
+    instances:
+      mlService:
+        timeout-duration: ${ML_SERVICE_TIMEOUT:30000}ms
+        cancel-running-future: true
+
 # Logging configuration
 logging:
   level:
-    root: INFO
+    root: ${LOG_LEVEL:INFO}
     org.vericrop: DEBUG
     org.springframework.web: INFO
     org.apache.kafka: WARN
+    org.flywaydb: INFO
+    com.zaxxer.hikari: INFO
+    io.github.resilience4j: DEBUG
   pattern:
-    console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: ${LOG_FILE_PATH:logs/vericrop-gui.log}
+    max-size: 10MB
+    max-history: 30

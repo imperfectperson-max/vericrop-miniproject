@@ -108,6 +108,21 @@ project(':vericrop-gui') {
         implementation 'com.zaxxer:HikariCP:5.0.1'
         implementation 'org.springframework.boot:spring-boot-starter-jdbc'
         
+        // Database migrations with Flyway
+        implementation 'org.flywaydb:flyway-core:9.22.3'
+        
+        // Resilience4j for circuit breaker, retry, timeout
+        implementation 'io.github.resilience4j:resilience4j-spring-boot3:2.1.0'
+        implementation 'io.github.resilience4j:resilience4j-circuitbreaker:2.1.0'
+        implementation 'io.github.resilience4j:resilience4j-retry:2.1.0'
+        implementation 'io.github.resilience4j:resilience4j-timelimiter:2.1.0'
+        
+        // Spring Boot Actuator for health and metrics endpoints
+        implementation 'org.springframework.boot:spring-boot-starter-actuator'
+        
+        // Micrometer for Prometheus metrics
+        implementation 'io.micrometer:micrometer-registry-prometheus'
+        
         // HTTP client for ML service integration
         implementation 'com.squareup.okhttp3:okhttp:4.11.0'
         

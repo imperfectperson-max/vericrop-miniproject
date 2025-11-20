@@ -13,17 +13,23 @@ RUN mkdir -p model
 # Copy requirements first for better caching
 COPY requirements.txt .
 
-# Install Python dependencies
+# Install Python dependencies (including onnxruntime for production)
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application and model files
+# Copy application code
 COPY app.py .
+
+# Copy model files (ONNX model and label map) if they exist
+# Note: In production, mount model directory as volume or use fetch script before building
 COPY model/ ./model/
 
+# Set environment variables
 ENV PYTHONUNBUFFERED=1
+ENV VERICROP_MODE=dev
 
 # Health check using curl
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+# In production mode, this will fail if model is not loaded
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 EXPOSE 8000
