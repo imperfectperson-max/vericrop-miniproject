@@ -11,8 +11,12 @@ env:
   PYTHON_VERSION: '3.11'
 
 # Set default permissions to read-only for security
+# Added pull-requests: write and actions: read for test result publishing and artifact access
 permissions:
   contents: read
+  checks: write
+  pull-requests: write
+  actions: read
 
 jobs:
   build-java:
@@ -46,6 +50,25 @@ jobs:
     
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
+    
+    # Validate Gradle wrapper download with retry logic to handle transient network failures
+    - name: Validate Gradle wrapper download
+      run: |
+        max_attempts=3
+        attempt=0
+        until [ $attempt -ge $max_attempts ]; do
+          if ./gradlew --version; then
+            echo "✅ Gradle wrapper downloaded successfully"
+            break
+          fi
+          attempt=$((attempt+1))
+          echo "⚠️ Gradle download attempt $attempt failed, retrying in 5 seconds..."
+          sleep 5
+        done
+        if [ $attempt -ge $max_attempts ]; then
+          echo "❌ Failed to download Gradle after $max_attempts attempts"
+          exit 1
+        fi
     
     - name: Build with Gradle
       run: ./gradlew build --no-daemon --stacktrace
