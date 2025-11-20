@@ -20,6 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      actions: write
       checks: write  # For publishing test results
     
     steps:
@@ -34,7 +35,7 @@ jobs:
         cache: 'gradle'
     
     - name: Cache Gradle packages
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/.gradle/caches
@@ -81,6 +82,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      actions: write
+      checks: write
     
     steps:
     - name: Checkout code

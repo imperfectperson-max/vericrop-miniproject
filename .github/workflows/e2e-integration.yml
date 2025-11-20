@@ -4,6 +4,11 @@ on:
   push:
     branches: [ "main" ]
 
+permissions:
+  contents: read
+  actions: write
+  checks: write
+
 jobs:
   e2e:
     name: E2E tests (build image, run container, pytest)
