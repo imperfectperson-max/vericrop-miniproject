@@ -8,6 +8,7 @@
 <?import javafx.scene.chart.BarChart?>
 <?import javafx.scene.chart.CategoryAxis?>
 <?import javafx.scene.chart.NumberAxis?>
+<?import javafx.scene.shape.Rectangle?>
 
 <?import javafx.scene.shape.Circle?>
 <ScrollPane fx:id="mainScrollPane" fitToWidth="true" style="-fx-background-color: transparent; -fx-border-color: transparent;" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
@@ -122,13 +123,30 @@
                         <!-- Quality Distribution -->
                         <VBox spacing="8" style="-fx-background-color: white; -fx-padding: 15; -fx-background-radius: 15; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 10, 0, 0, 2); -fx-pref-width: 280;">
                             <Label text="📊 Quality Distribution" style="-fx-font-weight: bold; -fx-font-size: 14px; -fx-text-fill: #555;"/>
-                            <PieChart fx:id="qualityDistributionChart" prefHeight="200" legendVisible="false"/>
+                            <PieChart fx:id="qualityDistributionChart" prefHeight="180" legendVisible="false" labelsVisible="true"/>
+
+                            <!-- Custom Legend -->
+                            <VBox spacing="5" style="-fx-padding: 10 0 0 0;">
+                                <HBox spacing="10" alignment="CENTER_LEFT">
+                                    <Rectangle width="12" height="12" fill="#4CAF50" stroke="TRANSPARENT" arcWidth="3" arcHeight="3"/>
+                                    <Label text="Prime (80-100%)" style="-fx-font-size: 11px; -fx-text-fill: #555;"/>
+                                </HBox>
+                                <HBox spacing="10" alignment="CENTER_LEFT">
+                                    <Rectangle width="12" height="12" fill="#FFC107" stroke="TRANSPARENT" arcWidth="3" arcHeight="3"/>
+                                    <Label text="Standard (60-79%)" style="-fx-font-size: 11px; -fx-text-fill: #555;"/>
+                                </HBox>
+                                <HBox spacing="10" alignment="CENTER_LEFT">
+                                    <Rectangle width="12" height="12" fill="#F44336" stroke="TRANSPARENT" arcWidth="3" arcHeight="3"/>
+                                    <Label text="Sub-standard (0-59%)" style="-fx-font-size: 11px; -fx-text-fill: #555;"/>
+                                </HBox>
+                            </VBox>
                         </VBox>
 
                         <!-- Recent Batches -->
                         <VBox spacing="8" style="-fx-background-color: white; -fx-padding: 15; -fx-background-radius: 15; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 10, 0, 0, 2);" VBox.vgrow="ALWAYS">
                             <Label text="📋 Recent Batches" style="-fx-font-weight: bold; -fx-font-size: 14px; -fx-text-fill: #555;"/>
-                            <ListView fx:id="recentBatchesList" prefHeight="200" style="-fx-font-size: 11px; -fx-background-radius: 8; -fx-border-radius: 8;"/>
+                            <ListView fx:id="recentBatchesList" prefHeight="200" style="-fx-font-size: 11px; -fx-background-radius: 8; -fx-border-radius: 8; -fx-pref-width: 300;"/>
+                            <Label text="Scroll to see more batches" style="-fx-font-size: 9px; -fx-text-fill: #888; -fx-alignment: center; -fx-padding: 5 0 0 0;"/>
                         </VBox>
                     </HBox>
 
@@ -139,9 +157,10 @@
                             <Region HBox.hgrow="ALWAYS"/>
                             <Label text="🔒 Immutable • 📝 Transparent" style="-fx-font-size: 10px; -fx-text-fill: #888; -fx-font-style: italic;"/>
                         </HBox>
-                        <TextArea fx:id="blockchainArea" editable="false"
+                        <TextArea fx:id="blockchainArea" editable="false" wrapText="true"
                                   style="-fx-font-family: 'Monaco', 'Consolas', monospace; -fx-font-size: 10px; -fx-background-radius: 8; -fx-border-radius: 8;"
                                   VBox.vgrow="ALWAYS"/>
+                        <Label text="New blocks appear here when batches are created" style="-fx-font-size: 9px; -fx-text-fill: #888; -fx-alignment: center; -fx-padding: 5 0 0 0;"/>
                     </VBox>
                 </VBox>
             </HBox>

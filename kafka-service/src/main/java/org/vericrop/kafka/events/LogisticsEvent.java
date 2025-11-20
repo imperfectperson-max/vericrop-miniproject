@@ -15,6 +15,7 @@ public class LogisticsEvent {
     private long timestamp;
     private double latitude;
     private double longitude;
+    private double qualityScore; // Added field
 
     public LogisticsEvent() {
         this.timestamp = System.currentTimeMillis();
@@ -67,10 +68,15 @@ public class LogisticsEvent {
     public double getLongitude() { return longitude; }
     public void setLongitude(double longitude) { this.longitude = longitude; }
 
+    // Added getter and setter for qualityScore
+    @JsonProperty("quality_score")
+    public double getQualityScore() { return qualityScore; }
+    public void setQualityScore(double qualityScore) { this.qualityScore = qualityScore; }
+
     @Override
     public String toString() {
-        return String.format("LogisticsEvent{batchId='%s', status='%s', temp=%.1f°C, location='%s'}",
-                batchId, status, temperature, location);
+        return String.format("LogisticsEvent{batchId='%s', status='%s', temp=%.1f°C, location='%s', quality=%.1f%%}",
+                batchId, status, temperature, location, qualityScore);
     }
 
     @Override
@@ -80,6 +86,7 @@ public class LogisticsEvent {
         LogisticsEvent that = (LogisticsEvent) o;
         return Double.compare(that.temperature, temperature) == 0 &&
                 Double.compare(that.humidity, humidity) == 0 &&
+                Double.compare(that.qualityScore, qualityScore) == 0 &&
                 timestamp == that.timestamp &&
                 Objects.equals(batchId, that.batchId) &&
                 Objects.equals(status, that.status) &&
@@ -88,6 +95,6 @@ public class LogisticsEvent {
 
     @Override
     public int hashCode() {
-        return Objects.hash(batchId, status, temperature, humidity, location, timestamp);
+        return Objects.hash(batchId, status, temperature, humidity, qualityScore, location, timestamp);
     }
 }

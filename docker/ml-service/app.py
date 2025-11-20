@@ -11,8 +11,7 @@ import json
 import logging
 from typing import Dict, List
 import os
-import random
-from datetime import datetime, timedelta
+from datetime import datetime
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -41,6 +40,7 @@ model_loaded = False
 
 # In-memory storage for batches
 batches_db = []
+
 def load_batches_from_file():
     """Load batches from file if it exists"""
     global batches_db
@@ -61,76 +61,65 @@ def save_batches_to_file():
     except Exception as e:
         logger.error(f"❌ Error saving batches to file: {e}")
 
-def compute_deterministic_rates(batch_id: str, batch_index: int) -> tuple[float, float]:
+def compute_quality_based_rates(quality_score: float) -> tuple[float, float]:
     """
-    Compute deterministic primeRate and rejectionRate for a batch.
-    
-    Uses the batch ID as a seed to create a Random instance, ensuring that the same
-    batch always gets the same rates across different runs. This makes batch processing
-    deterministic and reproducible.
-    
+    Compute primeRate and rejectionRate based on actual quality score.
+
     Args:
-        batch_id: Unique identifier for the batch
-        batch_index: Sequential index of the batch (0-based)
-    
+        quality_score: The actual quality score from prediction (0.0 to 1.0)
+
     Returns:
         tuple of (primeRate, rejectionRate) both in range [0.0, 1.0]
-    
+
     Logic:
-        - primeRate: probability that items in this batch are prime quality
-        - rejectionRate: probability that non-prime items are rejected
-        - primeRate + rejectionRate <= 1.0 (ensured by clamping)
+        - Higher quality scores result in higher prime rates and lower rejection rates
+        - Quality score directly influences the rates
     """
-    # Create deterministic seed from batch_id by hashing it
-    # This ensures same batch_id always produces same rates
-    seed = int(hashlib.sha256(batch_id.encode()).hexdigest(), 16) % (2**31)
-    batch_random = random.Random(seed)
-    
-    # Generate rates in reasonable ranges
-    # Prime rate: typically 60-90% for agricultural products
-    prime_rate = 0.6 + batch_random.random() * 0.3  # Range: 0.6 to 0.9
-    
-    # Rejection rate: typically 5-20% for agricultural products  
-    rejection_rate = 0.05 + batch_random.random() * 0.15  # Range: 0.05 to 0.2
-    
+    # Prime rate: quality score with a slight boost for high quality items
+    if quality_score >= 0.8:
+        prime_rate = quality_score * 0.95  # 76-95% for high quality
+    elif quality_score >= 0.6:
+        prime_rate = quality_score * 0.85  # 51-68% for medium quality
+    else:
+        prime_rate = quality_score * 0.7   # 0-42% for low quality
+
+    # Rejection rate: inverse of quality score
+    rejection_rate = (1.0 - quality_score) * 0.6  # 0-60% based on quality
+
     # Ensure logical consistency: primeRate + rejectionRate <= 1.0
-    # If they sum to more than 1.0, scale them down proportionally
     total = prime_rate + rejection_rate
     if total > 1.0:
-        scale = 0.95 / total  # Scale to 0.95 to leave some room for standard items
+        scale = 0.95 / total
         prime_rate *= scale
         rejection_rate *= scale
-    
+
     # Clamp to valid ranges [0.0, 1.0]
     prime_rate = max(0.0, min(1.0, prime_rate))
     rejection_rate = max(0.0, min(1.0, rejection_rate))
-    
+
     return prime_rate, rejection_rate
 
 # Update the create_batch endpoint to save data
 @app.post("/batches")
 async def create_batch(batch_data: dict = None):
-    """Create a new batch with proper quality score storage and deterministic rates"""
+    """Create a new batch with proper quality score storage and quality-based rates"""
     try:
-        batch_id = f"BATCH_{int(time.time())}_{random.randint(1000, 9999)}"
+        batch_id = f"BATCH_{int(time.time())}_{int(time.time() * 1000) % 10000}"
 
-        # Extract quality data from the request
+        # Extract quality data from the request or use defaults
         quality_data = batch_data.get('quality_data', {}) if batch_data else {}
 
-        # Ensure quality_score is properly extracted and stored
+        # Get quality score from request or use default
         quality_score = quality_data.get('quality_score', 0.8)
-        # Ensure it's a float
         if not isinstance(quality_score, (int, float)):
-            quality_score = 0.8
+            quality_score = 0.8  # Default fallback
 
         quality_label = quality_data.get('label', 'fresh')
-        
-        # Compute deterministic rates based on batch_id
-        # This ensures the same batch always has the same rates across runs
-        batch_index = len(batches_db)  # Use current batch count as index
-        prime_rate, rejection_rate = compute_deterministic_rates(batch_id, batch_index)
 
-        # Create batch record with proper quality data and deterministic rates
+        # Compute rates based on actual quality score
+        prime_rate, rejection_rate = compute_quality_based_rates(quality_score)
+
+        # Create batch record with proper quality data and quality-based rates
         batch_record = {
             "batch_id": batch_id,
             "name": batch_data.get('name', 'Unnamed_Batch') if batch_data else 'Unnamed_Batch',
@@ -142,7 +131,7 @@ async def create_batch(batch_data: dict = None):
             "timestamp": datetime.now().isoformat(),
             "status": "created",
             "data_hash": batch_data.get('data_hash', '') if batch_data else '',
-            # Deterministic rates derived from batch_id (stored once, never recalculated)
+            # Quality-based rates derived from actual quality score
             "prime_rate": round(prime_rate, 4),
             "rejection_rate": round(rejection_rate, 4)
         }
@@ -155,15 +144,18 @@ async def create_batch(batch_data: dict = None):
 
         logger.info(f"✅ Batch created: {batch_record['name']} (ID: {batch_id}, Quality: {quality_score:.3f}, PrimeRate: {prime_rate:.3f}, RejectionRate: {rejection_rate:.3f})")
 
+        # Return ALL required fields including quality_score, prime_rate, and rejection_rate
         return {
             "batch_id": batch_id,
             "status": "created",
             "timestamp": datetime.now().isoformat(),
             "message": f"Batch '{batch_record['name']}' created successfully",
-            "quality_score": quality_score,
-            "quality_label": quality_label,
+            # CRITICAL: Include these fields that the frontend expects
+            "quality_score": float(quality_score),
             "prime_rate": round(prime_rate, 4),
-            "rejection_rate": round(rejection_rate, 4)
+            "rejection_rate": round(rejection_rate, 4),
+            "quality_label": quality_label,
+            "data_hash": batch_data.get('data_hash', '') if batch_data else ''
         }
 
     except Exception as e:
@@ -179,7 +171,7 @@ async def startup_event():
     # Load existing batches first
     load_batches_from_file()
 
-    # Then load the model (your existing model loading code)
+    # Then load the model
     try:
         model_path = "model/vericrop_quality_model.onnx"
         label_map_path = "model/quality_label_map.json"
@@ -190,33 +182,6 @@ async def startup_event():
 
         session = ort.InferenceSession(model_path)
 
-        with open(label_map_path, "r") as f:
-            label_map = json.load(f)
-
-        model_loaded = True
-        logger.info(f"✅ Model Loaded - {len(label_map)} classes")
-        logger.info(f"✅ Classes: {list(label_map.values())}")
-
-    except Exception as e:
-        logger.error(f"❌ Failed to load model: {e}")
-        logger.info("🔄 Running in fallback mode with dummy predictions")
-@app.on_event("startup")
-async def startup_event():
-    """Initialize the model on startup"""
-    global session, label_map, model_loaded
-
-    try:
-        # Load the ONNX model
-        model_path = "model/vericrop_quality_model.onnx"
-        label_map_path = "model/quality_label_map.json"
-
-        if not os.path.exists(model_path):
-            logger.warning(f"Model file not found at {model_path}. Using fallback mode.")
-            return
-
-        session = ort.InferenceSession(model_path)
-
-        # Load label map
         with open(label_map_path, "r") as f:
             label_map = json.load(f)
 
@@ -267,7 +232,8 @@ def get_dummy_prediction():
             status_code=503,
             detail="ML model not available. Set VERICROP_LOAD_DEMO=true for demo mode."
         )
-    
+
+    # Use consistent demo data without randomization
     dummy_score = 0.85
     dummy_label = "fresh"
     report = f'{{"score": {dummy_score}, "label": "{dummy_label}", "note": "demo_mode"}}'
@@ -304,7 +270,7 @@ async def root():
 
 @app.get("/dashboard/farm")
 async def get_farm_dashboard():
-    """Dashboard data for farmer UI - using deterministic per-batch rates"""
+    """Dashboard data for farmer UI - using quality-based rates"""
 
     # Use consistent calculation method
     if batches_db:
@@ -314,7 +280,7 @@ async def get_farm_dashboard():
         quality_scores = []
         prime_rates = []
         rejection_rates = []
-        
+
         for batch in batches_db:
             quality_score = batch.get('quality_score', 0.8)
             # Ensure quality_score is a float
@@ -323,17 +289,16 @@ async def get_farm_dashboard():
             else:
                 # Default fallback if invalid
                 quality_scores.append(0.8)
-            
-            # Extract deterministic rates (computed once per batch, stored with batch)
+
+            # Extract quality-based rates (computed from actual quality score)
             # If batch doesn't have rates yet (old data), compute them now
             if 'prime_rate' in batch and 'rejection_rate' in batch:
                 prime_rates.append(float(batch['prime_rate']))
                 rejection_rates.append(float(batch['rejection_rate']))
             else:
-                # Fallback: compute deterministic rates for old batches without stored rates
-                batch_id = batch.get('batch_id', f"BATCH_{batch.get('timestamp', '')}")
-                batch_index = batches_db.index(batch)
-                prime_rate, rejection_rate = compute_deterministic_rates(batch_id, batch_index)
+                # Fallback: compute quality-based rates for old batches without stored rates
+                quality_score = batch.get('quality_score', 0.8)
+                prime_rate, rejection_rate = compute_quality_based_rates(quality_score)
                 prime_rates.append(prime_rate)
                 rejection_rates.append(rejection_rate)
                 # Update the batch with computed rates for future use
@@ -343,8 +308,7 @@ async def get_farm_dashboard():
         # Calculate metrics consistently
         avg_quality = (sum(quality_scores) / len(quality_scores)) * 100 if quality_scores else 0
 
-        # Use average of per-batch deterministic rates instead of recalculating from scratch
-        # This ensures consistency: same batches always yield same dashboard values
+        # Use average of per-batch quality-based rates
         avg_prime_rate = (sum(prime_rates) / len(prime_rates)) * 100 if prime_rates else 0
         avg_rejection_rate = (sum(rejection_rates) / len(rejection_rates)) * 100 if rejection_rates else 0
 
@@ -373,7 +337,7 @@ async def get_farm_dashboard():
 
         # Reverse to show newest first
         recent_batches_data.reverse()
-        
+
         # Save updated batches if any rates were computed for old batches
         save_batches_to_file()
 
@@ -392,7 +356,7 @@ async def get_farm_dashboard():
         "kpis": {
             "total_batches_today": total_batches,
             "average_quality": round(avg_quality, 1),
-            # Use average of per-batch deterministic rates
+            # Use average of per-batch quality-based rates
             "prime_percentage": round(avg_prime_rate, 1),
             "rejection_rate": round(avg_rejection_rate, 1)
         },
@@ -405,9 +369,8 @@ async def get_farm_dashboard():
         "timestamp": datetime.now().isoformat()  # Add timestamp for cache control
     }
 
-    logger.info(f"📊 Dashboard data - Total: {total_batches}, AvgPrime: {avg_prime_rate:.1f}%, AvgReject: {avg_rejection_rate:.1f}%")
+    logger.info(f"📊 Dashboard data - Total: {total_batches}, AvgQuality: {avg_quality:.1f}%, AvgPrime: {avg_prime_rate:.1f}%, AvgReject: {avg_rejection_rate:.1f}%")
     return dashboard_data
-
 
 @app.get("/batches")
 async def get_batches():
@@ -455,7 +418,7 @@ async def predict(file: UploadFile = File(...)):
         confidence = float(probabilities[predicted_class_idx])
         predicted_class = label_map[str(predicted_class_idx)]
 
-        # 🚀 FIX: Convert class to quality score based on meaning, not confidence
+        # Convert class to quality score based on meaning, not confidence
         quality_score = map_class_to_quality_score(predicted_class, confidence)
 
         # Get top 3 predictions for additional context
@@ -530,39 +493,6 @@ def map_class_to_quality_score(predicted_class: str, confidence: float) -> float
     # Ensure quality stays within reasonable bounds
     return max(0.1, min(0.99, adjusted_quality))
 
-def get_dummy_prediction():
-    """Demo prediction for testing (only when VERICROP_LOAD_DEMO=true)"""
-    if not should_use_demo_mode():
-        raise HTTPException(
-            status_code=503,
-            detail="ML model not available. Set VERICROP_LOAD_DEMO=true for demo mode."
-        )
-
-    # 🚀 FIX: Use appropriate quality scores for demo data
-    demo_classes = [
-        {"class": "fresh", "confidence": 0.92, "quality": 0.88},
-        {"class": "good", "confidence": 0.85, "quality": 0.78},
-        {"class": "rotten", "confidence": 0.95, "quality": 0.25}
-    ]
-    demo_data = random.choice(demo_classes)
-
-    report_data = {
-        "prediction": demo_data["class"],
-        "confidence": demo_data["confidence"],
-        "quality_score": demo_data["quality"],
-        "note": "demo_mode"
-    }
-    report_json = json.dumps(report_data, sort_keys=True)
-    data_hash = hashlib.sha256(report_json.encode("utf-8")).hexdigest()
-
-    return {
-        "quality_score": demo_data["quality"],  # Use quality score, not confidence
-        "label": demo_data["class"],
-        "confidence": demo_data["confidence"],  # Add confidence separately
-        "report": report_json,
-        "data_hash": data_hash,
-        "model_accuracy": "demo_mode"
-    }
 @app.get("/classes")
 async def get_classes():
     """Get all available fruit classes"""

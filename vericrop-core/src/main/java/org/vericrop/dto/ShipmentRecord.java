@@ -33,6 +33,13 @@ public class ShipmentRecord {
 
     private long timestamp;
 
+    // Added fields for prime and rejection rates
+    @JsonProperty("prime_rate")
+    private double primeRate;
+
+    @JsonProperty("rejection_rate")
+    private double rejectionRate;
+
     public ShipmentRecord() {
         this.timestamp = System.currentTimeMillis();
     }
@@ -119,12 +126,32 @@ public class ShipmentRecord {
         this.timestamp = timestamp;
     }
 
+    // Added getters and setters for primeRate and rejectionRate
+    public double getPrimeRate() {
+        return primeRate;
+    }
+
+    public void setPrimeRate(double primeRate) {
+        this.primeRate = primeRate;
+    }
+
+    public double getRejectionRate() {
+        return rejectionRate;
+    }
+
+    public void setRejectionRate(double rejectionRate) {
+        this.rejectionRate = rejectionRate;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         ShipmentRecord that = (ShipmentRecord) o;
-        return timestamp == that.timestamp &&
+        return Double.compare(that.qualityScore, qualityScore) == 0 &&
+                Double.compare(that.primeRate, primeRate) == 0 &&
+                Double.compare(that.rejectionRate, rejectionRate) == 0 &&
+                timestamp == that.timestamp &&
                 Objects.equals(shipmentId, that.shipmentId) &&
                 Objects.equals(batchId, that.batchId) &&
                 Objects.equals(ledgerHash, that.ledgerHash);
@@ -132,12 +159,12 @@ public class ShipmentRecord {
 
     @Override
     public int hashCode() {
-        return Objects.hash(shipmentId, batchId, ledgerHash, timestamp);
+        return Objects.hash(shipmentId, batchId, qualityScore, primeRate, rejectionRate, ledgerHash, timestamp);
     }
 
     @Override
     public String toString() {
-        return String.format("ShipmentRecord{shipmentId='%s', batchId='%s', from='%s', to='%s', status='%s'}",
-                shipmentId, batchId, fromParty, toParty, status);
+        return String.format("ShipmentRecord{shipmentId='%s', batchId='%s', from='%s', to='%s', status='%s', quality=%.1f%%, prime=%.1f%%, reject=%.1f%%}",
+                shipmentId, batchId, fromParty, toParty, status, qualityScore, primeRate * 100, rejectionRate * 100);
     }
 }
