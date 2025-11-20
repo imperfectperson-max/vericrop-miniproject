@@ -10,9 +10,14 @@ env:
   JAVA_VERSION: '17'
   PYTHON_VERSION: '3.11'
 
-# Set default permissions to read-only for security
+# Set permissions to allow test result publishing and PR interactions
 permissions:
   contents: read
+  checks: write
+  issues: write
+  pull-requests: write
+  actions: read
+  packages: read
 
 jobs:
   build-java:
