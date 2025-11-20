@@ -1,356 +1,349 @@
-# VeriCrop GUI - Interactive Supply Chain Management Interface
+# VeriCrop GUI - Enterprise Supply Chain Management Application
 
-The VeriCrop GUI provides both a JavaFX desktop application and a Spring Boot REST API for quality evaluation and supply chain management.
+The VeriCrop GUI is a JavaFX desktop application with enterprise-grade architecture for managing agricultural supply chain quality, tracking, and analytics.
 
-## Features
+## 🏗️ Architecture
 
-- 🖥️ **JavaFX Desktop Application** - Interactive dashboards for producers, logistics, consumers, and analytics
-- 🌐 **REST API** - Quality evaluation and shipment management endpoints
-- ⛓️ **Blockchain Integration** - Immutable record-keeping with configurable initialization modes
-- 📨 **Kafka Integration** - Event-driven architecture with graceful fallback
-- 🚀 **Fast Dev Mode** - Quick iteration without waiting for full blockchain initialization
+The application follows a clean, layered architecture:
 
-## Quick Start
+```
+┌─────────────────────────────────────────────────────────┐
+│  UI Layer (JavaFX Controllers)                          │
+│  - LoginController, ProducerController, etc.            │
+└──────────────────┬──────────────────────────────────────┘
+                   │
+┌──────────────────▼──────────────────────────────────────┐
+│  Service Layer (Business Logic)                         │
+│  - BatchService, AnalyticsService, AuthService          │
+└──────┬──────────────────┬──────────────────────┬────────┘
+       │                  │                      │
+┌──────▼────┐   ┌─────────▼────────┐   ┌────────▼────────┐
+│ ML Client │   │ Kafka Messaging  │   │ Postgres Repo   │
+│ (FastAPI) │   │ (Event Stream)   │   │ (Persistence)   │
+└───────────┘   └──────────────────┘   └─────────────────┘
+```
 
-### Running the Desktop GUI
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Java 17 or later
+- Docker & Docker Compose (for external services)
+- Gradle 8.0+ (included via wrapper)
+
+### 1. Start External Services
+
+```bash
+# Start Postgres, Kafka, and ML Service
+docker-compose up -d postgres kafka zookeeper ml-service
+
+# Verify services are running
+docker-compose ps
+```
+
+### 2. Configure Environment
+
+```bash
+# Copy example environment file
+cp .env.example .env
+
+# Edit .env with your settings (or use defaults)
+# Key settings:
+# - POSTGRES_USER=vericrop
+# - POSTGRES_PASSWORD=vericrop123
+# - KAFKA_ENABLED=true
+# - ML_SERVICE_URL=http://localhost:8000
+```
+
+### 3. Initialize Database
+
+```bash
+# Database schema is automatically loaded via docker-compose volume mount
+# Schema file: vericrop-gui/src/main/resources/db/schema.sql
+```
+
+### 4. Run the Application
 
 ```bash
 # From repository root
 ./gradlew :vericrop-gui:run
 ```
 
-### Running the REST API
+The application will:
+1. Initialize ApplicationContext
+2. Connect to Postgres, Kafka, and ML Service
+3. Launch the JavaFX GUI
 
+## ⚙️ Configuration
+
+### Environment Variables
+
+Configuration is managed through `application.properties` with environment variable override support.
+
+#### Database (PostgreSQL)
 ```bash
-# From repository root
-./gradlew :vericrop-gui:bootRun
+POSTGRES_HOST=localhost          # Database host
+POSTGRES_PORT=5432               # Database port
+POSTGRES_DB=vericrop             # Database name
+POSTGRES_USER=vericrop           # Database user
+POSTGRES_PASSWORD=vericrop123    # Database password
+
+DB_POOL_SIZE=10                  # HikariCP pool size
+DB_CONNECTION_TIMEOUT=30000      # Connection timeout (ms)
 ```
 
-The REST API will start on port 8080 (configurable via `SERVER_PORT` environment variable).
-
-## Configuration
-
-### Development Mode (Default)
-
-By default, the application runs in **dev mode** for fast iteration:
-
+#### Kafka Messaging
 ```bash
-# Runs with lightweight blockchain and disabled Kafka
-./gradlew :vericrop-gui:run
+KAFKA_BOOTSTRAP_SERVERS=localhost:9092  # Kafka broker
+KAFKA_ENABLED=true                       # Enable/disable Kafka
+KAFKA_ACKS=all                          # Producer acks (all/1/0)
+KAFKA_RETRIES=3                         # Retry attempts
+KAFKA_IDEMPOTENCE=true                  # Idempotent producer
+
+# Topic names
+KAFKA_TOPIC_BATCH_EVENTS=batch-events
+KAFKA_TOPIC_QUALITY_ALERTS=quality-alerts
+KAFKA_TOPIC_LOGISTICS_EVENTS=logistics-events
 ```
 
-**Dev mode features:**
-- Fast blockchain initialization (< 1 second)
-- In-memory blockchain with sample data
-- Kafka disabled by default (falls back to in-memory stub)
-- No external service dependencies
-
-### Production Mode
-
-For production deployment with full features:
-
+#### ML Service (FastAPI)
 ```bash
-# Set environment variables
-export VERICROP_MODE=prod
-export KAFKA_ENABLED=true
-export KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-
-# Run the application
-./gradlew :vericrop-gui:bootRun
+ML_SERVICE_URL=http://localhost:8000    # ML service base URL
+ML_SERVICE_TIMEOUT=30000                # HTTP timeout (ms)
+ML_SERVICE_RETRIES=3                    # Retry attempts
+VERICROP_LOAD_DEMO=true                 # Use demo mode if model unavailable
 ```
 
-**Production mode features:**
-- Full blockchain initialization with validation
-- Persistent blockchain storage
-- Full Kafka integration
-- Complete ledger functionality
-
-## Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `VERICROP_MODE` | `dev` | Application mode: `dev` or `prod` |
-| `KAFKA_ENABLED` | `false` | Enable/disable Kafka integration |
-| `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` | Kafka broker address |
-| `SERVER_PORT` | `8080` | REST API port |
-| `LEDGER_PATH` | `ledger` | Directory for ledger files |
-| `QUALITY_PASS_THRESHOLD` | `0.7` | Quality score threshold (0-1) |
-| `ML_SERVICE_URL` | `http://localhost:8000` | ML service endpoint |
-
-## Application Configuration
-
-Edit `src/main/resources/application.yml` to change defaults:
-
-```yaml
-# VeriCrop application mode
-vericrop:
-  mode: ${VERICROP_MODE:dev}  # dev or prod
-
-# Kafka configuration
-kafka:
-  enabled: ${KAFKA_ENABLED:false}
-  topics:
-    evaluation-request: evaluation-requests
-    evaluation-result: evaluation-results
-    shipment-record: shipment-records
-```
-
-## REST API Endpoints
-
-### Health Check
+#### Application Settings
 ```bash
-GET /api/health
+VERICROP_MODE=dev                # dev or prod
+SERVER_PORT=8080                 # REST API port (if enabled)
+LOG_LEVEL=INFO                   # Logging level
+QUALITY_PASS_THRESHOLD=0.7       # Quality threshold (0-1)
 ```
 
-### Quality Evaluation
-```bash
-POST /api/evaluate
-Content-Type: application/json
+## 📦 Components
 
-{
-  "batch_id": "BATCH_001",
-  "product_type": "apple",
-  "farmer_id": "farmer_001",
-  "image_path": "/path/to/image.jpg"
-}
+### Services Layer
+
+#### BatchService
+Manages batch creation, updates, and queries. Coordinates ML predictions, Kafka events, and database persistence.
+
+```java
+// Example usage
+BatchRecord batch = new BatchRecord.Builder()
+    .name("Apple Batch 001")
+    .farmer("John Farmer")
+    .productType("Apple")
+    .quantity(100)
+    .build();
+
+BatchRecord created = batchService.createBatch(batch, imageFile);
 ```
 
-### Shipment Management
-```bash
-# Get all shipments
-GET /api/shipments
+#### AnalyticsService
+Provides analytics and dashboard data from ML service.
 
-# Get shipments for a specific batch
-GET /api/shipments?batch_id=BATCH_001
-
-# Get specific shipment
-GET /api/shipments/{ledger_id}
+```java
+DashboardData dashboard = analyticsService.getDashboardData();
+List<BatchRecord> batches = analyticsService.getAllBatches();
 ```
 
-## Docker Deployment
+#### KafkaMessagingService
+Publishes events to Kafka with idempotent producer configuration.
 
-### Building the Docker Image
-
-```bash
-# Build from repository root
-docker build -t vericrop-gui -f vericrop-gui/Dockerfile .
+```java
+kafkaService.sendBatch(batchRecord);
+kafkaService.sendQualityAlert(batchId, alertData);
 ```
 
-The Dockerfile uses a **multi-stage build**:
-1. **Build stage**: Compiles the application with Gradle
-2. **Runtime stage**: Minimal JRE image with only the JAR
+#### AuthenticationService
+Manages user authentication and session state.
 
-**Important**: Blockchain initialization happens at **container startup**, not during image build. This ensures:
-- Faster image builds
-- Consistent initialization across environments
-- Configuration can be applied at runtime
-
-### Running the Container
-
-```bash
-# Development mode (default)
-docker run -p 8080:8080 vericrop-gui
-
-# Production mode with Kafka
-docker run -p 8080:8080 \
-  -e VERICROP_MODE=prod \
-  -e KAFKA_ENABLED=true \
-  -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
-  vericrop-gui
+```java
+authService.login("john@farm.com", "farmer");
+boolean authenticated = authService.isAuthenticated();
 ```
 
-### Docker Compose
+### Clients Layer
 
-See the main repository `docker-compose.yml` for full stack deployment:
+#### MLClientService
+HTTP client for FastAPI ML service with retry logic.
 
-```bash
-# From repository root
-docker-compose up
+**Endpoints:**
+- `health()` - Health check
+- `createBatch(BatchRecord)` - Create batch
+- `listBatches()` - List all batches
+- `predictImage(File)` - Predict quality from image
+- `getDashboardFarm()` - Get farm dashboard data
+
+### Persistence Layer
+
+#### PostgresBatchRepository
+JDBC repository with HikariCP connection pooling for batch metadata.
+
+**Methods:**
+- `create(BatchRecord)` - Insert new batch
+- `findByBatchId(String)` - Find by batch ID
+- `findAll()` - List all batches
+- `update(BatchRecord)` - Update batch
+- `delete(String)` - Delete batch
+
+## 🗄️ Database Schema
+
+```sql
+CREATE TABLE batches (
+    id BIGSERIAL PRIMARY KEY,
+    batch_id VARCHAR(255) NOT NULL UNIQUE,
+    name VARCHAR(255) NOT NULL,
+    farmer VARCHAR(255) NOT NULL,
+    product_type VARCHAR(255) NOT NULL,
+    quantity INTEGER NOT NULL DEFAULT 0,
+    quality_score DECIMAL(5, 4),
+    quality_label VARCHAR(50),
+    data_hash VARCHAR(255),
+    timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    status VARCHAR(50) NOT NULL DEFAULT 'created',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 ```
 
-## Kafka Integration
+## 🧪 Testing
 
-### Enabling Kafka
-
-Set the `KAFKA_ENABLED` environment variable:
-
-```bash
-export KAFKA_ENABLED=true
-export KAFKA_BOOTSTRAP_SERVERS=localhost:9092
-```
-
-### Kafka Topics
-
-The application publishes to and consumes from these topics:
-
-- `evaluation-requests` - Quality evaluation requests
-- `evaluation-results` - Evaluation results
-- `shipment-records` - Shipment tracking records
-- `logistics-tracking` - Logistics events
-- `quality-alerts` - Quality alert notifications
-- `blockchain-events` - Blockchain transaction events
-
-### Graceful Kafka Fallback
-
-When Kafka is disabled or unavailable:
-- Application continues to function normally
-- Events are logged instead of published
-- No blocking or errors from Kafka connection failures
-- UI operations remain responsive
-
-## Airflow Integration
-
-The VeriCrop DAG (`airflow/dags/vericrop_dag.py`) demonstrates end-to-end integration:
-
-1. Produces evaluation requests to Kafka
-2. Calls REST API for evaluation
-3. Verifies ledger records
-4. Generates pipeline summary
-
-### Running the Airflow DAG
-
-```bash
-# Ensure VeriCrop API is running
-./gradlew :vericrop-gui:bootRun
-
-# Start Airflow (from airflow directory)
-airflow standalone
-
-# Trigger the DAG
-airflow dags trigger vericrop_evaluation_pipeline
-```
-
-The DAG has graceful fallbacks:
-- Runs in simulation mode if Kafka is unavailable
-- Handles API connection failures
-- Continues with available services
-
-## Building and Testing
-
-### Build the Module
-
-```bash
-# Build only vericrop-gui
-./gradlew :vericrop-gui:build
-
-# Build with tests
-./gradlew :vericrop-gui:test
-
-# Create bootable JAR
-./gradlew :vericrop-gui:bootJar
-```
-
-### Run Tests
+### Unit Tests
 
 ```bash
 # Run all tests
 ./gradlew :vericrop-gui:test
 
-# Run with code coverage
-./gradlew :vericrop-gui:jacocoTestReport
+# Run specific test class
+./gradlew :vericrop-gui:test --tests BatchServiceTest
 ```
 
-### Smoke Testing
+### Integration Tests
 
 ```bash
-# Run smoke tests (if available)
-./scripts/smoke_test.sh
+# Start test containers (Postgres, Kafka)
+docker-compose -f docker-compose.test.yml up -d
+
+# Run integration tests
+./gradlew :vericrop-gui:integrationTest
 ```
 
-## Troubleshooting
-
-### Application Won't Start
-
-1. **Check Java version**: Requires Java 17+
-   ```bash
-   java -version
-   ```
-
-2. **Check port availability**: Default port 8080
-   ```bash
-   lsof -i :8080
-   ```
-
-3. **Check logs**: Enable debug logging
-   ```bash
-   export LOGGING_LEVEL_ORG_VERICROP=DEBUG
-   ./gradlew :vericrop-gui:bootRun
-   ```
-
-### Kafka Connection Issues
-
-If you see Kafka connection errors but want to continue:
+### Manual Testing
 
 ```bash
-# Disable Kafka
-export KAFKA_ENABLED=false
-./gradlew :vericrop-gui:bootRun
+# Test ML Service connection
+curl http://localhost:8000/health
+
+# Test database connection
+docker exec -it vericrop-postgres psql -U vericrop -d vericrop -c "SELECT COUNT(*) FROM batches;"
+
+# Test Kafka producer
+docker exec -it vericrop-kafka kafka-console-consumer --bootstrap-server localhost:9092 --topic batch-events --from-beginning
 ```
 
-The application will fall back to in-memory mode.
+## 🐳 Docker Deployment
 
-### Blockchain Initialization Slow
-
-In production mode, blockchain validation can take time. Use dev mode for faster iteration:
+### Build Docker Image
 
 ```bash
-export VERICROP_MODE=dev
-./gradlew :vericrop-gui:bootRun
+# Build image
+docker build -t vericrop-gui -f vericrop-gui/Dockerfile .
 ```
 
-## Architecture
+### Run with Docker Compose
 
-```
-vericrop-gui/
-├── src/main/java/org/vericrop/gui/
-│   ├── MainApp.java              # JavaFX application entry point
-│   ├── VeriCropApiApplication.java  # Spring Boot REST API
-│   ├── ProducerController.java    # Farm dashboard controller
-│   ├── LogisticsController.java   # Logistics dashboard
-│   ├── ConsumerController.java    # Consumer dashboard
-│   ├── AnalyticsController.java   # Analytics dashboard
-│   ├── config/
-│   │   └── AppConfiguration.java  # Spring configuration
-│   ├── controller/
-│   │   └── EvaluationController.java  # REST API controller
-│   └── util/
-│       └── BlockchainInitializer.java  # Blockchain setup utility
-├── src/main/resources/
-│   ├── application.yml            # Spring Boot configuration
-│   ├── fxml/                      # JavaFX UI layouts
-│   └── css/                       # Stylesheets
-└── Dockerfile                     # Multi-stage Docker build
+```bash
+# Full stack deployment
+docker-compose up -d
+
+# View logs
+docker-compose logs -f vericrop-gui
+
+# Stop services
+docker-compose down
 ```
 
-## Performance Considerations
+## 📊 Monitoring & Logging
 
-### Dev Mode
-- Blockchain init: < 1 second
-- Memory usage: ~200 MB
-- Startup time: ~5 seconds
+### Application Logs
 
-### Production Mode
-- Blockchain init: 5-10 seconds (depends on chain size)
-- Memory usage: ~400 MB
-- Startup time: ~15 seconds
+Logs are written to:
+- Console (stdout)
+- File: `logs/vericrop-gui.log` (configurable)
 
-## Contributing
+### Log Levels
 
-When making changes to vericrop-gui:
+```bash
+# Set log level via environment variable
+export LOG_LEVEL=DEBUG  # DEBUG, INFO, WARN, ERROR
+```
 
-1. Maintain dev mode for fast iteration
-2. Ensure Kafka fallback works (test with `KAFKA_ENABLED=false`)
-3. Keep REST API backward compatible
-4. Test both JavaFX GUI and REST API modes
-5. Update this README if adding new features
+### Health Checks
 
-## Related Documentation
+Monitor service health:
+
+```bash
+# ML Service
+curl http://localhost:8000/health
+
+# Postgres (via docker)
+docker exec vericrop-postgres pg_isready -U vericrop
+
+# Kafka
+docker exec vericrop-kafka kafka-broker-api-versions --bootstrap-server localhost:9092
+```
+
+## 🔒 Security Considerations
+
+- Database passwords should be stored in environment variables or secrets manager
+- Kafka SASL/SSL should be configured for production
+- ML service should use HTTPS in production
+- Implement proper authentication/authorization (currently simplified)
+
+## 🐛 Troubleshooting
+
+### Application won't start
+
+1. Check Java version: `java -version` (requires 17+)
+2. Verify services are running: `docker-compose ps`
+3. Check logs: `./gradlew :vericrop-gui:run --info`
+
+### Database connection failed
+
+1. Verify Postgres is running: `docker-compose ps postgres`
+2. Check connection settings in `.env`
+3. Test connection: `docker exec -it vericrop-postgres psql -U vericrop`
+
+### Kafka connection failed
+
+1. Verify Kafka is running: `docker-compose ps kafka`
+2. Set `KAFKA_ENABLED=false` to disable Kafka
+3. Check bootstrap servers configuration
+
+### ML Service unavailable
+
+1. Verify ML service is running: `curl http://localhost:8000/health`
+2. Set `VERICROP_LOAD_DEMO=true` for demo mode
+3. Check ML service logs: `docker-compose logs ml-service`
+
+## 📚 Additional Documentation
 
 - [Main README](../README.md) - Project overview
-- [Docker Implementation](../DOCKER_IMPLEMENTATION.md) - Deployment details
-- [Kafka Integration](../KAFKA_INTEGRATION.md) - Kafka setup guide
 - [Deployment Guide](../DEPLOYMENT.md) - Production deployment
+- [ML Service API](../docker/ml-service/README.md) - ML service documentation
+- [Database Schema](src/main/resources/db/schema.sql) - Database structure
 
-## License
+## 🤝 Contributing
+
+When making changes:
+1. Follow the existing architecture patterns
+2. Add unit tests for new services
+3. Update this README if adding new features
+4. Test locally before committing
+
+## 📝 License
 
 See [LICENSE](../LICENSE) in the repository root.
