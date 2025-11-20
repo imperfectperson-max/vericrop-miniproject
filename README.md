@@ -559,7 +559,7 @@ The ML Service is called by:
 
 For detailed implementation, inspect:
 - **ML Service**: [docker/ml-service/app.py](docker/ml-service/app.py)
-- **Java Client**: `vericrop-gui/src/main/java/org/vericrop/gui/service/MLClientService.java`
+- **Java Client**: `vericrop-gui/src/main/java/org/vericrop/gui/clients/MLClientService.java`
 - **Model Logic**: `docker/ml-service/app.py` (lines 100-200, prediction logic)
 
 ## Testing
