@@ -6,7 +6,7 @@ import javafx.scene.control.*;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 
-public class ConsumerController {
+public class ConsumerController extends BaseController {
 
     @FXML private TextField batchIdField;
     @FXML private ListView<String> verificationHistoryList;
@@ -45,13 +45,13 @@ public class ConsumerController {
 
     @FXML
     private void handleScanQR() {
-        showAlert(Alert.AlertType.INFORMATION, "QR Scanner", "QR scanner would activate here");
+        showSuccess("QR scanner would activate here");
     }
 
     @FXML
     private void handleVerifyAnother() {
         batchIdField.clear();
-        showAlert(Alert.AlertType.INFORMATION, "Reset", "Ready to verify another product");
+        showSuccess("Ready to verify another product");
     }
 
     @FXML
@@ -60,7 +60,7 @@ public class ConsumerController {
         if (batchId != null && !batchId.trim().isEmpty()) {
             verifyBatch(batchId.trim());
         } else {
-            showAlert(Alert.AlertType.WARNING, "Input Required", "Please enter a Batch ID or scan QR code");
+            showWarning("Please enter a Batch ID or scan QR code");
         }
     }
 
@@ -77,42 +77,20 @@ public class ConsumerController {
 
     @FXML
     private void handleExportHistory() {
-        showAlert(Alert.AlertType.INFORMATION, "Export", "Verification history exported successfully");
+        showSuccess("Verification history exported successfully");
     }
 
     @FXML
     private void handleShareVerification() {
-        showAlert(Alert.AlertType.INFORMATION, "Share", "Verification details shared successfully");
+        showSuccess("Verification details shared successfully");
     }
 
-    @FXML
-    private void handleBackToProducer() {
-        MainApp mainApp = MainApp.getInstance();
-        if (mainApp != null) {
-            mainApp.showProducerScreen();
-        }
-    }
-
-    @FXML
-    private void handleShowAnalytics() {
-        MainApp mainApp = MainApp.getInstance();
-        if (mainApp != null) {
-            mainApp.showAnalyticsScreen();
-        }
-    }
-
-    @FXML
-    private void handleShowLogistics() {
-        MainApp mainApp = MainApp.getInstance();
-        if (mainApp != null) {
-            mainApp.showLogisticsScreen();
-        }
-    }
+    // Navigation methods inherited from BaseController
 
     private void verifyBatch(String batchId) {
         // Validation: if batchId non-empty -> attempt verification
         if (batchId == null || batchId.trim().isEmpty()) {
-            showAlert(Alert.AlertType.WARNING, "Invalid Input", "Batch ID cannot be empty");
+            showWarning("Batch ID cannot be empty");
             return;
         }
 
@@ -151,7 +129,7 @@ public class ConsumerController {
                 "\nVerification Time: " + java.time.LocalDateTime.now().format(
                         java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
 
-        showAlert(Alert.AlertType.INFORMATION, "Verification Complete", verificationResult);
+        showSuccess(verificationResult);
 
         // Add to history with proper formatting
         String historyEntry = java.time.LocalDateTime.now().format(
@@ -164,22 +142,9 @@ public class ConsumerController {
     }
     
     private boolean shouldLoadDemoData() {
-        // Check system property (set via --load-demo flag)
-        String loadDemo = System.getProperty("vericrop.loadDemo");
-        if ("true".equalsIgnoreCase(loadDemo)) {
-            return true;
-        }
-        
-        // Check environment variable
-        String loadDemoEnv = System.getenv("VERICROP_LOAD_DEMO");
-        return "true".equalsIgnoreCase(loadDemoEnv);
+        return org.vericrop.gui.util.Config.isDemoMode();
     }
 
-    private void showAlert(Alert.AlertType type, String title, String message) {
-        Alert alert = new Alert(type);
-        alert.setTitle(title);
-        alert.setHeaderText(null);
-        alert.setContentText(message);
-        alert.showAndWait();
-    }
+    // showAlert methods inherited from BaseController
+    // Use showError, showSuccess, showWarning from BaseController
 }

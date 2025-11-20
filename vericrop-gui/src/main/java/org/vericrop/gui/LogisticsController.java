@@ -8,7 +8,7 @@ import javafx.scene.control.*;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 
-public class LogisticsController {
+public class LogisticsController extends BaseController {
 
     @FXML private TableView<Shipment> shipmentsTable;
     @FXML private ListView<String> alertsList;
@@ -129,29 +129,7 @@ public class LogisticsController {
     }
 
     // Navigation methods
-    @FXML
-    private void handleBackToProducer() {
-        MainApp mainApp = MainApp.getInstance();
-        if (mainApp != null) {
-            mainApp.showProducerScreen();
-        }
-    }
-
-    @FXML
-    private void handleShowAnalytics() {
-        MainApp mainApp = MainApp.getInstance();
-        if (mainApp != null) {
-            mainApp.showAnalyticsScreen();
-        }
-    }
-
-    @FXML
-    private void handleShowConsumer() {
-        MainApp mainApp = MainApp.getInstance();
-        if (mainApp != null) {
-            mainApp.showConsumerScreen();
-        }
-    }
+    // Navigation methods inherited from BaseController
 
     // Action methods
     @FXML

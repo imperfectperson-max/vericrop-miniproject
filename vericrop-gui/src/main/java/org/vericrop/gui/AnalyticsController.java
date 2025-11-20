@@ -9,7 +9,7 @@ import javafx.scene.control.*;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 
-public class AnalyticsController {
+public class AnalyticsController extends BaseController {
 
     @FXML private Label totalBatchesLabel;
     @FXML private Label avgQualityLabel;
@@ -140,15 +140,13 @@ public class AnalyticsController {
     @FXML
     private void handleGenerateReport() {
         System.out.println("Generating analytics report...");
-        showAlert(javafx.scene.control.Alert.AlertType.INFORMATION, "Report Generated",
-                "Analytics report has been generated successfully.");
+        showSuccess("Analytics report has been generated successfully.");
     }
 
     @FXML
     private void handleSetAlerts() {
         System.out.println("Opening alert configuration...");
-        showAlert(javafx.scene.control.Alert.AlertType.INFORMATION, "Alert Settings",
-                "Alert configuration panel would open here.");
+        showSuccess("Alert configuration panel would open here.");
     }
 
     @FXML
@@ -163,21 +161,7 @@ public class AnalyticsController {
         }
     }
 
-    @FXML
-    private void handleBackToProducer() {
-        MainApp mainApp = MainApp.getInstance();
-        if (mainApp != null) {
-            mainApp.showProducerScreen();
-        }
-    }
-
-    private void showAlert(javafx.scene.control.Alert.AlertType type, String title, String message) {
-        javafx.scene.control.Alert alert = new javafx.scene.control.Alert(type);
-        alert.setTitle(title);
-        alert.setHeaderText(null);
-        alert.setContentText(message);
-        alert.showAndWait();
-    }
+    // Navigation method and alert methods inherited from BaseController
 
     // Data model classes
     public static class Supplier {
