@@ -937,6 +937,13 @@ public class ProducerController {
         }
     }
 
+    /**
+     * Update the live blockchain view display.
+     * 
+     * Displays blocks in newest-first order to show recent activity at the top.
+     * This method is called after new blocks are added to ensure real-time updates.
+     * Runs on UI thread via Platform.runLater to ensure thread-safety.
+     */
     private void updateBlockchainDisplay() {
         Platform.runLater(() -> {
             StringBuilder sb = new StringBuilder();
@@ -948,7 +955,9 @@ public class ProducerController {
                 sb.append("No blocks in the chain yet.\n");
                 sb.append("Create your first batch to see blockchain data!\n");
             } else {
-                for (Block block : chain) {
+                // Display blocks in reverse order (newest first) for better UX
+                for (int i = chain.size() - 1; i >= 0; i--) {
+                    Block block = chain.get(i);
                     sb.append("Block #").append(block.getIndex()).append("\n");
                     sb.append("Hash: ").append(safeSubstring(block.getHash(), 20)).append("\n");
                     sb.append("Previous: ").append(safeSubstring(block.getPreviousHash(), 20)).append("\n");
