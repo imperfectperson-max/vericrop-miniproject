@@ -17,6 +17,7 @@ from datetime import datetime, timedelta
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+BATCHES_FILE = "batches_data.json"
 
 app = FastAPI(
     title="VeriCrop ML Service",
@@ -40,7 +41,109 @@ model_loaded = False
 
 # In-memory storage for batches
 batches_db = []
+def load_batches_from_file():
+    """Load batches from file if it exists"""
+    global batches_db
+    try:
+        if os.path.exists(BATCHES_FILE):
+            with open(BATCHES_FILE, 'r') as f:
+                batches_db = json.load(f)
+            logger.info(f"✅ Loaded {len(batches_db)} batches from file")
+    except Exception as e:
+        logger.error(f"❌ Error loading batches from file: {e}")
+        batches_db = []
 
+def save_batches_to_file():
+    """Save batches to file"""
+    try:
+        with open(BATCHES_FILE, 'w') as f:
+            json.dump(batches_db, f, indent=2)
+    except Exception as e:
+        logger.error(f"❌ Error saving batches to file: {e}")
+
+# Update the create_batch endpoint to save data
+@app.post("/batches")
+async def create_batch(batch_data: dict = None):
+    """Create a new batch with proper quality score storage"""
+    try:
+        batch_id = f"BATCH_{int(time.time())}_{random.randint(1000, 9999)}"
+
+        # Extract quality data from the request
+        quality_data = batch_data.get('quality_data', {}) if batch_data else {}
+
+        # Ensure quality_score is properly extracted and stored
+        quality_score = quality_data.get('quality_score', 0.8)
+        # Ensure it's a float
+        if not isinstance(quality_score, (int, float)):
+            quality_score = 0.8
+
+        quality_label = quality_data.get('label', 'fresh')
+
+        # Create batch record with proper quality data
+        batch_record = {
+            "batch_id": batch_id,
+            "name": batch_data.get('name', 'Unnamed_Batch') if batch_data else 'Unnamed_Batch',
+            "farmer": batch_data.get('farmer', 'Unknown_Farmer') if batch_data else 'Unknown_Farmer',
+            "product_type": batch_data.get('product_type', 'Unknown_Product') if batch_data else 'Unknown_Product',
+            "quantity": batch_data.get('quantity', 1) if batch_data else 1,
+            "quality_score": float(quality_score),  # Ensure float type
+            "quality_label": quality_label,
+            "timestamp": datetime.now().isoformat(),
+            "status": "created",
+            "data_hash": batch_data.get('data_hash', '') if batch_data else ''
+        }
+
+        # Store in database
+        batches_db.append(batch_record)
+
+        # Save to file for persistence
+        save_batches_to_file()
+
+        logger.info(f"✅ Batch created: {batch_record['name']} (ID: {batch_id}, Quality: {quality_score:.3f})")
+
+        return {
+            "batch_id": batch_id,
+            "status": "created",
+            "timestamp": datetime.now().isoformat(),
+            "message": f"Batch '{batch_record['name']}' created successfully",
+            "quality_score": quality_score,
+            "quality_label": quality_label
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Error creating batch: {e}")
+        raise HTTPException(status_code=500, detail=f"Error creating batch: {e}")
+
+# Load batches on startup
+@app.on_event("startup")
+async def startup_event():
+    """Initialize the model and load data on startup"""
+    global session, label_map, model_loaded
+
+    # Load existing batches first
+    load_batches_from_file()
+
+    # Then load the model (your existing model loading code)
+    try:
+        model_path = "model/vericrop_quality_model.onnx"
+        label_map_path = "model/quality_label_map.json"
+
+        if not os.path.exists(model_path):
+            logger.warning(f"Model file not found at {model_path}. Using fallback mode.")
+            return
+
+        session = ort.InferenceSession(model_path)
+
+        with open(label_map_path, "r") as f:
+            label_map = json.load(f)
+
+        model_loaded = True
+        logger.info(f"✅ Model Loaded - {len(label_map)} classes")
+        logger.info(f"✅ Classes: {list(label_map.values())}")
+
+    except Exception as e:
+        logger.error(f"❌ Failed to load model: {e}")
+        logger.info("🔄 Running in fallback mode with dummy predictions")
 @app.on_event("startup")
 async def startup_event():
     """Initialize the model on startup"""
@@ -143,74 +246,85 @@ async def root():
         "endpoints": ["/health", "/predict", "/batches", "/dashboard/farm"]
     }
 
-# NEW ENDPOINTS - Add these
 @app.get("/dashboard/farm")
 async def get_farm_dashboard():
-    """Dashboard data for farmer UI"""
+    """Dashboard data for farmer UI - with consistent calculations"""
+
+    # Use consistent calculation method
+    if batches_db:
+        total_batches = len(batches_db)
+
+        # Extract quality scores once
+        quality_scores = []
+        for batch in batches_db:
+            quality_score = batch.get('quality_score', 0.8)
+            # Ensure quality_score is a float
+            if isinstance(quality_score, (int, float)):
+                quality_scores.append(float(quality_score))
+            else:
+                # Default fallback if invalid
+                quality_scores.append(0.8)
+
+        # Calculate metrics consistently
+        avg_quality = (sum(quality_scores) / len(quality_scores)) * 100 if quality_scores else 0
+
+        # Count batches in each category
+        prime_count = sum(1 for score in quality_scores if score >= 0.8)
+        standard_count = sum(1 for score in quality_scores if 0.6 <= score < 0.8)
+        sub_standard_count = sum(1 for score in quality_scores if score < 0.6)
+
+        # Calculate percentages
+        prime_percentage = (prime_count / total_batches) * 100 if total_batches > 0 else 0
+        rejection_rate = (sub_standard_count / total_batches) * 100 if total_batches > 0 else 0
+
+        # Recent batches (last 5)
+        recent_batches_data = []
+        for batch in batches_db[-5:]:
+            batch_quality = batch.get('quality_score', 0.8)
+            if isinstance(batch_quality, (int, float)):
+                quality_display = f"{float(batch_quality) * 100:.1f}%"
+            else:
+                quality_display = "85.0%"
+
+            recent_batches_data.append({
+                "name": batch.get('name', f"Batch_{len(recent_batches_data)}"),
+                "quality_score": quality_display,
+                "timestamp": batch.get('timestamp', datetime.now().isoformat())
+            })
+
+        # Reverse to show newest first
+        recent_batches_data.reverse()
+
+    else:
+        # Default values when no batches
+        total_batches = 0
+        avg_quality = 0
+        prime_percentage = 0
+        rejection_rate = 0
+        prime_count = 0
+        standard_count = 0
+        sub_standard_count = 0
+        recent_batches_data = []
+
     dashboard_data = {
         "kpis": {
-            "total_batches_today": len(batches_db),
-            "average_quality": round(random.uniform(85, 95), 1) if not batches_db else round(sum(b.get('quality_score', 0.8) for b in batches_db) / len(batches_db) * 100, 1),
-            "prime_percentage": round(random.uniform(70, 85), 1),
-            "rejection_rate": round(random.uniform(2, 8), 1)
+            "total_batches_today": total_batches,
+            "average_quality": round(avg_quality, 1),
+            "prime_percentage": round(prime_percentage, 1),
+            "rejection_rate": round(rejection_rate, 1)
         },
         "quality_distribution": {
-            "prime": random.randint(30, 50),
-            "standard": random.randint(20, 40),
-            "sub_standard": random.randint(5, 15)
+            "prime": prime_count,
+            "standard": standard_count,
+            "sub_standard": sub_standard_count
         },
-        "recent_batches": [
-            {
-                "name": batch.get('name', f"Batch_{i}"),
-                "quality_score": batch.get('quality_score', 0.8),
-                "timestamp": batch.get('timestamp', datetime.now().isoformat())
-            }
-            for i, batch in enumerate(batches_db[-5:])
-        ] if batches_db else [
-            {
-                "name": f"GreenValley_Apples_{i:03d}",
-                "quality_score": round(random.uniform(0.7, 0.98), 2),
-                "timestamp": (datetime.now() - timedelta(hours=i)).isoformat()
-            }
-            for i in range(1, 6)
-        ]
+        "recent_batches": recent_batches_data,
+        "timestamp": datetime.now().isoformat()  # Add timestamp for cache control
     }
+
+    logger.info(f"📊 Dashboard data - Total: {total_batches}, Prime: {prime_percentage:.1f}%, Reject: {rejection_rate:.1f}%")
     return dashboard_data
 
-@app.post("/batches")
-async def create_batch(batch_data: dict = None):
-    """Create a new batch"""
-    try:
-        batch_id = f"BATCH_{int(time.time())}_{random.randint(1000, 9999)}"
-
-        # Create batch record
-        batch_record = {
-            "batch_id": batch_id,
-            "name": batch_data.get('name', 'Unnamed_Batch') if batch_data else 'Unnamed_Batch',
-            "farmer": batch_data.get('farmer', 'Unknown_Farmer') if batch_data else 'Unknown_Farmer',
-            "product_type": batch_data.get('product_type', 'Unknown_Product') if batch_data else 'Unknown_Product',
-            "quantity": batch_data.get('quantity', 1) if batch_data else 1,
-            "quality_score": batch_data.get('quality_data', {}).get('quality_score', 0.8) if batch_data and 'quality_data' in batch_data else 0.8,
-            "quality_label": batch_data.get('quality_data', {}).get('label', 'fresh') if batch_data and 'quality_data' in batch_data else 'fresh',
-            "timestamp": datetime.now().isoformat(),
-            "status": "created"
-        }
-
-        # Store in database
-        batches_db.append(batch_record)
-
-        logger.info(f"✅ Batch created: {batch_record['name']} (ID: {batch_id})")
-
-        return {
-            "batch_id": batch_id,
-            "status": "created",
-            "timestamp": datetime.now().isoformat(),
-            "message": f"Batch '{batch_record['name']}' created successfully"
-        }
-
-    except Exception as e:
-        logger.error(f"❌ Error creating batch: {e}")
-        raise HTTPException(status_code=500, detail=f"Error creating batch: {e}")
 
 @app.get("/batches")
 async def get_batches():
@@ -258,6 +372,9 @@ async def predict(file: UploadFile = File(...)):
         confidence = float(probabilities[predicted_class_idx])
         predicted_class = label_map[str(predicted_class_idx)]
 
+        # 🚀 FIX: Convert class to quality score based on meaning, not confidence
+        quality_score = map_class_to_quality_score(predicted_class, confidence)
+
         # Get top 3 predictions for additional context
         top3_indices = np.argsort(probabilities)[-3:][::-1]
         top_predictions = {
@@ -268,7 +385,8 @@ async def predict(file: UploadFile = File(...)):
         # Create report
         report_data = {
             "prediction": predicted_class,
-            "confidence": confidence,
+            "confidence": confidence,  # Model's confidence in its prediction
+            "quality_score": quality_score,  # Actual quality percentage
             "class_id": int(predicted_class_idx),
             "top_predictions": top_predictions,
             "model_accuracy": "99.06%",
@@ -279,8 +397,9 @@ async def predict(file: UploadFile = File(...)):
         data_hash = hashlib.sha256(report_json.encode("utf-8")).hexdigest()
 
         response = {
-            "quality_score": confidence,
+            "quality_score": quality_score,  # Use mapped quality score, not confidence
             "label": predicted_class,
+            "confidence": confidence,  # Add confidence as separate field
             "report": report_json,
             "data_hash": data_hash,
             "model_accuracy": "99.06%",
@@ -288,7 +407,7 @@ async def predict(file: UploadFile = File(...)):
             "class_id": int(predicted_class_idx)
         }
 
-        logger.info(f"✅ Prediction: {predicted_class} (confidence: {confidence:.3f})")
+        logger.info(f"✅ Prediction: {predicted_class} (confidence: {confidence:.3f}, quality: {quality_score:.1f}%)")
         return response
 
     except HTTPException:
@@ -303,6 +422,64 @@ async def predict(file: UploadFile = File(...)):
         else:
             raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
 
+def map_class_to_quality_score(predicted_class: str, confidence: float) -> float:
+    """Map prediction class to appropriate quality score"""
+    class_quality_map = {
+        "fresh": 0.85,  # Base quality for fresh products
+        "good": 0.75,   # Base quality for good products
+        "ripe": 0.70,   # Base quality for ripe products
+        "low_quality": 0.45,  # Base quality for low quality
+        "rotten": 0.20,  # Base quality for rotten
+        "damaged": 0.30,  # Base quality for damaged
+    }
+
+    # Get base quality score for this class
+    base_quality = class_quality_map.get(predicted_class.lower(), 0.5)
+
+    # Adjust quality slightly based on confidence (but keep within class boundaries)
+    if predicted_class.lower() in ["fresh", "good", "ripe"]:
+        # For positive classes, higher confidence = slightly higher quality
+        adjusted_quality = base_quality + (confidence * 0.15)
+    else:
+        # For negative classes, higher confidence = slightly lower quality
+        adjusted_quality = base_quality - (confidence * 0.15)
+
+    # Ensure quality stays within reasonable bounds
+    return max(0.1, min(0.99, adjusted_quality))
+
+def get_dummy_prediction():
+    """Demo prediction for testing (only when VERICROP_LOAD_DEMO=true)"""
+    if not should_use_demo_mode():
+        raise HTTPException(
+            status_code=503,
+            detail="ML model not available. Set VERICROP_LOAD_DEMO=true for demo mode."
+        )
+
+    # 🚀 FIX: Use appropriate quality scores for demo data
+    demo_classes = [
+        {"class": "fresh", "confidence": 0.92, "quality": 0.88},
+        {"class": "good", "confidence": 0.85, "quality": 0.78},
+        {"class": "rotten", "confidence": 0.95, "quality": 0.25}
+    ]
+    demo_data = random.choice(demo_classes)
+
+    report_data = {
+        "prediction": demo_data["class"],
+        "confidence": demo_data["confidence"],
+        "quality_score": demo_data["quality"],
+        "note": "demo_mode"
+    }
+    report_json = json.dumps(report_data, sort_keys=True)
+    data_hash = hashlib.sha256(report_json.encode("utf-8")).hexdigest()
+
+    return {
+        "quality_score": demo_data["quality"],  # Use quality score, not confidence
+        "label": demo_data["class"],
+        "confidence": demo_data["confidence"],  # Add confidence separately
+        "report": report_json,
+        "data_hash": data_hash,
+        "model_accuracy": "demo_mode"
+    }
 @app.get("/classes")
 async def get_classes():
     """Get all available fruit classes"""

@@ -529,47 +529,67 @@ public class ProducerController {
     private void updateDashboardUI(Map<String, Object> dashboardData) {
         if (dashboardData == null) return;
 
-        try {
-            Map<String, Object> kpis = (Map<String, Object>) dashboardData.get("kpis");
-            Map<String, Object> distribution = (Map<String, Object>) dashboardData.get("quality_distribution");
-            List<Map<String, Object>> recentBatches = (List<Map<String, Object>>) dashboardData.get("recent_batches");
+        Platform.runLater(() -> {
+            try {
+                Map<String, Object> kpis = (Map<String, Object>) dashboardData.get("kpis");
+                Map<String, Object> distribution = (Map<String, Object>) dashboardData.get("quality_distribution");
+                List<Map<String, Object>> recentBatches = (List<Map<String, Object>>) dashboardData.get("recent_batches");
 
-            if (kpis != null) {
-                if (totalBatchesLabel != null)
-                    totalBatchesLabel.setText(String.valueOf(kpis.getOrDefault("total_batches_today", "0")));
-                if (avgQualityLabel != null)
-                    avgQualityLabel.setText(kpis.getOrDefault("average_quality", "0") + "%");
-                if (primePercentageLabel != null)
-                    primePercentageLabel.setText(kpis.getOrDefault("prime_percentage", "0") + "%");
-                if (rejectionRateLabel != null)
-                    rejectionRateLabel.setText(kpis.getOrDefault("rejection_rate", "0") + "%");
-            }
-
-            if (qualityDistributionChart != null && distribution != null) {
-                ObservableList<PieChart.Data> pieChartData = FXCollections.observableArrayList(
-                        new PieChart.Data("Prime", safeGetDouble(distribution, "prime")),
-                        new PieChart.Data("Standard", safeGetDouble(distribution, "standard")),
-                        new PieChart.Data("Sub-standard", safeGetDouble(distribution, "sub_standard"))
-                );
-                qualityDistributionChart.setData(pieChartData);
-                qualityDistributionChart.setLegendVisible(false);
-                qualityDistributionChart.setStyle("-fx-font-size: 10px;");
-            }
-
-            if (recentBatchesList != null && recentBatches != null) {
-                ObservableList<String> batches = FXCollections.observableArrayList();
-                for (Map<String, Object> batch : recentBatches) {
-                    String batchName = safeGetString(batch, "name");
-                    String qualityScore = safeGetString(batch, "quality_score");
-                    batches.add(batchName + " - Quality: " + qualityScore);
+                if (kpis != null) {
+                    // Use consistent parsing with fallbacks
+                    if (totalBatchesLabel != null) {
+                        Object totalBatches = kpis.get("total_batches_today");
+                        totalBatchesLabel.setText(totalBatches != null ? String.valueOf(totalBatches) : "0");
+                    }
+                    if (avgQualityLabel != null) {
+                        Object avgQuality = kpis.get("average_quality");
+                        avgQualityLabel.setText(avgQuality != null ? avgQuality + "%" : "0%");
+                    }
+                    if (primePercentageLabel != null) {
+                        Object primePct = kpis.get("prime_percentage");
+                        primePercentageLabel.setText(primePct != null ? primePct + "%" : "0%");
+                    }
+                    if (rejectionRateLabel != null) {
+                        Object rejectionRate = kpis.get("rejection_rate");
+                        rejectionRateLabel.setText(rejectionRate != null ? rejectionRate + "%" : "0%");
+                    }
                 }
-                recentBatchesList.setItems(batches);
-                recentBatchesList.getStyleClass().add("modern-list");
+
+                if (qualityDistributionChart != null && distribution != null) {
+                    ObservableList<PieChart.Data> pieChartData = FXCollections.observableArrayList(
+                            new PieChart.Data("Prime", safeGetDouble(distribution, "prime")),
+                            new PieChart.Data("Standard", safeGetDouble(distribution, "standard")),
+                            new PieChart.Data("Sub-standard", safeGetDouble(distribution, "sub_standard"))
+                    );
+                    qualityDistributionChart.setData(pieChartData);
+                    qualityDistributionChart.setLegendVisible(false);
+                    qualityDistributionChart.setStyle("-fx-font-size: 10px;");
+                }
+
+                if (recentBatchesList != null && recentBatches != null) {
+                    ObservableList<String> batches = FXCollections.observableArrayList();
+                    for (Map<String, Object> batch : recentBatches) {
+                        String batchName = safeGetString(batch, "name");
+                        String qualityScore = safeGetString(batch, "quality_score");
+                        batches.add(batchName + " - Quality: " + qualityScore);
+                    }
+                    recentBatchesList.setItems(batches);
+                    recentBatchesList.getStyleClass().add("modern-list");
+                }
+
+                updateStatus("✅ Dashboard updated");
+
+            } catch (Exception e) {
+                System.err.println("Error updating dashboard UI: " + e.getMessage());
+                updateStatus("❌ Dashboard update failed");
+
+                // Set fallback values on error
+                if (totalBatchesLabel != null) totalBatchesLabel.setText("0");
+                if (avgQualityLabel != null) avgQualityLabel.setText("0%");
+                if (primePercentageLabel != null) primePercentageLabel.setText("0%");
+                if (rejectionRateLabel != null) rejectionRateLabel.setText("0%");
             }
-        } catch (Exception e) {
-            System.err.println("Error updating dashboard UI: " + e.getMessage());
-            updateStatus("❌ Dashboard update failed");
-        }
+        });
     }
 
     @FXML
