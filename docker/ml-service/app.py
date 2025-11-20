@@ -270,7 +270,20 @@ async def root():
 
 @app.get("/dashboard/farm")
 async def get_farm_dashboard():
+<<<<<<< HEAD
     """Dashboard data for farmer UI - using quality-based rates"""
+=======
+    """
+    Dashboard data for farmer UI.
+    
+    Returns actual counts for prime/rejected samples to enable consistent rate calculation:
+    - prime_rate = prime_count / total_count
+    - rejection_rate = rejected_count / total_count  
+    - total_count = prime_count + rejected_count
+    
+    When total_count == 0, rates should be 0.0 (not NaN/inf).
+    """
+>>>>>>> 0c07b982be5469f140bd506799040c829361b1ea
 
     # Use consistent calculation method
     if batches_db:
@@ -313,9 +326,14 @@ async def get_farm_dashboard():
         avg_rejection_rate = (sum(rejection_rates) / len(rejection_rates)) * 100 if rejection_rates else 0
 
         # Count batches in each category (based on quality score for distribution chart)
+        # These represent the actual prime/standard/rejected counts
         prime_count = sum(1 for score in quality_scores if score >= 0.8)
         standard_count = sum(1 for score in quality_scores if 0.6 <= score < 0.8)
         sub_standard_count = sum(1 for score in quality_scores if score < 0.6)
+        
+        # For the canonical formula: total = prime + rejected (standard items are not counted)
+        rejected_count = sub_standard_count
+        total_count = prime_count + rejected_count
 
         # Recent batches (last 5)
         recent_batches_data = []
@@ -350,6 +368,8 @@ async def get_farm_dashboard():
         prime_count = 0
         standard_count = 0
         sub_standard_count = 0
+        rejected_count = 0
+        total_count = 0
         recent_batches_data = []
 
     dashboard_data = {
@@ -360,6 +380,12 @@ async def get_farm_dashboard():
             "prime_percentage": round(avg_prime_rate, 1),
             "rejection_rate": round(avg_rejection_rate, 1)
         },
+        # Include actual counts for consistent rate calculation in the GUI
+        "counts": {
+            "prime_count": prime_count,
+            "rejected_count": rejected_count,
+            "total_count": total_count
+        },
         "quality_distribution": {
             "prime": prime_count,
             "standard": standard_count,
@@ -369,7 +395,11 @@ async def get_farm_dashboard():
         "timestamp": datetime.now().isoformat()  # Add timestamp for cache control
     }
 
+<<<<<<< HEAD
     logger.info(f"📊 Dashboard data - Total: {total_batches}, AvgQuality: {avg_quality:.1f}%, AvgPrime: {avg_prime_rate:.1f}%, AvgReject: {avg_rejection_rate:.1f}%")
+=======
+    logger.info(f"📊 Dashboard data - Total: {total_batches}, Prime: {prime_count}, Rejected: {rejected_count}, AvgPrime: {avg_prime_rate:.1f}%, AvgReject: {avg_rejection_rate:.1f}%")
+>>>>>>> 0c07b982be5469f140bd506799040c829361b1ea
     return dashboard_data
 
 @app.get("/batches")

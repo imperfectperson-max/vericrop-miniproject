@@ -625,9 +625,11 @@ public class ProducerController {
         Platform.runLater(() -> {
             try {
                 Map<String, Object> kpis = (Map<String, Object>) dashboardData.get("kpis");
+                Map<String, Object> counts = (Map<String, Object>) dashboardData.get("counts");
                 Map<String, Object> distribution = (Map<String, Object>) dashboardData.get("quality_distribution");
                 List<Map<String, Object>> recentBatches = (List<Map<String, Object>>) dashboardData.get("recent_batches");
 
+<<<<<<< HEAD
                 // Use actual backend data if available, otherwise compute from batches
                 if (kpis == null || !kpis.containsKey("prime_percentage") || !kpis.containsKey("rejection_rate")) {
                     Map<String, Object> computed = computeKpisFromRecentBatches(recentBatches);
@@ -637,6 +639,29 @@ public class ProducerController {
 
                 if (kpis != null) {
                     // Use actual backend data
+=======
+                // Use counts to calculate rates consistently
+                if (counts != null) {
+                    int primeCount = safeGetInt(counts, "prime_count");
+                    int rejectedCount = safeGetInt(counts, "rejected_count");
+                    
+                    // Calculate rates using the canonical formula
+                    double[] rates = calculateRates(primeCount, rejectedCount);
+                    double primeRate = rates[0];
+                    double rejectionRate = rates[1];
+                    
+                    // Update UI with calculated rates
+                    if (primePercentageLabel != null) {
+                        primePercentageLabel.setText(String.format("%.1f%%", primeRate));
+                    }
+                    if (rejectionRateLabel != null) {
+                        rejectionRateLabel.setText(String.format("%.1f%%", rejectionRate));
+                    }
+                }
+
+                if (kpis != null) {
+                    // Use consistent parsing with fallbacks for other KPIs
+>>>>>>> 0c07b982be5469f140bd506799040c829361b1ea
                     if (totalBatchesLabel != null) {
                         Object totalBatches = kpis.get("total_batches_today");
                         totalBatchesLabel.setText(totalBatches != null ? String.valueOf(totalBatches) : "0");
@@ -645,16 +670,9 @@ public class ProducerController {
                         Object avgQuality = kpis.get("average_quality");
                         avgQualityLabel.setText(avgQuality != null ? avgQuality + "%" : "0%");
                     }
-                    if (primePercentageLabel != null) {
-                        Object primePct = kpis.get("prime_percentage");
-                        primePercentageLabel.setText(primePct != null ? primePct + "%" : "0%");
-                    }
-                    if (rejectionRateLabel != null) {
-                        Object rejectionRate = kpis.get("rejection_rate");
-                        rejectionRateLabel.setText(rejectionRate != null ? rejectionRate + "%" : "0%");
-                    }
                 }
 
+<<<<<<< HEAD
                 if (qualityDistributionChart != null) {
                     if (distribution == null) {
                         distribution = computeDistributionFromRecentBatches(recentBatches);
@@ -680,6 +698,39 @@ public class ProducerController {
 
                         qualityDistributionChart.setStyle("-fx-font-size: 10px;");
                     }
+=======
+                // Update pie chart with labeled segments
+                if (qualityDistributionChart != null && distribution != null) {
+                    double primeCount = safeGetDouble(distribution, "prime");
+                    double standardCount = safeGetDouble(distribution, "standard");
+                    double subStandardCount = safeGetDouble(distribution, "sub_standard");
+                    double total = primeCount + standardCount + subStandardCount;
+                    
+                    // Create pie chart data with labels showing category and percentage
+                    ObservableList<PieChart.Data> pieChartData = FXCollections.observableArrayList();
+                    
+                    if (total > 0) {
+                        double primePercent = (primeCount / total) * 100.0;
+                        double standardPercent = (standardCount / total) * 100.0;
+                        double subStandardPercent = (subStandardCount / total) * 100.0;
+                        
+                        pieChartData.add(new PieChart.Data(
+                            String.format("Prime — %.1f%%", primePercent), primeCount));
+                        pieChartData.add(new PieChart.Data(
+                            String.format("Standard — %.1f%%", standardPercent), standardCount));
+                        pieChartData.add(new PieChart.Data(
+                            String.format("Sub-standard — %.1f%%", subStandardPercent), subStandardCount));
+                    } else {
+                        // Zero case: show labels with 0.0%
+                        pieChartData.add(new PieChart.Data("Prime — 0.0%", 0));
+                        pieChartData.add(new PieChart.Data("Standard — 0.0%", 0));
+                        pieChartData.add(new PieChart.Data("Sub-standard — 0.0%", 0));
+                    }
+                    
+                    qualityDistributionChart.setData(pieChartData);
+                    qualityDistributionChart.setLegendVisible(true);
+                    qualityDistributionChart.setStyle("-fx-font-size: 10px;");
+>>>>>>> 0c07b982be5469f140bd506799040c829361b1ea
                 }
 
                 if (recentBatchesList != null && recentBatches != null) {
@@ -705,6 +756,7 @@ public class ProducerController {
 
             } catch (Exception e) {
                 System.err.println("Error updating dashboard UI: " + e.getMessage());
+                e.printStackTrace();
                 updateStatus("❌ Dashboard update failed");
 
                 // Set fallback values on error
@@ -999,6 +1051,125 @@ public class ProducerController {
         }
     }
 
+<<<<<<< HEAD
+=======
+    @FXML
+    private void handleSimulateShipment() {
+        if (logisticsProducer == null) {
+            showError("Kafka producer not initialized");
+            return;
+        }
+
+        String batchId = "SIM_" + System.currentTimeMillis();
+        updateStatus("🔄 Simulating shipment events...");
+
+        try {
+            List<LogisticsEvent> events = Arrays.asList(
+                    new LogisticsEvent(batchId, "IN_TRANSIT", 4.5, 68.0, "Highway A - Mile 50"),
+                    new LogisticsEvent(batchId, "IN_TRANSIT", 4.8, 67.0, "Highway A - Mile 120"),
+                    new LogisticsEvent(batchId, "IN_TRANSIT", 5.2, 69.0, "Distribution Center Entrance"),
+                    new LogisticsEvent(batchId, "AT_WAREHOUSE", 3.8, 62.0, "Metro Fresh Warehouse - Dock 3"),
+                    new LogisticsEvent(batchId, "AT_WAREHOUSE", 3.9, 61.0, "Metro Fresh Warehouse - Storage A"),
+                    new LogisticsEvent(batchId, "DELIVERED", 4.1, 63.0, "FreshMart Downtown - Received")
+            );
+
+            events.get(0).setVehicleId("TRUCK_001");
+            events.get(0).setDriverId("DRIVER_123");
+
+            new Thread(() -> {
+                try {
+                    for (int i = 0; i < events.size(); i++) {
+                        LogisticsEvent event = events.get(i);
+                        logisticsProducer.sendLogisticsEvent(event);
+                        System.out.println("📦 Sent shipment update: " + event.getStatus() + " at " + event.getLocation());
+
+                        final int progress = i + 1;
+                        Platform.runLater(() -> {
+                            updateStatus("📦 Shipment progress: " + progress + "/" + events.size() + " - " + event.getStatus());
+                        });
+
+                        Thread.sleep(2000);
+                    }
+
+                    Platform.runLater(() -> {
+                        showSuccess("Shipment simulation completed!\nBatch: " + batchId +
+                                "\n6 events sent to Kafka");
+                        updateStatus("✅ Shipment simulation completed");
+                    });
+
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    Platform.runLater(() -> showError("Shipment simulation interrupted"));
+                }
+            }).start();
+
+        } catch (Exception e) {
+            showError("Error simulating shipment: " + e.getMessage());
+        }
+    }
+
+    @FXML
+    private void handleTestAlert() {
+        if (qualityAlertProducer == null) {
+            showError("Kafka alert producer not initialized");
+            return;
+        }
+
+        String batchId = "TEST_ALERT_" + System.currentTimeMillis();
+
+        try {
+            QualityAlertEvent tempAlert = new QualityAlertEvent(
+                    batchId,
+                    "TEMPERATURE_BREACH",
+                    "HIGH",
+                    "Temperature exceeded safe threshold during transit",
+                    8.5,
+                    7.0
+            );
+            tempAlert.setSensorId("TEMP_SENSOR_001");
+            tempAlert.setLocation("Vehicle TRUCK_001");
+
+            QualityAlertEvent qualityAlert = new QualityAlertEvent(
+                    batchId,
+                    "QUALITY_DROP",
+                    "MEDIUM",
+                    "Quality degradation detected at warehouse inspection",
+                    55.0,
+                    70.0
+            );
+            qualityAlert.setLocation("Metro Fresh Warehouse");
+
+            QualityAlertEvent humidityAlert = new QualityAlertEvent(
+                    batchId,
+                    "HUMIDITY_BREACH",
+                    "LOW",
+                    "Humidity slightly above optimal range",
+                    75.0,
+                    70.0
+            );
+            humidityAlert.setSensorId("HUMIDITY_SENSOR_002");
+            humidityAlert.setLocation("Storage Room B");
+
+            qualityAlertProducer.sendQualityAlert(tempAlert);
+            qualityAlertProducer.sendQualityAlert(qualityAlert);
+            qualityAlertProducer.sendQualityAlert(humidityAlert);
+
+            showSuccess("Test alerts sent successfully!\n3 different alert types generated");
+            updateStatus("✅ Test alerts sent to Kafka");
+
+        } catch (Exception e) {
+            showError("Error sending test alerts: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Update the live blockchain view display.
+     * 
+     * Displays blocks in newest-first order to show recent activity at the top.
+     * This method is called after new blocks are added to ensure real-time updates.
+     * Runs on UI thread via Platform.runLater to ensure thread-safety.
+     */
+>>>>>>> 0c07b982be5469f140bd506799040c829361b1ea
     private void updateBlockchainDisplay() {
         Platform.runLater(() -> {
             StringBuilder sb = new StringBuilder();
@@ -1010,7 +1181,9 @@ public class ProducerController {
                 sb.append("No blocks in the chain yet.\n");
                 sb.append("Create your first batch to see blockchain data!\n");
             } else {
-                for (Block block : chain) {
+                // Display blocks in reverse order (newest first) for better UX
+                for (int i = chain.size() - 1; i >= 0; i--) {
+                    Block block = chain.get(i);
                     sb.append("Block #").append(block.getIndex()).append("\n");
                     sb.append("Hash: ").append(safeSubstring(block.getHash(), 20)).append("\n");
                     sb.append("Previous: ").append(safeSubstring(block.getPreviousHash(), 20)).append("\n");
@@ -1124,6 +1297,18 @@ public class ProducerController {
         }
     }
 
+    private int safeGetInt(Map<String, Object> map, String key) {
+        try {
+            Object value = map.get(key);
+            if (value instanceof Number) {
+                return ((Number) value).intValue();
+            }
+            return 0;
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
     private String safeGetString(Map<String, Object> map, String key) {
         try {
             Object value = map.get(key);
@@ -1133,6 +1318,7 @@ public class ProducerController {
         }
     }
 
+<<<<<<< HEAD
     @FXML
     private void handleValidateBlockchain() {
         if (!blockchainReady) {
@@ -1167,6 +1353,35 @@ public class ProducerController {
             this.valid = valid;
             this.blockCount = blockCount;
         }
+=======
+    /**
+     * Calculate prime rate and rejection rate using consistent formulas.
+     * 
+     * Canonical formulas:
+     * - prime_rate = prime_count / total_count
+     * - rejection_rate = rejected_count / total_count
+     * - total_count = prime_count + rejected_count
+     * 
+     * Edge case: when total_count == 0, rates are defined as 0.0 (not NaN/inf).
+     * 
+     * @param primeCount number of prime quality samples
+     * @param rejectedCount number of rejected samples
+     * @return array with [primeRate, rejectionRate] as percentages (0.0 to 100.0)
+     */
+    private double[] calculateRates(int primeCount, int rejectedCount) {
+        int totalCount = primeCount + rejectedCount;
+        
+        // Handle zero-count edge case: rates are 0.0
+        if (totalCount == 0) {
+            return new double[] {0.0, 0.0};
+        }
+        
+        // Calculate rates as percentages (0.0 to 100.0)
+        double primeRate = (primeCount * 100.0) / totalCount;
+        double rejectionRate = (rejectedCount * 100.0) / totalCount;
+        
+        return new double[] {primeRate, rejectionRate};
+>>>>>>> 0c07b982be5469f140bd506799040c829361b1ea
     }
 
     public void cleanup() {
