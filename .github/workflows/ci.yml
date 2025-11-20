@@ -13,6 +13,7 @@ env:
 # Set default permissions to read-only for security
 permissions:
   contents: read
+  issues: write
 
 jobs:
   build-java:
@@ -21,6 +22,7 @@ jobs:
     permissions:
       contents: read
       checks: write  # For publishing test results
+      issues: write  # For creating issue comments with test results
     
     steps:
     - name: Checkout code
