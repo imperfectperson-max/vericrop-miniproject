@@ -6,12 +6,21 @@ import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.image.Image;
 import javafx.stage.Stage;
-import java.net.URL;
-import java.util.Objects;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.vericrop.gui.app.ApplicationContext;
 
+import java.net.URL;
+
+/**
+ * Main JavaFX Application entry point for VeriCrop GUI.
+ * Initializes ApplicationContext and manages screen navigation.
+ */
 public class MainApp extends Application {
+    private static final Logger logger = LoggerFactory.getLogger(MainApp.class);
     private static MainApp instance;
     private Stage primaryStage;
+    private ApplicationContext appContext;
 
     @Override
     public void start(Stage primaryStage) throws Exception {
@@ -19,6 +28,12 @@ public class MainApp extends Application {
         this.primaryStage = primaryStage;
 
         try {
+            logger.info("=== Starting VeriCrop GUI Application ===");
+            
+            // Initialize application context (services, config, etc.)
+            this.appContext = ApplicationContext.getInstance();
+            logger.info("Application context initialized");
+            
             primaryStage.setTitle("VeriCrop - Supply Chain Management");
 
             try {
@@ -26,20 +41,45 @@ public class MainApp extends Application {
                 if (iconUrl != null) {
                     Image icon = new Image(iconUrl.toString());
                     primaryStage.getIcons().add(icon);
+                    logger.debug("Application icon loaded");
                 } else {
-                    System.out.println("⚠️  Icon not found, continuing without icon");
+                    logger.warn("Icon not found, continuing without icon");
                 }
             } catch (Exception e) {
-                System.out.println("⚠️  Could not load icon: " + e.getMessage());
+                logger.warn("Could not load icon: {}", e.getMessage());
             }
+            
+            // Add shutdown hook
+            primaryStage.setOnCloseRequest(event -> {
+                logger.info("Application closing...");
+                shutdown();
+            });
 
             showProducerScreen();
+            logger.info("Application started successfully");
 
         } catch (Exception e) {
-            System.err.println("Failed to start application: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Failed to start application", e);
             throw e;
         }
+    }
+    
+    /**
+     * Get ApplicationContext for dependency injection
+     */
+    public ApplicationContext getApplicationContext() {
+        return appContext;
+    }
+    
+    /**
+     * Shutdown application and release resources
+     */
+    public void shutdown() {
+        logger.info("Shutting down application...");
+        if (appContext != null) {
+            appContext.shutdown();
+        }
+        logger.info("Application shutdown complete");
     }
 
     private String createFallbackCSS() {
@@ -118,17 +158,16 @@ public class MainApp extends Application {
     }
 
     public static void main(String[] args) {
-        System.out.println("=== DEBUG: Launching JavaFX ===");
+        logger.info("=== Launching VeriCrop JavaFX Application ===");
         try {
             Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> {
-                System.err.println("Uncaught exception in thread " + thread.getName() + ": " + throwable.getMessage());
-                throwable.printStackTrace();
+                logger.error("Uncaught exception in thread {}: {}", thread.getName(), throwable.getMessage(), throwable);
             });
 
             launch(args);
         } catch (Exception e) {
-            System.err.println("Application launch failed: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Application launch failed", e);
+            System.exit(1);
         }
     }
 }

@@ -1,16 +1,26 @@
 version: '3.8'
 
 services:
+  # VeriCrop Postgres Database for Batch Metadata
   postgres:
     image: postgres:15
+    container_name: vericrop-postgres
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-untitled}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
-      POSTGRES_DB: ${POSTGRES_DB:-untitled}
+      POSTGRES_USER: ${POSTGRES_USER:-vericrop}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vericrop123}
+      POSTGRES_DB: ${POSTGRES_DB:-vericrop}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./vericrop-gui/src/main/resources/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vericrop}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - vericrop-network
 
   # Airflow Services
   postgres-airflow:
@@ -63,14 +73,18 @@ services:
   # Kafka Services
   zookeeper:
     image: confluentinc/cp-zookeeper:latest
+    container_name: vericrop-zookeeper
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
     ports:
       - "2181:2181"
+    networks:
+      - vericrop-network
 
   kafka:
     image: confluentinc/cp-kafka:latest
+    container_name: vericrop-kafka
     depends_on:
       - zookeeper
     ports:
@@ -82,14 +96,52 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - vericrop-network
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     ports:
       - "8081:8080"
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=local
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:29092
+    networks:
+      - vericrop-network
+    depends_on:
+      - kafka
+
+  # ML Service (FastAPI) for Quality Predictions
+  ml-service:
+    build:
+      context: ./docker/ml-service
+      dockerfile: Dockerfile
+    container_name: vericrop-ml-service
+    ports:
+      - "8000:8000"
+    environment:
+      - VERICROP_LOAD_DEMO=${VERICROP_LOAD_DEMO:-true}
+    networks:
+      - vericrop-network
+    volumes:
+      - ./docker/ml-service:/app
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 volumes:
   postgres_data:
   postgres_airflow_data:
 
-# NOTE: Database passwords and other sensitive values must be provided via environment variables or a separate secrets backend. See .env.sample for placeholders.
+networks:
+  vericrop-network:
+    driver: bridge
+
+# NOTE: Database passwords and other sensitive values must be provided via environment variables or a separate secrets backend. See .env.example for placeholders.

@@ -97,15 +97,36 @@ project(':vericrop-gui') {
         implementation project(':ml-client')
         implementation project(':kafka-service')
 
+        // Spring Boot and Web
         implementation 'org.springframework.boot:spring-boot-starter-web'
+        
+        // Apache Kafka client for messaging
+        implementation 'org.apache.kafka:kafka-clients:3.4.0'
+        
+        // Database - PostgreSQL and HikariCP connection pool
+        implementation 'org.postgresql:postgresql:42.6.0'
+        implementation 'com.zaxxer:HikariCP:5.0.1'
+        implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+        
+        // HTTP client for ML service integration
         implementation 'com.squareup.okhttp3:okhttp:4.11.0'
+        
+        // JSON processing
         implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.2'
+        implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.15.2'
+        
+        // Logging
         implementation 'org.slf4j:slf4j-api:2.0.7'
         implementation 'ch.qos.logback:logback-classic:1.4.8'
 
+        // Testing dependencies
         testImplementation 'org.springframework.boot:spring-boot-starter-test'
         testImplementation 'org.junit.jupiter:junit-jupiter-api:5.9.3'
         testImplementation 'org.junit.jupiter:junit-jupiter-engine:5.9.3'
+        testImplementation 'org.mockito:mockito-core:5.3.1'
+        testImplementation 'org.mockito:mockito-junit-jupiter:5.3.1'
+        testImplementation 'com.squareup.okhttp3:mockwebserver:4.11.0'
+        testImplementation 'com.h2database:h2:2.2.220'  // In-memory database for tests
     }
 
     application {
