@@ -80,12 +80,57 @@ def test_dashboard_uses_per_batch_rates():
     print(f"✅ Dashboard shows rates: prime_percentage={prime_pct}%, rejection_rate={reject_rate}%")
 
 
+def test_dashboard_returns_counts():
+    """Test that dashboard endpoint returns actual counts for consistent rate calculation"""
+    base = os.environ.get("BASE_URL", "http://localhost:8000")
+    url = f"{base}/dashboard/farm"
+    
+    resp = requests.get(url, timeout=10)
+    assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
+    
+    result = resp.json()
+    
+    # Verify counts structure exists
+    assert "counts" in result, "Dashboard should contain counts"
+    counts = result["counts"]
+    
+    # Verify required count fields
+    assert "prime_count" in counts, "Counts should contain prime_count"
+    assert "rejected_count" in counts, "Counts should contain rejected_count"
+    assert "total_count" in counts, "Counts should contain total_count"
+    
+    prime_count = counts["prime_count"]
+    rejected_count = counts["rejected_count"]
+    total_count = counts["total_count"]
+    
+    # Verify counts are non-negative integers
+    assert prime_count >= 0, f"prime_count {prime_count} should be >= 0"
+    assert rejected_count >= 0, f"rejected_count {rejected_count} should be >= 0"
+    assert total_count >= 0, f"total_count {total_count} should be >= 0"
+    
+    # Verify canonical formula: total_count = prime_count + rejected_count
+    assert total_count == prime_count + rejected_count, \
+        f"total_count {total_count} should equal prime_count {prime_count} + rejected_count {rejected_count}"
+    
+    # If total_count > 0, verify rate calculations would be valid
+    if total_count > 0:
+        prime_rate = prime_count / total_count
+        rejection_rate = rejected_count / total_count
+        assert 0.0 <= prime_rate <= 1.0, f"Calculated prime_rate {prime_rate} should be in [0.0, 1.0]"
+        assert 0.0 <= rejection_rate <= 1.0, f"Calculated rejection_rate {rejection_rate} should be in [0.0, 1.0]"
+        print(f"✅ Dashboard counts: prime={prime_count}, rejected={rejected_count}, total={total_count}")
+        print(f"   Calculated rates: prime_rate={prime_rate:.3f}, rejection_rate={rejection_rate:.3f}")
+    else:
+        print(f"✅ Dashboard counts (zero case): prime={prime_count}, rejected={rejected_count}, total={total_count}")
+
+
 if __name__ == "__main__":
     # Run tests manually for debugging
     print("Testing deterministic batch rates...")
     try:
         test_batch_creation_has_deterministic_rates()
         test_dashboard_uses_per_batch_rates()
+        test_dashboard_returns_counts()
         print("\n✅ All tests passed!")
     except AssertionError as e:
         print(f"\n❌ Test failed: {e}")
