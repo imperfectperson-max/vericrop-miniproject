@@ -57,10 +57,26 @@ cp .env.example .env
 
 ### 3. Initialize Database
 
+Database initialization is handled automatically via Flyway migrations:
+
 ```bash
-# Database schema is automatically loaded via docker-compose volume mount
-# Schema file: vericrop-gui/src/main/resources/db/schema.sql
+# Migrations run automatically on first startup
+# Located in: vericrop-gui/src/main/resources/db/migration/
+
+# Verify migrations applied:
+docker exec -it vericrop-postgres psql -U vericrop -d vericrop \
+  -c "SELECT version, description FROM flyway_schema_history;"
 ```
+
+**Database Schema:**
+- V1: Batches and quality tracking tables
+- V2: Users table with BCrypt authentication
+- V3: Shipments and blockchain tracking tables
+
+**Demo Users** (created by V2 migration):
+- `admin` / `admin123` - Full access
+- `farmer` / `farmer123` - Producer operations
+- `supplier` / `supplier123` - Logistics operations
 
 ### 4. Run the Application
 

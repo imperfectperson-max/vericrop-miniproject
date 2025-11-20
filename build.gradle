@@ -111,6 +111,10 @@ project(':vericrop-gui') {
         // Database migrations with Flyway
         implementation 'org.flywaydb:flyway-core:9.22.3'
         
+        // Security - BCrypt for password hashing
+        implementation 'org.springframework.security:spring-security-crypto:6.1.0'
+        implementation 'org.bouncycastle:bcprov-jdk15on:1.70'
+        
         // Resilience4j for circuit breaker, retry, timeout
         implementation 'io.github.resilience4j:resilience4j-spring-boot3:2.1.0'
         implementation 'io.github.resilience4j:resilience4j-circuitbreaker:2.1.0'

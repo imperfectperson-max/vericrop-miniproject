@@ -239,6 +239,80 @@ docker-compose down
 docker-compose down -v
 ```
 
+## Database Setup & User Provisioning
+
+VeriCrop uses PostgreSQL for metadata storage with Flyway for automatic migrations.
+
+### Database Migrations
+
+Database schema is managed through Flyway migrations located in `vericrop-gui/src/main/resources/db/migration/`:
+
+- **V1__create_batches_table.sql**: Batches and quality tracking tables
+- **V2__create_users_table.sql**: User authentication with BCrypt hashing
+- **V3__create_shipments_table.sql**: Shipment tracking with blockchain integration
+
+Migrations run automatically on application startup when `spring.flyway.enabled=true` (default).
+
+### Pre-configured Users
+
+The V2 migration creates demo users for testing:
+
+| Username | Password | Role | Description |
+|----------|----------|------|-------------|
+| admin | admin123 | ADMIN | Full system access |
+| farmer | farmer123 | FARMER | Farm/producer operations |
+| supplier | supplier123 | SUPPLIER | Logistics operations |
+
+**⚠️ Security Note**: Change these passwords in production! Passwords are BCrypt hashed with cost factor 10.
+
+### Adding New Users
+
+To add users manually:
+
+```sql
+-- Connect to PostgreSQL
+docker exec -it vericrop-postgres psql -U vericrop -d vericrop
+
+-- Generate BCrypt hash (use online tool or bcrypt CLI)
+-- For password "mypassword": $2a$10$...
+
+-- Insert new user
+INSERT INTO users (username, password_hash, email, full_name, role, status)
+VALUES (
+    'newuser',
+    '$2a$10$YOUR_BCRYPT_HASH_HERE',
+    'user@example.com',
+    'User Full Name',
+    'USER',
+    'active'
+);
+```
+
+### Authentication Features
+
+- **BCrypt Password Hashing**: Secure password storage (never plaintext)
+- **Failed Login Tracking**: Account locks after 5 failed attempts
+- **Lockout Duration**: 30 minutes automatic unlock
+- **Role-Based Access**: ADMIN, FARMER, SUPPLIER, CONSUMER, USER
+- **Last Login Tracking**: Monitors user activity
+- **Database Fallback**: Simple auth mode when database unavailable
+
+### Verifying Database Setup
+
+```bash
+# Check migrations applied
+docker exec -it vericrop-postgres psql -U vericrop -d vericrop \
+  -c "SELECT version, description, installed_on FROM flyway_schema_history ORDER BY installed_rank;"
+
+# Verify users exist
+docker exec -it vericrop-postgres psql -U vericrop -d vericrop \
+  -c "SELECT username, role, status, created_at FROM users;"
+
+# Check batches table
+docker exec -it vericrop-postgres psql -U vericrop -d vericrop \
+  -c "SELECT COUNT(*) as batch_count FROM batches;"
+```
+
 ## Local Development
 
 For active development without Docker containers.
