@@ -48,22 +48,40 @@ public class LogisticsController {
     }
 
     private void setupShipmentsTable() {
-        // Sample data
-        shipments.addAll(
-                new Shipment("BATCH_A2386", "IN_TRANSIT", "Highway A - Mile 120", 4.2, 65, "17:30", "TRUCK_001"),
-                new Shipment("BATCH_A2387", "AT_WAREHOUSE", "Metro Fresh Warehouse", 3.8, 62, "ARRIVED", null),
-                new Shipment("BATCH_A2388", "DELIVERED", "FreshMart Downtown", 4.1, 63, "DELIVERED", null)
-        );
+        // Load demo data only if flag is set
+        if (shouldLoadDemoData()) {
+            shipments.addAll(
+                    new Shipment("BATCH_A2386 (demo)", "IN_TRANSIT", "Highway A - Mile 120", 4.2, 65, "17:30", "TRUCK_001"),
+                    new Shipment("BATCH_A2387 (demo)", "AT_WAREHOUSE", "Metro Fresh Warehouse", 3.8, 62, "ARRIVED", null),
+                    new Shipment("BATCH_A2388 (demo)", "DELIVERED", "FreshMart Downtown", 4.1, 63, "DELIVERED", null)
+            );
+        }
         shipmentsTable.setItems(shipments);
     }
 
     private void setupAlertsList() {
-        alerts.addAll(
-                "✓ No active alerts - System normal",
-                "✓ Last temperature check: 4.2°C ✅",
-                "✓ Humidity within optimal range ✅"
-        );
+        if (shouldLoadDemoData()) {
+            alerts.addAll(
+                    "✓ No active alerts - System normal (demo)",
+                    "✓ Last temperature check: 4.2°C ✅ (demo)",
+                    "✓ Humidity within optimal range ✅ (demo)"
+            );
+        } else {
+            alerts.add("No alerts. System ready for real shipments.");
+        }
         alertsList.setItems(alerts);
+    }
+    
+    private boolean shouldLoadDemoData() {
+        // Check system property (set via --load-demo flag)
+        String loadDemo = System.getProperty("vericrop.loadDemo");
+        if ("true".equalsIgnoreCase(loadDemo)) {
+            return true;
+        }
+        
+        // Check environment variable
+        String loadDemoEnv = System.getenv("VERICROP_LOAD_DEMO");
+        return "true".equalsIgnoreCase(loadDemoEnv);
     }
 
     private void setupReportCombo() {
@@ -76,27 +94,33 @@ public class LogisticsController {
     }
 
     private void setupTemperatureChart() {
-        // Populate temperature chart with sample data showing temperature monitoring
+        // Set chart title and legend
         if (temperatureChart != null) {
-            XYChart.Series<String, Number> series1 = new XYChart.Series<>();
-            series1.setName("BATCH_A2386");
-            series1.getData().add(new XYChart.Data<>("00:00", 4.2));
-            series1.getData().add(new XYChart.Data<>("04:00", 4.5));
-            series1.getData().add(new XYChart.Data<>("08:00", 4.8));
-            series1.getData().add(new XYChart.Data<>("12:00", 5.1));
-            series1.getData().add(new XYChart.Data<>("16:00", 4.6));
-            series1.getData().add(new XYChart.Data<>("20:00", 4.3));
+            temperatureChart.setTitle("Temperature Monitoring");
+            temperatureChart.setLegendVisible(true);
             
-            XYChart.Series<String, Number> series2 = new XYChart.Series<>();
-            series2.setName("BATCH_A2387");
-            series2.getData().add(new XYChart.Data<>("00:00", 3.8));
-            series2.getData().add(new XYChart.Data<>("04:00", 3.9));
-            series2.getData().add(new XYChart.Data<>("08:00", 4.1));
-            series2.getData().add(new XYChart.Data<>("12:00", 4.3));
-            series2.getData().add(new XYChart.Data<>("16:00", 4.0));
-            series2.getData().add(new XYChart.Data<>("20:00", 3.8));
-            
-            temperatureChart.getData().addAll(series1, series2);
+            // Populate with demo data only if flag is set
+            if (shouldLoadDemoData()) {
+                XYChart.Series<String, Number> series1 = new XYChart.Series<>();
+                series1.setName("BATCH_A2386 (demo)");
+                series1.getData().add(new XYChart.Data<>("00:00", 4.2));
+                series1.getData().add(new XYChart.Data<>("04:00", 4.5));
+                series1.getData().add(new XYChart.Data<>("08:00", 4.8));
+                series1.getData().add(new XYChart.Data<>("12:00", 5.1));
+                series1.getData().add(new XYChart.Data<>("16:00", 4.6));
+                series1.getData().add(new XYChart.Data<>("20:00", 4.3));
+                
+                XYChart.Series<String, Number> series2 = new XYChart.Series<>();
+                series2.setName("BATCH_A2387 (demo)");
+                series2.getData().add(new XYChart.Data<>("00:00", 3.8));
+                series2.getData().add(new XYChart.Data<>("04:00", 3.9));
+                series2.getData().add(new XYChart.Data<>("08:00", 4.1));
+                series2.getData().add(new XYChart.Data<>("12:00", 4.3));
+                series2.getData().add(new XYChart.Data<>("16:00", 4.0));
+                series2.getData().add(new XYChart.Data<>("20:00", 3.8));
+                
+                temperatureChart.getData().addAll(series1, series2);
+            }
         }
     }
 

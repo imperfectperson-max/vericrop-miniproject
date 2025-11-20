@@ -96,11 +96,22 @@ def preprocess_image(image_bytes: bytes) -> np.ndarray:
         logger.error(f"Image preprocessing failed: {e}")
         raise HTTPException(status_code=400, detail=f"Image processing error: {e}")
 
+def should_use_demo_mode():
+    """Check if demo mode is enabled via environment variable"""
+    load_demo = os.getenv("VERICROP_LOAD_DEMO", "false").lower()
+    return load_demo == "true"
+
 def get_dummy_prediction():
-    """Fallback prediction when model is not loaded"""
+    """Demo prediction for testing (only when VERICROP_LOAD_DEMO=true)"""
+    if not should_use_demo_mode():
+        raise HTTPException(
+            status_code=503,
+            detail="ML model not available. Set VERICROP_LOAD_DEMO=true for demo mode."
+        )
+    
     dummy_score = 0.85
     dummy_label = "fresh"
-    report = f'{{"score": {dummy_score}, "label": "{dummy_label}"}}'
+    report = f'{{"score": {dummy_score}, "label": "{dummy_label}", "note": "demo_mode"}}'
     data_hash = hashlib.sha256(report.encode("utf-8")).hexdigest()
 
     return {
@@ -108,7 +119,7 @@ def get_dummy_prediction():
         "label": dummy_label,
         "report": report,
         "data_hash": data_hash,
-        "model_accuracy": "fallback_mode"
+        "model_accuracy": "demo_mode"
     }
 
 @app.get("/health")
@@ -223,9 +234,9 @@ async def predict(file: UploadFile = File(...)):
         # Read image
         contents = await file.read()
 
-        # If model is not loaded, use fallback
+        # If model is not loaded, use demo mode only if enabled
         if not model_loaded:
-            logger.warning("Using fallback prediction (model not loaded)")
+            logger.warning("Model not loaded. Checking for demo mode...")
             return get_dummy_prediction()
 
         # Preprocess image
@@ -285,8 +296,12 @@ async def predict(file: UploadFile = File(...)):
     except Exception as e:
         logger.error(f"❌ Prediction failed: {e}")
         logger.exception("Full error details:")
-        # Fallback to dummy prediction on error
-        return get_dummy_prediction()
+        # Only use demo mode if explicitly enabled
+        if should_use_demo_mode():
+            logger.warning("Using demo prediction due to error")
+            return get_dummy_prediction()
+        else:
+            raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
 
 @app.get("/classes")
 async def get_classes():

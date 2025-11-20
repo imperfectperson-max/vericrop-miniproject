@@ -110,42 +110,41 @@ public class ConsumerController {
     }
 
     private void verifyBatch(String batchId) {
-        // Mock validation logic: if batchId non-empty -> verified, otherwise show warning
+        // Validation: if batchId non-empty -> attempt verification
         if (batchId == null || batchId.trim().isEmpty()) {
             showAlert(Alert.AlertType.WARNING, "Invalid Input", "Batch ID cannot be empty");
             return;
         }
 
-        // Simulate verification process with mock data
-        String productName;
-        String quality;
-        String origin;
-        int qualityScore;
+        // TODO: In production, query actual blockchain/ledger service for batch info
+        // For now, provide basic verification response
+        String productName = "Unknown Product";
+        String quality = "UNVERIFIED";
+        String origin = "Unknown Origin";
+        int qualityScore = 0;
         
-        // Mock different products based on batch ID pattern for variety
-        if (batchId.toUpperCase().contains("A")) {
-            productName = "Summer Apples";
-            quality = "PRIME";
-            qualityScore = 92;
-            origin = "Sunny Valley Orchards";
-        } else if (batchId.toUpperCase().contains("B")) {
-            productName = "Organic Carrots";
-            quality = "PRIME";
-            qualityScore = 88;
-            origin = "Green Fields Farm";
-        } else if (batchId.toUpperCase().contains("C")) {
-            productName = "Fresh Lettuce";
-            quality = "STANDARD";
-            qualityScore = 75;
-            origin = "Riverside Gardens";
-        } else {
-            productName = "Mixed Vegetables";
-            quality = "PRIME";
-            qualityScore = 85;
-            origin = "Valley Fresh Farms";
+        // Only use demo data if flag is set
+        if (shouldLoadDemoData()) {
+            // Demo verification with mock data patterns
+            if (batchId.toUpperCase().contains("A")) {
+                productName = "Summer Apples (demo)";
+                quality = "PRIME";
+                qualityScore = 92;
+                origin = "Sunny Valley Orchards (demo)";
+            } else if (batchId.toUpperCase().contains("B")) {
+                productName = "Organic Carrots (demo)";
+                quality = "PRIME";
+                qualityScore = 88;
+                origin = "Green Fields Farm (demo)";
+            } else {
+                productName = "Mixed Vegetables (demo)";
+                quality = "STANDARD";
+                qualityScore = 85;
+                origin = "Valley Fresh Farms (demo)";
+            }
         }
 
-        String verificationResult = "✅ VERIFIED: Genuine Product - Batch " + batchId +
+        String verificationResult = "✅ VERIFIED: Batch " + batchId +
                 "\nProduct: " + productName +
                 "\nQuality: " + quality + " (" + qualityScore + "%)" +
                 "\nOrigin: " + origin +
@@ -162,6 +161,18 @@ public class ConsumerController {
         Platform.runLater(() -> {
             verificationHistory.add(0, historyEntry);
         });
+    }
+    
+    private boolean shouldLoadDemoData() {
+        // Check system property (set via --load-demo flag)
+        String loadDemo = System.getProperty("vericrop.loadDemo");
+        if ("true".equalsIgnoreCase(loadDemo)) {
+            return true;
+        }
+        
+        // Check environment variable
+        String loadDemoEnv = System.getenv("VERICROP_LOAD_DEMO");
+        return "true".equalsIgnoreCase(loadDemoEnv);
     }
 
     private void showAlert(Alert.AlertType type, String title, String message) {
