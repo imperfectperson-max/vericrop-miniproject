@@ -532,11 +532,31 @@ public class ProducerController {
         Platform.runLater(() -> {
             try {
                 Map<String, Object> kpis = (Map<String, Object>) dashboardData.get("kpis");
+                Map<String, Object> counts = (Map<String, Object>) dashboardData.get("counts");
                 Map<String, Object> distribution = (Map<String, Object>) dashboardData.get("quality_distribution");
                 List<Map<String, Object>> recentBatches = (List<Map<String, Object>>) dashboardData.get("recent_batches");
 
+                // Use counts to calculate rates consistently
+                if (counts != null) {
+                    int primeCount = safeGetInt(counts, "prime_count");
+                    int rejectedCount = safeGetInt(counts, "rejected_count");
+                    
+                    // Calculate rates using the canonical formula
+                    double[] rates = calculateRates(primeCount, rejectedCount);
+                    double primeRate = rates[0];
+                    double rejectionRate = rates[1];
+                    
+                    // Update UI with calculated rates
+                    if (primePercentageLabel != null) {
+                        primePercentageLabel.setText(String.format("%.1f%%", primeRate));
+                    }
+                    if (rejectionRateLabel != null) {
+                        rejectionRateLabel.setText(String.format("%.1f%%", rejectionRate));
+                    }
+                }
+
                 if (kpis != null) {
-                    // Use consistent parsing with fallbacks
+                    // Use consistent parsing with fallbacks for other KPIs
                     if (totalBatchesLabel != null) {
                         Object totalBatches = kpis.get("total_batches_today");
                         totalBatchesLabel.setText(totalBatches != null ? String.valueOf(totalBatches) : "0");
@@ -545,24 +565,38 @@ public class ProducerController {
                         Object avgQuality = kpis.get("average_quality");
                         avgQualityLabel.setText(avgQuality != null ? avgQuality + "%" : "0%");
                     }
-                    if (primePercentageLabel != null) {
-                        Object primePct = kpis.get("prime_percentage");
-                        primePercentageLabel.setText(primePct != null ? primePct + "%" : "0%");
-                    }
-                    if (rejectionRateLabel != null) {
-                        Object rejectionRate = kpis.get("rejection_rate");
-                        rejectionRateLabel.setText(rejectionRate != null ? rejectionRate + "%" : "0%");
-                    }
                 }
 
+                // Update pie chart with labeled segments
                 if (qualityDistributionChart != null && distribution != null) {
-                    ObservableList<PieChart.Data> pieChartData = FXCollections.observableArrayList(
-                            new PieChart.Data("Prime", safeGetDouble(distribution, "prime")),
-                            new PieChart.Data("Standard", safeGetDouble(distribution, "standard")),
-                            new PieChart.Data("Sub-standard", safeGetDouble(distribution, "sub_standard"))
-                    );
+                    double primeCount = safeGetDouble(distribution, "prime");
+                    double standardCount = safeGetDouble(distribution, "standard");
+                    double subStandardCount = safeGetDouble(distribution, "sub_standard");
+                    double total = primeCount + standardCount + subStandardCount;
+                    
+                    // Create pie chart data with labels showing category and percentage
+                    ObservableList<PieChart.Data> pieChartData = FXCollections.observableArrayList();
+                    
+                    if (total > 0) {
+                        double primePercent = (primeCount / total) * 100.0;
+                        double standardPercent = (standardCount / total) * 100.0;
+                        double subStandardPercent = (subStandardCount / total) * 100.0;
+                        
+                        pieChartData.add(new PieChart.Data(
+                            String.format("Prime — %.1f%%", primePercent), primeCount));
+                        pieChartData.add(new PieChart.Data(
+                            String.format("Standard — %.1f%%", standardPercent), standardCount));
+                        pieChartData.add(new PieChart.Data(
+                            String.format("Sub-standard — %.1f%%", subStandardPercent), subStandardCount));
+                    } else {
+                        // Zero case: show labels with 0.0%
+                        pieChartData.add(new PieChart.Data("Prime — 0.0%", 0));
+                        pieChartData.add(new PieChart.Data("Standard — 0.0%", 0));
+                        pieChartData.add(new PieChart.Data("Sub-standard — 0.0%", 0));
+                    }
+                    
                     qualityDistributionChart.setData(pieChartData);
-                    qualityDistributionChart.setLegendVisible(false);
+                    qualityDistributionChart.setLegendVisible(true);
                     qualityDistributionChart.setStyle("-fx-font-size: 10px;");
                 }
 
@@ -581,6 +615,7 @@ public class ProducerController {
 
             } catch (Exception e) {
                 System.err.println("Error updating dashboard UI: " + e.getMessage());
+                e.printStackTrace();
                 updateStatus("❌ Dashboard update failed");
 
                 // Set fallback values on error
@@ -1020,6 +1055,18 @@ public class ProducerController {
         }
     }
 
+    private int safeGetInt(Map<String, Object> map, String key) {
+        try {
+            Object value = map.get(key);
+            if (value instanceof Number) {
+                return ((Number) value).intValue();
+            }
+            return 0;
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
     private String safeGetString(Map<String, Object> map, String key) {
         try {
             Object value = map.get(key);
@@ -1027,6 +1074,35 @@ public class ProducerController {
         } catch (Exception e) {
             return "Unknown";
         }
+    }
+
+    /**
+     * Calculate prime rate and rejection rate using consistent formulas.
+     * 
+     * Canonical formulas:
+     * - prime_rate = prime_count / total_count
+     * - rejection_rate = rejected_count / total_count
+     * - total_count = prime_count + rejected_count
+     * 
+     * Edge case: when total_count == 0, rates are defined as 0.0 (not NaN/inf).
+     * 
+     * @param primeCount number of prime quality samples
+     * @param rejectedCount number of rejected samples
+     * @return array with [primeRate, rejectionRate] as percentages (0.0 to 100.0)
+     */
+    private double[] calculateRates(int primeCount, int rejectedCount) {
+        int totalCount = primeCount + rejectedCount;
+        
+        // Handle zero-count edge case: rates are 0.0
+        if (totalCount == 0) {
+            return new double[] {0.0, 0.0};
+        }
+        
+        // Calculate rates as percentages (0.0 to 100.0)
+        double primeRate = (primeCount * 100.0) / totalCount;
+        double rejectionRate = (rejectedCount * 100.0) / totalCount;
+        
+        return new double[] {primeRate, rejectionRate};
     }
 
     public void cleanup() {
