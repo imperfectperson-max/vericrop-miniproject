@@ -629,17 +629,6 @@ public class ProducerController {
                 Map<String, Object> distribution = (Map<String, Object>) dashboardData.get("quality_distribution");
                 List<Map<String, Object>> recentBatches = (List<Map<String, Object>>) dashboardData.get("recent_batches");
 
-<<<<<<< HEAD
-                // Use actual backend data if available, otherwise compute from batches
-                if (kpis == null || !kpis.containsKey("prime_percentage") || !kpis.containsKey("rejection_rate")) {
-                    Map<String, Object> computed = computeKpisFromRecentBatches(recentBatches);
-                    if (kpis == null) kpis = new HashMap<>();
-                    kpis.putAll(computed);
-                }
-
-                if (kpis != null) {
-                    // Use actual backend data
-=======
                 // Use counts to calculate rates consistently
                 if (counts != null) {
                     int primeCount = safeGetInt(counts, "prime_count");
@@ -661,7 +650,6 @@ public class ProducerController {
 
                 if (kpis != null) {
                     // Use consistent parsing with fallbacks for other KPIs
->>>>>>> 0c07b982be5469f140bd506799040c829361b1ea
                     if (totalBatchesLabel != null) {
                         Object totalBatches = kpis.get("total_batches_today");
                         totalBatchesLabel.setText(totalBatches != null ? String.valueOf(totalBatches) : "0");
@@ -672,33 +660,6 @@ public class ProducerController {
                     }
                 }
 
-<<<<<<< HEAD
-                if (qualityDistributionChart != null) {
-                    if (distribution == null) {
-                        distribution = computeDistributionFromRecentBatches(recentBatches);
-                    }
-                    if (distribution != null) {
-                        ObservableList<PieChart.Data> pieChartData = FXCollections.observableArrayList();
-
-                        double primeValue = safeGetDouble(distribution, "prime");
-                        double standardValue = safeGetDouble(distribution, "standard");
-                        double subStandardValue = safeGetDouble(distribution, "sub_standard");
-
-                        PieChart.Data primeData = new PieChart.Data("Prime", primeValue);
-                        PieChart.Data standardData = new PieChart.Data("Standard", standardValue);
-                        PieChart.Data subStandardData = new PieChart.Data("Sub-standard", subStandardValue);
-
-                        pieChartData.addAll(primeData, standardData, subStandardData);
-                        qualityDistributionChart.setData(pieChartData);
-                        qualityDistributionChart.setLegendVisible(false);
-                        qualityDistributionChart.setLabelsVisible(true);
-
-                        // Set colors for each slice
-                        setPieChartColors(qualityDistributionChart);
-
-                        qualityDistributionChart.setStyle("-fx-font-size: 10px;");
-                    }
-=======
                 // Update pie chart with labeled segments
                 if (qualityDistributionChart != null && distribution != null) {
                     double primeCount = safeGetDouble(distribution, "prime");
@@ -730,7 +691,6 @@ public class ProducerController {
                     qualityDistributionChart.setData(pieChartData);
                     qualityDistributionChart.setLegendVisible(true);
                     qualityDistributionChart.setStyle("-fx-font-size: 10px;");
->>>>>>> 0c07b982be5469f140bd506799040c829361b1ea
                 }
 
                 if (recentBatchesList != null && recentBatches != null) {
@@ -1051,8 +1011,6 @@ public class ProducerController {
         }
     }
 
-<<<<<<< HEAD
-=======
     @FXML
     private void handleSimulateShipment() {
         if (logisticsProducer == null) {
@@ -1169,7 +1127,6 @@ public class ProducerController {
      * This method is called after new blocks are added to ensure real-time updates.
      * Runs on UI thread via Platform.runLater to ensure thread-safety.
      */
->>>>>>> 0c07b982be5469f140bd506799040c829361b1ea
     private void updateBlockchainDisplay() {
         Platform.runLater(() -> {
             StringBuilder sb = new StringBuilder();
@@ -1318,7 +1275,6 @@ public class ProducerController {
         }
     }
 
-<<<<<<< HEAD
     @FXML
     private void handleValidateBlockchain() {
         if (!blockchainReady) {
@@ -1353,7 +1309,8 @@ public class ProducerController {
             this.valid = valid;
             this.blockCount = blockCount;
         }
-=======
+    }
+
     /**
      * Calculate prime rate and rejection rate using consistent formulas.
      * 
@@ -1381,7 +1338,6 @@ public class ProducerController {
         double rejectionRate = (rejectedCount * 100.0) / totalCount;
         
         return new double[] {primeRate, rejectionRate};
->>>>>>> 0c07b982be5469f140bd506799040c829361b1ea
     }
 
     public void cleanup() {

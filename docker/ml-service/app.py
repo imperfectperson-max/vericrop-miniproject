@@ -270,9 +270,6 @@ async def root():
 
 @app.get("/dashboard/farm")
 async def get_farm_dashboard():
-<<<<<<< HEAD
-    """Dashboard data for farmer UI - using quality-based rates"""
-=======
     """
     Dashboard data for farmer UI.
     
@@ -283,7 +280,6 @@ async def get_farm_dashboard():
     
     When total_count == 0, rates should be 0.0 (not NaN/inf).
     """
->>>>>>> 0c07b982be5469f140bd506799040c829361b1ea
 
     # Use consistent calculation method
     if batches_db:
@@ -395,11 +391,7 @@ async def get_farm_dashboard():
         "timestamp": datetime.now().isoformat()  # Add timestamp for cache control
     }
 
-<<<<<<< HEAD
-    logger.info(f"📊 Dashboard data - Total: {total_batches}, AvgQuality: {avg_quality:.1f}%, AvgPrime: {avg_prime_rate:.1f}%, AvgReject: {avg_rejection_rate:.1f}%")
-=======
     logger.info(f"📊 Dashboard data - Total: {total_batches}, Prime: {prime_count}, Rejected: {rejected_count}, AvgPrime: {avg_prime_rate:.1f}%, AvgReject: {avg_rejection_rate:.1f}%")
->>>>>>> 0c07b982be5469f140bd506799040c829361b1ea
     return dashboard_data
 
 @app.get("/batches")
