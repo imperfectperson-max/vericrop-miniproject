@@ -498,6 +498,34 @@ ml:
     url: http://localhost:8000
 ```
 
+#### Demo Mode Configuration
+
+VeriCrop supports an optional demo mode that loads sample data for testing and demonstrations. Demo mode is **disabled by default** to ensure production environments start clean.
+
+**Enable Demo Mode:**
+
+Via environment variable:
+```bash
+export VERICROP_LOAD_DEMO=true
+./gradlew :vericrop-gui:bootRun
+```
+
+Via system property:
+```bash
+./gradlew :vericrop-gui:bootRun -Dvericrop.loadDemo=true
+```
+
+Via Docker:
+```bash
+docker-compose up -d -e VERICROP_LOAD_DEMO=true
+```
+
+When demo mode is enabled:
+- Blockchain initializer adds sample blocks
+- GUI controllers populate sample analytics data
+- ML service provides fallback predictions
+- Charts show demo data with "(demo)" labels
+
 **Note:** See [KAFKA_INTEGRATION.md](KAFKA_INTEGRATION.md) for detailed configuration options and advanced setup.
 
 ## 🧪 Running Tests
@@ -677,16 +705,107 @@ python airflow/dags/vericrop_dag.py
 - **Blockchain**: Custom implementation with SHA-256 hashing
 - **Database**: SQLite with connection pooling
 - **REST API**: Comprehensive endpoints for all dashboards
+- **Messaging System**: Actor-to-actor communication with persistence
+- **Quality Decay Model**: Temperature and humidity-based degradation tracking
+- **Delivery Simulator**: Real-time route simulation with environmental monitoring
 
 ### Frontend Application
 - **JavaFX**: Modern, responsive user interface
-- **Charts & Visualizations**: Real-time data representation
+- **Charts & Visualizations**: Real-time data representation with labels and legends
 - **Multi-threading**: Non-blocking UI with background processing
 - **Configuration Management**: Typesafe config with environment support
 
 ## 🛠️ API Endpoints
 
-### ML Service Endpoints
+### VeriCrop REST API Endpoints (Port 8080)
+
+#### Evaluation & Shipments
+```
+POST /api/evaluate              # Evaluate fruit quality
+GET  /api/shipments/{id}        # Get shipment by ledger ID
+GET  /api/shipments             # Get all shipments (filter by batch_id)
+GET  /api/health                # Health check
+```
+
+#### Messaging API (v1)
+```
+POST /api/v1/messaging/send                    # Send a message
+GET  /api/v1/messaging/inbox                   # Get inbox (by recipient role/id)
+GET  /api/v1/messaging/sent                    # Get sent messages (by sender)
+GET  /api/v1/messaging/batch/{batchId}         # Messages for a batch
+GET  /api/v1/messaging/shipment/{shipmentId}   # Messages for a shipment
+PUT  /api/v1/messaging/read/{messageId}        # Mark message as read
+DELETE /api/v1/messaging/{messageId}           # Delete a message
+```
+
+#### Quality Decay API (v1)
+```
+POST /api/v1/quality/predict      # Predict quality at future time
+POST /api/v1/quality/simulate     # Simulate quality over route
+GET  /api/v1/quality/decay-rate   # Get decay rate for conditions
+GET  /api/v1/quality/ideal-ranges # Get ideal temp/humidity ranges
+```
+
+#### Delivery Simulation API (v1)
+```
+POST /api/v1/delivery/generate-route              # Generate simulated route
+POST /api/v1/delivery/start-simulation            # Start delivery simulation
+POST /api/v1/delivery/stop-simulation             # Stop simulation
+GET  /api/v1/delivery/simulation-status/{id}      # Get simulation status
+```
+
+### Example Usage
+
+#### Send a Message
+```bash
+curl -X POST http://localhost:8080/api/v1/messaging/send \
+  -H "Content-Type: application/json" \
+  -d '{
+    "senderRole": "farmer",
+    "senderId": "farmer_001",
+    "recipientRole": "supplier",
+    "recipientId": "supplier_001",
+    "subject": "Batch Ready",
+    "content": "Batch ABC123 is ready for pickup",
+    "batchId": "ABC123"
+  }'
+```
+
+#### Predict Quality Decay
+```bash
+curl -X POST http://localhost:8080/api/v1/quality/predict \
+  -H "Content-Type: application/json" \
+  -d '{
+    "current_quality": 95.0,
+    "temperature": 12.0,
+    "humidity": 85.0,
+    "hours_in_future": 24.0
+  }'
+```
+
+#### Start Delivery Simulation
+```bash
+# First, generate a route
+curl -X POST http://localhost:8080/api/v1/delivery/generate-route \
+  -H "Content-Type: application/json" \
+  -d '{
+    "origin": {"latitude": 40.7128, "longitude": -74.0060, "name": "Farm"},
+    "destination": {"latitude": 34.0522, "longitude": -118.2437, "name": "Market"},
+    "num_waypoints": 10,
+    "avg_speed_kmh": 60
+  }'
+
+# Then start simulation with the generated route
+curl -X POST http://localhost:8080/api/v1/delivery/start-simulation \
+  -H "Content-Type: application/json" \
+  -d '{
+    "shipment_id": "SHIP_001",
+    "route": [...],
+    "update_interval_ms": 5000
+  }'
+```
+
+### ML Service Endpoints (Port 8000)
 
 ```
 POST /predict              # Fruit quality prediction
@@ -696,17 +815,13 @@ GET  /health              # Service health check
 GET  /batches             # Batch management
 ```
 
-### Example Usage
-
+#### ML Service Example
 ```bash
-# Test prediction
+# Test prediction (requires ML model or VERICROP_LOAD_DEMO=true)
 curl -X POST -F "file=@fruit.jpg" http://localhost:8000/predict
 
 # Check health
 curl http://localhost:8000/health
-
-# Get analytics
-curl http://localhost:8000/dashboard/analytics
 ```
 
 ## 📊 Machine Learning Model
@@ -753,6 +868,135 @@ Each block contains:
 - Transaction data
 - Data hash (SHA-256)
 - Merkle root for data integrity
+
+## 🌡️ Quality Decay Model
+
+VeriCrop includes a deterministic quality decay model that tracks produce quality degradation based on environmental conditions.
+
+### Model Parameters
+
+**Ideal Ranges (Cold Chain):**
+- Temperature: 4-8°C
+- Humidity: 70-85%
+
+**Decay Factors:**
+- Base decay: 0.5% quality loss per hour (in ideal conditions)
+- Temperature penalty: 0.3% per degree outside ideal range per hour
+- Humidity penalty: 0.1% per percent outside ideal range per hour
+
+### Quality Calculation
+
+Quality at time *t*:
+```
+Quality(t) = Initial_Quality - (Decay_Rate × Hours_Elapsed)
+
+Decay_Rate = Base_Decay + Temp_Penalty + Humidity_Penalty
+```
+
+### Example Scenarios
+
+1. **Ideal Conditions** (5°C, 75% humidity):
+   - Decay rate: 0.5%/hour
+   - Quality after 24h: 100% → 88%
+
+2. **High Temperature** (15°C, 75% humidity):
+   - Temp deviation: 7°C above ideal
+   - Decay rate: 0.5 + (7 × 0.3) = 2.6%/hour
+   - Quality after 24h: 100% → 37.6%
+
+3. **Poor Conditions** (20°C, 95% humidity):
+   - Temp deviation: 12°C above ideal
+   - Humidity deviation: 10% above ideal
+   - Decay rate: 0.5 + (12 × 0.3) + (10 × 0.1) = 5.1%/hour
+   - Quality after 24h: 100% → 0% (critical)
+
+### API Usage
+
+Predict future quality:
+```bash
+curl -X POST http://localhost:8080/api/v1/quality/predict \
+  -H "Content-Type: application/json" \
+  -d '{
+    "current_quality": 95.0,
+    "temperature": 12.0,
+    "humidity": 85.0,
+    "hours_in_future": 24.0
+  }'
+```
+
+Simulate quality over a route:
+```bash
+curl -X POST http://localhost:8080/api/v1/quality/simulate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "initial_quality": 100.0,
+    "readings": [
+      {"timestamp": 1700000000000, "temperature": 5.0, "humidity": 75.0},
+      {"timestamp": 1700003600000, "temperature": 8.0, "humidity": 80.0},
+      {"timestamp": 1700007200000, "temperature": 6.0, "humidity": 77.0}
+    ]
+  }'
+```
+
+## 📦 Delivery Simulation
+
+The delivery simulator generates realistic routes with environmental conditions and tracks shipments in real-time.
+
+### Features
+
+- **Route Generation**: Create routes between geo-coordinates with configurable waypoints
+- **Environmental Readings**: Temperature and humidity sampled from realistic distributions
+- **Real-time Updates**: Location and condition updates via messaging system
+- **Simulation Control**: Start, stop, and monitor active simulations
+
+### Simulation Flow
+
+1. Generate a route between origin and destination
+2. Start simulation with update interval (e.g., 5 seconds)
+3. Simulator emits location updates as messages
+4. Quality degradation calculated based on conditions
+5. Alerts sent when temperature/humidity exceed thresholds
+
+### Example Usage
+
+See [API Endpoints](#-api-endpoints) section for delivery simulation examples.
+
+## 💬 Messaging System
+
+VeriCrop includes an actor-to-actor messaging system for communication between supply chain participants.
+
+### Supported Roles
+
+- `farmer` - Produce farmers
+- `supplier` - Distribution suppliers
+- `logistics` - Transportation and logistics providers
+- `consumer` - End consumers
+
+### Message Features
+
+- Direct messaging (role-to-role)
+- Broadcast messaging (to all roles)
+- Batch and shipment filtering
+- Read receipts and status tracking
+- File persistence (ledger/messages.jsonl)
+
+### Message Structure
+
+```json
+{
+  "messageId": "uuid",
+  "senderRole": "farmer",
+  "senderId": "farmer_001",
+  "recipientRole": "supplier",
+  "recipientId": "supplier_001",
+  "subject": "Batch Ready",
+  "content": "Batch ABC123 ready for pickup",
+  "timestamp": 1700000000000,
+  "status": "sent",
+  "batchId": "ABC123",
+  "shipmentId": null
+}
+```
 
 ## 🗃️ Database Schema
 
