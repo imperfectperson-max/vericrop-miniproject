@@ -87,15 +87,7 @@ public class AnalyticsController {
     }
     
     private boolean shouldLoadDemoData() {
-        // Check system property (set via --load-demo flag)
-        String loadDemo = System.getProperty("vericrop.loadDemo");
-        if ("true".equalsIgnoreCase(loadDemo)) {
-            return true;
-        }
-        
-        // Check environment variable
-        String loadDemoEnv = System.getenv("VERICROP_LOAD_DEMO");
-        return "true".equalsIgnoreCase(loadDemoEnv);
+        return org.vericrop.gui.util.Config.isDemoMode();
     }
 
     private void setupExportCombo() {

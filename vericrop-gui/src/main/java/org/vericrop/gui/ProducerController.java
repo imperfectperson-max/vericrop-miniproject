@@ -36,12 +36,15 @@ import org.vericrop.kafka.events.LogisticsEvent;
 import org.vericrop.kafka.events.BlockchainEvent;
 import org.vericrop.kafka.events.QualityAlertEvent;
 import org.vericrop.gui.util.BlockchainInitializer;
+import org.vericrop.gui.util.Config;
+import org.vericrop.gui.service.ApiService;
 
-public class ProducerController {
+public class ProducerController extends BaseController {
     private Blockchain blockchain;
     private BlockchainService blockchainService;
     private ObjectMapper mapper;
     private OkHttpClient httpClient;
+    private ApiService apiService;
     private FileLedgerService ledgerService;
     private ExecutorService backgroundExecutor;
     private boolean blockchainReady = false;
@@ -93,6 +96,7 @@ public class ProducerController {
         backgroundExecutor = Executors.newFixedThreadPool(4);
         mapper = new ObjectMapper();
         ledgerService = new FileLedgerService();
+        apiService = new ApiService();
 
         // Initialize blockchain asynchronously based on mode
         initializeBlockchainAsync();
@@ -287,52 +291,23 @@ public class ProducerController {
 
         return batchData;
     }
-    private Map<String, Object> ensureRequiredFields(Map<String, Object> result) {
-        // Ensure all required fields exist with fallback values
-        if (!result.containsKey("quality_score")) {
-            result.put("quality_score", 0.8); // Default fallback
-        }
-        if (!result.containsKey("prime_rate")) {
-            result.put("prime_rate", 0.7); // Default fallback
-        }
-        if (!result.containsKey("rejection_rate")) {
-            result.put("rejection_rate", 0.1); // Default fallback
-        }
-        return result;
-    }
+    // ensureRequiredFields is now handled by ApiService
 
     private CompletableFuture<Map<String, Object>> sendBatchToBackend(Map<String, Object> batchData) {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 Platform.runLater(() -> updateStatus("📡 Sending to backend..."));
 
-                String json = mapper.writeValueAsString(batchData);
-                RequestBody body = RequestBody.create(json, MediaType.parse("application/json"));
-                Request request = new Request.Builder()
-                        .url("http://localhost:8000/batches")
-                        .post(body)
-                        .build();
+                Map<String, Object> result = apiService.createBatch(batchData);
+                result.put("batch_data", batchData);
 
-                try (Response response = httpClient.newCall(request).execute()) {
-                    if (response.isSuccessful() && response.body() != null) {
-                        String responseBody = response.body().string();
-                        Map<String, Object> result = mapper.readValue(responseBody, Map.class);
-                        result.put("batch_data", batchData);
+                // Store actual backend response data
+                result.put("backend_quality_score", result.get("quality_score"));
+                result.put("backend_prime_rate", result.get("prime_rate"));
+                result.put("backend_rejection_rate", result.get("rejection_rate"));
 
-                        // Ensure all required fields exist
-                        result = ensureRequiredFields(result);
-
-                        // Store actual backend response data
-                        result.put("backend_quality_score", result.get("quality_score"));
-                        result.put("backend_prime_rate", result.get("prime_rate"));
-                        result.put("backend_rejection_rate", result.get("rejection_rate"));
-
-                        return result;
-                    } else {
-                        throw new IOException("Backend error: " + response.code() + " - " + response.message());
-                    }
-                }
-            } catch (Exception e) {
+                return result;
+            } catch (IOException e) {
                 throw new RuntimeException("Backend communication failed: " + e.getMessage(), e);
             }
         }, backgroundExecutor);
@@ -585,37 +560,27 @@ public class ProducerController {
     }
 
     private void loadDashboardData() {
-        new Thread(() -> {
+        CompletableFuture.supplyAsync(() -> {
             try {
-                Request request = new Request.Builder()
-                        .url("http://localhost:8000/dashboard/farm")
-                        .build();
-
-                try (Response response = httpClient.newCall(request).execute()) {
-                    if (response.isSuccessful() && response.body() != null) {
-                        String responseBody = response.body().string();
-                        Map<String, Object> dashboardData = mapper.readValue(responseBody, Map.class);
-
-                        Platform.runLater(() -> {
-                            updateDashboardUI(dashboardData);
-                        });
-                    } else {
-                        throw new IOException("HTTP error: " + response.code());
-                    }
-                }
-            } catch (Exception e) {
-                System.err.println("Dashboard load error: " + e.getMessage());
-                Platform.runLater(() -> {
-                    if (totalBatchesLabel != null) {
-                        totalBatchesLabel.setText("N/A");
-                        avgQualityLabel.setText("N/A");
-                        primePercentageLabel.setText("N/A");
-                        rejectionRateLabel.setText("N/A");
-                    }
-                    updateStatus("❌ Dashboard load failed: " + e.getMessage());
-                });
+                return apiService.getFarmDashboard();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
             }
-        }).start();
+        }, backgroundExecutor).thenAcceptAsync(dashboardData -> {
+            updateDashboardUI(dashboardData);
+        }, Platform::runLater).exceptionallyAsync(throwable -> {
+            System.err.println("Dashboard load error: " + throwable.getMessage());
+            if (totalBatchesLabel != null) {
+                totalBatchesLabel.setText("N/A");
+                avgQualityLabel.setText("N/A");
+                primePercentageLabel.setText("N/A");
+                rejectionRateLabel.setText("N/A");
+            }
+            String errorMsg = throwable.getCause() != null ? 
+                    throwable.getCause().getMessage() : throwable.getMessage();
+            updateStatus("❌ Dashboard load failed: " + errorMsg);
+            return null;
+        }, Platform::runLater);
     }
 
     @SuppressWarnings("unchecked")
@@ -629,17 +594,6 @@ public class ProducerController {
                 Map<String, Object> distribution = (Map<String, Object>) dashboardData.get("quality_distribution");
                 List<Map<String, Object>> recentBatches = (List<Map<String, Object>>) dashboardData.get("recent_batches");
 
-<<<<<<< HEAD
-                // Use actual backend data if available, otherwise compute from batches
-                if (kpis == null || !kpis.containsKey("prime_percentage") || !kpis.containsKey("rejection_rate")) {
-                    Map<String, Object> computed = computeKpisFromRecentBatches(recentBatches);
-                    if (kpis == null) kpis = new HashMap<>();
-                    kpis.putAll(computed);
-                }
-
-                if (kpis != null) {
-                    // Use actual backend data
-=======
                 // Use counts to calculate rates consistently
                 if (counts != null) {
                     int primeCount = safeGetInt(counts, "prime_count");
@@ -661,7 +615,6 @@ public class ProducerController {
 
                 if (kpis != null) {
                     // Use consistent parsing with fallbacks for other KPIs
->>>>>>> 0c07b982be5469f140bd506799040c829361b1ea
                     if (totalBatchesLabel != null) {
                         Object totalBatches = kpis.get("total_batches_today");
                         totalBatchesLabel.setText(totalBatches != null ? String.valueOf(totalBatches) : "0");
@@ -672,33 +625,6 @@ public class ProducerController {
                     }
                 }
 
-<<<<<<< HEAD
-                if (qualityDistributionChart != null) {
-                    if (distribution == null) {
-                        distribution = computeDistributionFromRecentBatches(recentBatches);
-                    }
-                    if (distribution != null) {
-                        ObservableList<PieChart.Data> pieChartData = FXCollections.observableArrayList();
-
-                        double primeValue = safeGetDouble(distribution, "prime");
-                        double standardValue = safeGetDouble(distribution, "standard");
-                        double subStandardValue = safeGetDouble(distribution, "sub_standard");
-
-                        PieChart.Data primeData = new PieChart.Data("Prime", primeValue);
-                        PieChart.Data standardData = new PieChart.Data("Standard", standardValue);
-                        PieChart.Data subStandardData = new PieChart.Data("Sub-standard", subStandardValue);
-
-                        pieChartData.addAll(primeData, standardData, subStandardData);
-                        qualityDistributionChart.setData(pieChartData);
-                        qualityDistributionChart.setLegendVisible(false);
-                        qualityDistributionChart.setLabelsVisible(true);
-
-                        // Set colors for each slice
-                        setPieChartColors(qualityDistributionChart);
-
-                        qualityDistributionChart.setStyle("-fx-font-size: 10px;");
-                    }
-=======
                 // Update pie chart with labeled segments
                 if (qualityDistributionChart != null && distribution != null) {
                     double primeCount = safeGetDouble(distribution, "prime");
@@ -730,7 +656,6 @@ public class ProducerController {
                     qualityDistributionChart.setData(pieChartData);
                     qualityDistributionChart.setLegendVisible(true);
                     qualityDistributionChart.setStyle("-fx-font-size: 10px;");
->>>>>>> 0c07b982be5469f140bd506799040c829361b1ea
                 }
 
                 if (recentBatchesList != null && recentBatches != null) {
@@ -894,44 +819,29 @@ public class ProducerController {
             updateStatus("🔄 Analyzing image...");
         });
 
-        new Thread(() -> {
+        CompletableFuture.supplyAsync(() -> {
             try {
-                RequestBody requestBody = new MultipartBody.Builder()
-                        .setType(MultipartBody.FORM)
-                        .addFormDataPart("file", imageFile.getName(),
-                                RequestBody.create(imageFile, MediaType.parse("image/jpeg")))
-                        .build();
-
-                Request request = new Request.Builder()
-                        .url("http://localhost:8000/predict")
-                        .post(requestBody)
-                        .build();
-
-                try (Response response = httpClient.newCall(request).execute()) {
-                    if (response.isSuccessful() && response.body() != null) {
-                        String responseBody = response.body().string();
-                        currentPrediction = mapper.readValue(responseBody, Map.class);
-
-                        Platform.runLater(() -> {
-                            updatePredictionUI();
-                            progressIndicator.setVisible(false);
-                            uploadButton.setDisable(false);
-                            createBatchButton.setDisable(false);
-                            updateStatus("✅ Analysis complete - Ready to create batch");
-                        });
-                    } else {
-                        throw new IOException("Unexpected code " + response + ": " + response.body().string());
-                    }
-                }
-            } catch (Exception e) {
-                Platform.runLater(() -> {
-                    showError("AI Service Error: " + e.getMessage());
-                    progressIndicator.setVisible(false);
-                    uploadButton.setDisable(false);
-                    updateStatus("❌ Analysis failed");
-                });
+                return apiService.predictImage(imageFile);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
             }
-        }).start();
+        }, backgroundExecutor).thenAcceptAsync(prediction -> {
+            currentPrediction = prediction;
+            updatePredictionUI();
+            progressIndicator.setVisible(false);
+            uploadButton.setDisable(false);
+            createBatchButton.setDisable(false);
+            updateStatus("✅ Analysis complete - Ready to create batch");
+        }, Platform::runLater).exceptionallyAsync(throwable -> {
+            String errorMsg = throwable.getCause() != null ? 
+                    throwable.getCause().getMessage() : throwable.getMessage();
+            showError("ML Service Error: " + errorMsg + 
+                    "\nTip: Enable demo mode in the login screen if the ML service is not running.");
+            progressIndicator.setVisible(false);
+            uploadButton.setDisable(false);
+            updateStatus("❌ Analysis failed");
+            return null;
+        }, Platform::runLater);
     }
 
     @SuppressWarnings("unchecked")
@@ -975,23 +885,20 @@ public class ProducerController {
         });
     }
 
-    // Navigation methods
+    // Navigation methods - inherited from BaseController and made public for FXML
     @FXML
-    private void handleShowAnalytics() {
-        // Implementation depends on your MainApp class
-        System.out.println("Navigating to Analytics screen");
+    public void handleShowAnalytics() {
+        super.handleShowAnalytics();
     }
 
     @FXML
-    private void handleShowLogistics() {
-        // Implementation depends on your MainApp class
-        System.out.println("Navigating to Logistics screen");
+    public void handleShowLogistics() {
+        super.handleShowLogistics();
     }
 
     @FXML
-    private void handleShowConsumer() {
-        // Implementation depends on your MainApp class
-        System.out.println("Navigating to Consumer screen");
+    public void handleShowConsumer() {
+        super.handleShowConsumer();
     }
 
     private void sendKafkaEvents(String batchId, String batchName, String farmer,
@@ -1051,8 +958,6 @@ public class ProducerController {
         }
     }
 
-<<<<<<< HEAD
-=======
     @FXML
     private void handleSimulateShipment() {
         if (logisticsProducer == null) {
@@ -1169,7 +1074,6 @@ public class ProducerController {
      * This method is called after new blocks are added to ensure real-time updates.
      * Runs on UI thread via Platform.runLater to ensure thread-safety.
      */
->>>>>>> 0c07b982be5469f140bd506799040c829361b1ea
     private void updateBlockchainDisplay() {
         Platform.runLater(() -> {
             StringBuilder sb = new StringBuilder();
@@ -1234,24 +1138,16 @@ public class ProducerController {
         });
     }
 
-    private void showError(String message) {
-        Platform.runLater(() -> {
-            Alert alert = new Alert(Alert.AlertType.ERROR);
-            alert.setTitle("Error");
-            alert.setHeaderText("Operation Failed");
-            alert.setContentText(message);
-            alert.showAndWait();
-        });
+    // showError and showSuccess inherited from BaseController
+    // Override to add Platform.runLater for thread safety
+    @Override
+    protected void showError(String message) {
+        Platform.runLater(() -> super.showError(message));
     }
 
-    private void showSuccess(String message) {
-        Platform.runLater(() -> {
-            Alert alert = new Alert(Alert.AlertType.INFORMATION);
-            alert.setTitle("Success");
-            alert.setHeaderText("Operation Completed");
-            alert.setContentText(message);
-            alert.showAndWait();
-        });
+    @Override
+    protected void showSuccess(String message) {
+        Platform.runLater(() -> super.showSuccess(message));
     }
 
     private void updateStatus(String message) {
@@ -1285,75 +1181,36 @@ public class ProducerController {
         });
     }
 
-    private double safeGetDouble(Map<String, Object> map, String key) {
-        try {
-            Object value = map.get(key);
-            if (value instanceof Number) {
-                return ((Number) value).doubleValue();
-            }
-            return 0.0;
-        } catch (Exception e) {
-            return 0.0;
-        }
+    // safeGetDouble, safeGetInt, safeGetString inherited from BaseController
+    // Keep local versions with different default values for compatibility
+    @Override
+    protected double safeGetDouble(Map<String, Object> map, String key, double defaultValue) {
+        return super.safeGetDouble(map, key, defaultValue);
     }
 
-    private int safeGetInt(Map<String, Object> map, String key) {
-        try {
-            Object value = map.get(key);
-            if (value instanceof Number) {
-                return ((Number) value).intValue();
-            }
-            return 0;
-        } catch (Exception e) {
-            return 0;
-        }
+    @Override
+    protected int safeGetInt(Map<String, Object> map, String key, int defaultValue) {
+        return super.safeGetInt(map, key, defaultValue);
     }
 
-    private String safeGetString(Map<String, Object> map, String key) {
-        try {
-            Object value = map.get(key);
-            return value != null ? value.toString() : "Unknown";
-        } catch (Exception e) {
-            return "Unknown";
-        }
+    @Override
+    protected String safeGetString(Map<String, Object> map, String key, String defaultValue) {
+        return super.safeGetString(map, key, defaultValue);
+    }
+    
+    // Convenience overloads with compatible access level
+    protected double safeGetDouble(Map<String, Object> map, String key) {
+        return safeGetDouble(map, key, 0.0);
     }
 
-<<<<<<< HEAD
-    @FXML
-    private void handleValidateBlockchain() {
-        if (!blockchainReady) {
-            showError("Blockchain is not ready for validation");
-            return;
-        }
-
-        CompletableFuture.supplyAsync(() -> {
-            boolean isValid = blockchain.isChainValid();
-            int blockCount = blockchain.getChain().size();
-            return new ValidationResult(isValid, blockCount);
-        }, backgroundExecutor).thenAcceptAsync(result -> {
-            Alert alert = new Alert(result.valid ? Alert.AlertType.INFORMATION : Alert.AlertType.ERROR);
-            alert.setTitle("Blockchain Validation");
-            alert.setHeaderText(null);
-            alert.setContentText(result.valid ?
-                    "✅ Blockchain is valid and tamper-free!\n" +
-                            "Blocks in chain: " + result.blockCount :
-                    "❌ Blockchain has been tampered with!\n" +
-                            "Blocks in chain: " + result.blockCount);
-            alert.showAndWait();
-            updateBlockchainDisplay();
-        }, Platform::runLater);
+    protected int safeGetInt(Map<String, Object> map, String key) {
+        return safeGetInt(map, key, 0);
     }
 
-    // Helper class for validation result
-    private static class ValidationResult {
-        final boolean valid;
-        final int blockCount;
+    protected String safeGetString(Map<String, Object> map, String key) {
+        return safeGetString(map, key, "Unknown");
+    }
 
-        ValidationResult(boolean valid, int blockCount) {
-            this.valid = valid;
-            this.blockCount = blockCount;
-        }
-=======
     /**
      * Calculate prime rate and rejection rate using consistent formulas.
      * 
@@ -1381,7 +1238,6 @@ public class ProducerController {
         double rejectionRate = (rejectedCount * 100.0) / totalCount;
         
         return new double[] {primeRate, rejectionRate};
->>>>>>> 0c07b982be5469f140bd506799040c829361b1ea
     }
 
     public void cleanup() {

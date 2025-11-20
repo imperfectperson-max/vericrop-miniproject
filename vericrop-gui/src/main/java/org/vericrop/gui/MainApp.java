@@ -33,13 +33,18 @@ public class MainApp extends Application {
                 System.out.println("⚠️  Could not load icon: " + e.getMessage());
             }
 
-            showProducerScreen();
+            // Start at login screen instead of going directly to producer
+            showLoginScreen();
 
         } catch (Exception e) {
             System.err.println("Failed to start application: " + e.getMessage());
             e.printStackTrace();
             throw e;
         }
+    }
+    
+    public void showLoginScreen() {
+        switchToScreen("login.fxml");
     }
 
     private String createFallbackCSS() {

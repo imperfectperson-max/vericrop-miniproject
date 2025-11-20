@@ -3,6 +3,7 @@ package org.vericrop.gui;
 import javafx.fxml.FXML;
 import javafx.scene.control.Alert;
 import javafx.scene.control.CheckBox;
+import org.vericrop.gui.util.Config;
 
 public class LoginController {
 
@@ -10,11 +11,8 @@ public class LoginController {
 
     @FXML
     public void initialize() {
-        // Initialize demo mode based on system property
-        String loadDemo = System.getProperty("vericrop.loadDemo");
-        if ("true".equalsIgnoreCase(loadDemo)) {
-            demoModeCheckbox.setSelected(true);
-        }
+        // Initialize demo mode checkbox based on current config
+        demoModeCheckbox.setSelected(Config.isDemoMode());
     }
 
     @FXML
@@ -50,7 +48,7 @@ public class LoginController {
     @FXML
     private void handleDemoModeToggle() {
         boolean demoMode = demoModeCheckbox.isSelected();
-        System.setProperty("vericrop.loadDemo", String.valueOf(demoMode));
+        Config.setDemoMode(demoMode);
         System.out.println("Demo mode: " + (demoMode ? "ENABLED" : "DISABLED"));
 
         if (demoMode) {
@@ -61,7 +59,7 @@ public class LoginController {
 
     private void setDemoMode() {
         boolean demoMode = demoModeCheckbox.isSelected();
-        System.setProperty("vericrop.loadDemo", String.valueOf(demoMode));
+        Config.setDemoMode(demoMode);
     }
 
     private void showAlert(Alert.AlertType type, String title, String message) {
