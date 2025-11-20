@@ -66,7 +66,8 @@ public class FileLedgerService {
     }
 
     /**
-     * Record a shipment in the immutable ledger.
+     * Record a shipment in the immutable ledger with atomic file operations.
+     * Uses file locking to prevent concurrent write corruption.
      *
      * @param record The shipment record to store
      * @return The record with ledger ID and hash assigned
@@ -76,31 +77,60 @@ public class FileLedgerService {
             throw new IllegalArgumentException("Shipment record cannot be null");
         }
 
+        java.nio.channels.FileChannel channel = null;
+        java.nio.channels.FileLock lock = null;
+        
         try {
             // Generate unique ledger ID if not present
             if (record.getLedgerId() == null || record.getLedgerId().isEmpty()) {
                 record.setLedgerId(UUID.randomUUID().toString());
             }
 
-            // Compute SHA-256 hash of record content
-            String recordHash = computeRecordHash(record);
+            // Get previous record's hash for chain verification
+            String previousHash = getLastRecordHash();
+            
+            // Compute SHA-256 hash of record content including previous hash (chain)
+            String recordHash = computeRecordHash(record, previousHash);
             record.setLedgerHash(recordHash);
 
             // Serialize to JSON
             String jsonLine = objectMapper.writeValueAsString(record) + System.lineSeparator();
 
-            // Append to ledger file (immutable append-only)
-            Files.write(ledgerPath, jsonLine.getBytes(StandardCharsets.UTF_8),
-                    StandardOpenOption.APPEND);
+            // Use file locking for atomic append operation
+            RandomAccessFile raf = new RandomAccessFile(ledgerPath.toFile(), "rw");
+            channel = raf.getChannel();
+            
+            // Acquire exclusive lock for writing (blocks until available)
+            lock = channel.lock();
+            
+            // Move to end of file and append
+            raf.seek(raf.length());
+            raf.write(jsonLine.getBytes(StandardCharsets.UTF_8));
+            
+            // Force writes to disk for durability
+            channel.force(true);
 
-            logger.info("Recorded shipment {} in ledger with hash {}",
-                    record.getShipmentId(), recordHash.substring(0, 8));
+            logger.info("Recorded shipment {} in ledger with hash {} (chain: {})",
+                    record.getShipmentId(), recordHash.substring(0, 8), 
+                    previousHash != null ? previousHash.substring(0, 8) : "genesis");
 
             return record;
 
         } catch (IOException e) {
             logger.error("Failed to record shipment {}: {}", record.getShipmentId(), e.getMessage());
             throw new RuntimeException("Failed to record shipment in ledger", e);
+        } finally {
+            // Release lock and close channel
+            try {
+                if (lock != null && lock.isValid()) {
+                    lock.release();
+                }
+                if (channel != null) {
+                    channel.close();
+                }
+            } catch (IOException e) {
+                logger.error("Error releasing file lock: {}", e.getMessage());
+            }
         }
     }
 
@@ -213,9 +243,11 @@ public class FileLedgerService {
 
     /**
      * Verify integrity of a shipment record.
+     * Note: This method uses chain verification, so it's recommended to use
+     * verifyChainIntegrity() for validating the entire ledger.
      *
      * @param record The record to verify
-     * @return true if the record's hash matches its content
+     * @return true if the record's hash matches its content (without chain context)
      */
     public boolean verifyRecordIntegrity(ShipmentRecord record) {
         if (record == null || record.getLedgerHash() == null) {
@@ -223,7 +255,10 @@ public class FileLedgerService {
         }
 
         try {
-            String computedHash = computeRecordHash(record);
+            // For individual record verification, we need to find its previous hash
+            // This is a simplified check that verifies content without full chain context
+            String previousHash = findPreviousHashForRecord(record);
+            String computedHash = computeRecordHash(record, previousHash);
             return computedHash.equals(record.getLedgerHash());
         } catch (Exception e) {
             logger.error("Failed to verify record integrity: {}", e.getMessage());
@@ -232,14 +267,61 @@ public class FileLedgerService {
     }
 
     /**
-     * Compute SHA-256 hash of shipment record content.
+     * Find the hash of the record immediately before the given record.
+     * 
+     * @param targetRecord The record whose predecessor we're looking for
+     * @return The hash of the previous record, or null if this is the first record
      */
-    private String computeRecordHash(ShipmentRecord record) {
+    private String findPreviousHashForRecord(ShipmentRecord targetRecord) {
+        try {
+            if (!Files.exists(ledgerPath)) {
+                return null;
+            }
+
+            List<String> lines = Files.readAllLines(ledgerPath, StandardCharsets.UTF_8);
+            String previousHash = null;
+
+            for (String line : lines) {
+                if (line.trim().isEmpty()) {
+                    continue;
+                }
+
+                ShipmentRecord record = objectMapper.readValue(line, ShipmentRecord.class);
+                
+                // If this is our target record, return the previous hash
+                if (record.getLedgerId() != null && 
+                    record.getLedgerId().equals(targetRecord.getLedgerId())) {
+                    return previousHash;
+                }
+                
+                // Update previous hash for next iteration
+                previousHash = record.getLedgerHash();
+            }
+
+            return null;
+
+        } catch (IOException e) {
+            logger.warn("Could not find previous hash for record: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Compute SHA-256 hash of shipment record content with chain verification.
+     * Includes previous hash to create an immutable chain.
+     * 
+     * @param record The shipment record to hash
+     * @param previousHash Hash of the previous record in the chain (null for first record)
+     * @return SHA-256 hash as hex string
+     */
+    private String computeRecordHash(ShipmentRecord record, String previousHash) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
 
             // Create canonical representation of record for hashing
             StringBuilder content = new StringBuilder();
+            // Include previous hash in computation to create chain
+            content.append(previousHash != null ? previousHash : "genesis").append("|");
             content.append(record.getShipmentId()).append("|");
             content.append(record.getBatchId()).append("|");
             content.append(record.getFromParty()).append("|");
@@ -253,6 +335,36 @@ public class FileLedgerService {
 
         } catch (NoSuchAlgorithmException e) {
             throw new RuntimeException("SHA-256 algorithm not available", e);
+        }
+    }
+
+    /**
+     * Get the hash of the last record in the ledger for chain verification.
+     * 
+     * @return The hash of the last record, or null if ledger is empty
+     */
+    private String getLastRecordHash() {
+        try {
+            if (!Files.exists(ledgerPath)) {
+                return null;
+            }
+
+            List<String> lines = Files.readAllLines(ledgerPath, StandardCharsets.UTF_8);
+            
+            // Read from end to find last non-empty line
+            for (int i = lines.size() - 1; i >= 0; i--) {
+                String line = lines.get(i).trim();
+                if (!line.isEmpty()) {
+                    ShipmentRecord record = objectMapper.readValue(line, ShipmentRecord.class);
+                    return record.getLedgerHash();
+                }
+            }
+            
+            return null;
+
+        } catch (IOException e) {
+            logger.warn("Could not read last record hash: {}", e.getMessage());
+            return null;
         }
     }
 
@@ -290,6 +402,53 @@ public class FileLedgerService {
         } catch (IOException e) {
             logger.error("Failed to count records: {}", e.getMessage());
             return 0;
+        }
+    }
+
+    /**
+     * Verify the integrity of the entire ledger chain.
+     * Checks that each record's hash is correctly computed and that the chain is unbroken.
+     * 
+     * @return true if the entire chain is valid, false otherwise
+     */
+    public boolean verifyChainIntegrity() {
+        try {
+            if (!Files.exists(ledgerPath)) {
+                // Empty ledger is valid
+                return true;
+            }
+
+            List<String> lines = Files.readAllLines(ledgerPath, StandardCharsets.UTF_8);
+            String previousHash = null;
+            int recordCount = 0;
+
+            for (String line : lines) {
+                if (line.trim().isEmpty()) {
+                    continue;
+                }
+
+                recordCount++;
+                ShipmentRecord record = objectMapper.readValue(line, ShipmentRecord.class);
+                
+                // Verify this record's hash
+                String computedHash = computeRecordHash(record, previousHash);
+                if (!computedHash.equals(record.getLedgerHash())) {
+                    logger.error("Chain integrity check failed at record {}: hash mismatch", recordCount);
+                    logger.error("  Expected: {}", record.getLedgerHash());
+                    logger.error("  Computed: {}", computedHash);
+                    return false;
+                }
+
+                // Update previous hash for next iteration
+                previousHash = record.getLedgerHash();
+            }
+
+            logger.info("✅ Chain integrity verified for {} records", recordCount);
+            return true;
+
+        } catch (IOException e) {
+            logger.error("Failed to verify chain integrity: {}", e.getMessage());
+            return false;
         }
     }
 }
