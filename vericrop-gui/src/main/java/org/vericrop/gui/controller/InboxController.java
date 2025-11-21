@@ -352,8 +352,8 @@ public class InboxController {
         } else {
             markReadButton.setText("Mark as Read");
             
-            // Auto-mark as read if viewing inbox message
-            if (showingInbox) {
+            // Auto-mark as read if viewing inbox message (only if currently unread)
+            if (showingInbox && !message.isRead()) {
                 handleMarkAsRead();
             }
         }

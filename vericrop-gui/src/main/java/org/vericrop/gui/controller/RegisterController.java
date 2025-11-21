@@ -163,6 +163,9 @@ public class RegisterController {
         } else if (username.length() < 3) {
             showError(usernameError, "Username must be at least 3 characters");
             valid = false;
+        } else if (username.length() > 50) {
+            showError(usernameError, "Username must be 50 characters or less");
+            valid = false;
         } else if (!username.matches("^[a-zA-Z0-9_]+$")) {
             showError(usernameError, "Username can only contain letters, numbers, and underscores");
             valid = false;
@@ -171,6 +174,9 @@ public class RegisterController {
         // Validate email
         if (email.isEmpty()) {
             showError(emailError, "Email is required");
+            valid = false;
+        } else if (email.length() > 255) {
+            showError(emailError, "Email must be 255 characters or less");
             valid = false;
         } else if (!email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")) {
             showError(emailError, "Invalid email format");

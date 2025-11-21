@@ -17,12 +17,13 @@ import java.util.Optional;
  */
 public class UserDao {
     private static final Logger logger = LoggerFactory.getLogger(UserDao.class);
+    // Shared BCryptPasswordEncoder instance (thread-safe and expensive to instantiate)
+    private static final BCryptPasswordEncoder PASSWORD_ENCODER = new BCryptPasswordEncoder();
+    
     private final DataSource dataSource;
-    private final BCryptPasswordEncoder passwordEncoder;
     
     public UserDao(DataSource dataSource) {
         this.dataSource = dataSource;
-        this.passwordEncoder = new BCryptPasswordEncoder();
     }
     
     /**
@@ -41,7 +42,7 @@ public class UserDao {
         try (Connection conn = dataSource.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             
-            String passwordHash = passwordEncoder.encode(password);
+            String passwordHash = PASSWORD_ENCODER.encode(password);
             
             stmt.setString(1, username);
             stmt.setString(2, passwordHash);

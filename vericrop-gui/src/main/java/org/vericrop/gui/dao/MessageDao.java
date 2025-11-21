@@ -254,7 +254,9 @@ public class MessageDao {
                     } else if (userId.equals(recipientId)) {
                         updateSql = "UPDATE messages SET deleted_by_recipient = TRUE WHERE id = ?";
                     } else {
-                        logger.warn("User {} attempted to delete message {} they don't own", userId, messageId);
+                        // Security event: unauthorized deletion attempt
+                        logger.warn("SECURITY: User {} attempted to delete message {} they don't own (sender: {}, recipient: {})", 
+                                   userId, messageId, senderId, recipientId);
                         return false;
                     }
                 }
