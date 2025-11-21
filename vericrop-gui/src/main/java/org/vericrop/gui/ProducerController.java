@@ -954,20 +954,42 @@ public class ProducerController {
     // Navigation methods
     @FXML
     private void handleShowAnalytics() {
-        // Implementation depends on your MainApp class
-        System.out.println("Navigating to Analytics screen");
+        MainApp.getInstance().showAnalyticsScreen();
     }
 
     @FXML
     private void handleShowLogistics() {
-        // Implementation depends on your MainApp class
-        System.out.println("Navigating to Logistics screen");
+        MainApp.getInstance().showLogisticsScreen();
     }
 
     @FXML
     private void handleShowConsumer() {
-        // Implementation depends on your MainApp class
-        System.out.println("Navigating to Consumer screen");
+        MainApp.getInstance().showConsumerScreen();
+    }
+    
+    @FXML
+    private void handleShowMessages() {
+        MainApp.getInstance().showInboxScreen();
+    }
+    
+    @FXML
+    private void handleShowSimulator() {
+        // Show simulator dialog
+        showSimulatorDialog();
+    }
+    
+    @FXML
+    private void handleLogout() {
+        // Clear session and return to login
+        MainApp.getInstance().switchToScreen("login.fxml");
+    }
+    
+    private void showSimulatorDialog() {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("Delivery Simulator");
+        alert.setHeaderText("Start Delivery Simulation");
+        alert.setContentText("Simulator controls will be implemented in the next iteration.");
+        alert.showAndWait();
     }
 
     private void sendKafkaEvents(String batchId, String batchName, String farmer,
