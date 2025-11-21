@@ -55,7 +55,8 @@ public class MainApp extends Application {
                 shutdown();
             });
 
-            showProducerScreen();
+            // Start with login screen
+            switchToScreen("login.fxml");
             logger.info("Application started successfully");
 
         } catch (Exception e) {

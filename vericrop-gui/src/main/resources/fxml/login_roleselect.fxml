@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.*?>
+<?import javafx.scene.shape.*?>
+
+<VBox xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="org.vericrop.gui.LoginController"
+      styleClass="login-container" spacing="30"
+      stylesheets="@../css/styles.css"
+      alignment="CENTER">
+
+    <padding>
+        <Insets top="40" right="40" bottom="40" left="40"/>
+    </padding>
+
+    <!-- Header -->
+    <VBox spacing="15" alignment="CENTER">
+        <HBox spacing="10" alignment="CENTER">
+            <Circle radius="30" fill="linear-gradient(to right, #2E8B57, #3CB371)"/>
+            <VBox spacing="2">
+                <Label text="VeriCrop" style="-fx-font-size: 32px; -fx-font-weight: bold; -fx-text-fill: #2E8B57;"/>
+                <Label text="Supply Chain Management Platform" style="-fx-font-size: 14px; -fx-text-fill: #666;"/>
+            </VBox>
+        </HBox>
+        <Label text="Select Your Role to Continue" style="-fx-font-size: 16px; -fx-text-fill: #555;"/>
+    </VBox>
+
+    <!-- Role Selection Cards -->
+    <HBox spacing="20" alignment="CENTER">
+        <!-- Farmer Card -->
+        <VBox styleClass="role-card" spacing="15" alignment="CENTER"
+              onMouseClicked="#handleFarmerLogin"
+              style="-fx-cursor: hand;">
+            <VBox spacing="8" alignment="CENTER">
+                <Label text="👨‍🌾" style="-fx-font-size: 48px;"/>
+                <Label text="Farmer" style="-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: #2E8B57;"/>
+                <Label text="Crop Producer" style="-fx-font-size: 12px; -fx-text-fill: #666;"/>
+            </VBox>
+            <VBox spacing="5" alignment="CENTER_LEFT" style="-fx-padding: 0 15;">
+                <Label text="• Create batches" style="-fx-font-size: 11px; -fx-text-fill: #555;"/>
+                <Label text="• Upload crop images" style="-fx-font-size: 11px; -fx-text-fill: #555;"/>
+                <Label text="• Quality analysis" style="-fx-font-size: 11px; -fx-text-fill: #555;"/>
+                <Label text="• Blockchain records" style="-fx-font-size: 11px; -fx-text-fill: #555;"/>
+            </VBox>
+            <Button text="Enter as Farmer" styleClass="success-button"
+                    onAction="#handleFarmerLogin" prefWidth="140"/>
+        </VBox>
+
+        <!-- Supplier Card -->
+        <VBox styleClass="role-card" spacing="15" alignment="CENTER"
+              onMouseClicked="#handleSupplierLogin"
+              style="-fx-cursor: hand;">
+            <VBox spacing="8" alignment="CENTER">
+                <Label text="🏭" style="-fx-font-size: 48px;"/>
+                <Label text="Supplier" style="-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: #F59E0B;"/>
+                <Label text="Logistics & Storage" style="-fx-font-size: 12px; -fx-text-fill: #666;"/>
+            </VBox>
+            <VBox spacing="5" alignment="CENTER_LEFT" style="-fx-padding: 0 15;">
+                <Label text="• Monitor shipments" style="-fx-font-size: 11px; -fx-text-fill: #555;"/>
+                <Label text="• Track temperature" style="-fx-font-size: 11px; -fx-text-fill: #555;"/>
+                <Label text="• Manage inventory" style="-fx-font-size: 11px; -fx-text-fill: #555;"/>
+                <Label text="• Quality control" style="-fx-font-size: 11px; -fx-text-fill: #555;"/>
+            </VBox>
+            <Button text="Enter as Supplier" styleClass="warning-button"
+                    onAction="#handleSupplierLogin" prefWidth="140"/>
+        </VBox>
+
+        <!-- Consumer Card -->
+        <VBox styleClass="role-card" spacing="15" alignment="CENTER"
+              onMouseClicked="#handleConsumerLogin"
+              style="-fx-cursor: hand;">
+            <VBox spacing="8" alignment="CENTER">
+                <Label text="👥" style="-fx-font-size: 48px;"/>
+                <Label text="Consumer" style="-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: #10B981;"/>
+                <Label text="End User" style="-fx-font-size: 12px; -fx-text-fill: #666;"/>
+            </VBox>
+            <VBox spacing="5" alignment="CENTER_LEFT" style="-fx-padding: 0 15;">
+                <Label text="• Verify products" style="-fx-font-size: 11px; -fx-text-fill: #555;"/>
+                <Label text="• Scan QR codes" style="-fx-font-size: 11px; -fx-text-fill: #555;"/>
+                <Label text="• View journey" style="-fx-font-size: 11px; -fx-text-fill: #555;"/>
+                <Label text="• Check quality" style="-fx-font-size: 11px; -fx-text-fill: #555;"/>
+            </VBox>
+            <Button text="Enter as Consumer" styleClass="primary-button"
+                    onAction="#handleConsumerLogin" prefWidth="140"/>
+        </VBox>
+    </HBox>
+
+    <!-- Demo Mode Toggle -->
+    <VBox spacing="10" alignment="CENTER" style="-fx-padding: 20 0 0 0;">
+        <CheckBox fx:id="demoModeCheckbox" text="Enable Demo Mode"
+                  style="-fx-font-size: 12px; -fx-text-fill: #555;"
+                  onAction="#handleDemoModeToggle"/>
+        <Label text="Demo mode includes sample data for testing"
+               style="-fx-font-size: 10px; -fx-text-fill: #888;"/>
+    </VBox>
+
+    <!-- Footer -->
+    <VBox spacing="5" alignment="CENTER" style="-fx-padding: 20 0 0 0;">
+        <Label text="🔒 Secure • 🔗 Blockchain • 🤖 AI Powered"
+               style="-fx-font-size: 11px; -fx-text-fill: #666; -fx-font-style: italic;"/>
+        <Label text="Version 1.0.0" style="-fx-font-size: 10px; -fx-text-fill: #999;"/>
+    </VBox>
+
+</VBox>

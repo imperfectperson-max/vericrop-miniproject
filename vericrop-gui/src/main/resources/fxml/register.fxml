@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.*?>
+<?import javafx.scene.shape.*?>
+
+<VBox xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="org.vericrop.gui.controller.RegisterController"
+      styleClass="login-container" spacing="20"
+      stylesheets="@../css/styles.css"
+      alignment="CENTER">
+
+    <padding>
+        <Insets top="30" right="40" bottom="30" left="40"/>
+    </padding>
+
+    <!-- Header -->
+    <VBox spacing="10" alignment="CENTER">
+        <HBox spacing="10" alignment="CENTER">
+            <Circle radius="25" fill="linear-gradient(to right, #2E8B57, #3CB371)"/>
+            <VBox spacing="2">
+                <Label text="VeriCrop Registration" style="-fx-font-size: 28px; -fx-font-weight: bold; -fx-text-fill: #2E8B57;"/>
+                <Label text="Create Your Account" style="-fx-font-size: 13px; -fx-text-fill: #666;"/>
+            </VBox>
+        </HBox>
+    </VBox>
+
+    <!-- Registration Form -->
+    <VBox spacing="15" alignment="CENTER" style="-fx-max-width: 450px;">
+        
+        <!-- Username Field -->
+        <VBox spacing="5">
+            <Label text="Username *" style="-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #555;"/>
+            <TextField fx:id="usernameField" promptText="Enter username" 
+                       style="-fx-pref-width: 400px; -fx-pref-height: 35px;"/>
+            <Label fx:id="usernameError" style="-fx-text-fill: #d32f2f; -fx-font-size: 11px;" managed="false" visible="false"/>
+        </VBox>
+
+        <!-- Email Field -->
+        <VBox spacing="5">
+            <Label text="Email *" style="-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #555;"/>
+            <TextField fx:id="emailField" promptText="Enter email address" 
+                       style="-fx-pref-width: 400px; -fx-pref-height: 35px;"/>
+            <Label fx:id="emailError" style="-fx-text-fill: #d32f2f; -fx-font-size: 11px;" managed="false" visible="false"/>
+        </VBox>
+
+        <!-- Full Name Field -->
+        <VBox spacing="5">
+            <Label text="Full Name *" style="-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #555;"/>
+            <TextField fx:id="fullNameField" promptText="Enter your full name" 
+                       style="-fx-pref-width: 400px; -fx-pref-height: 35px;"/>
+            <Label fx:id="fullNameError" style="-fx-text-fill: #d32f2f; -fx-font-size: 11px;" managed="false" visible="false"/>
+        </VBox>
+
+        <!-- Password Field -->
+        <VBox spacing="5">
+            <Label text="Password *" style="-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #555;"/>
+            <PasswordField fx:id="passwordField" promptText="Enter password (min 6 characters)" 
+                           style="-fx-pref-width: 400px; -fx-pref-height: 35px;"/>
+            <Label fx:id="passwordError" style="-fx-text-fill: #d32f2f; -fx-font-size: 11px;" managed="false" visible="false"/>
+        </VBox>
+
+        <!-- Confirm Password Field -->
+        <VBox spacing="5">
+            <Label text="Confirm Password *" style="-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #555;"/>
+            <PasswordField fx:id="confirmPasswordField" promptText="Re-enter password" 
+                           style="-fx-pref-width: 400px; -fx-pref-height: 35px;"/>
+            <Label fx:id="confirmPasswordError" style="-fx-text-fill: #d32f2f; -fx-font-size: 11px;" managed="false" visible="false"/>
+        </VBox>
+
+        <!-- Role Selection -->
+        <VBox spacing="5">
+            <Label text="Select Your Role *" style="-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #555;"/>
+            <HBox spacing="10" alignment="CENTER">
+                <ToggleButton fx:id="farmerToggle" text="👨‍🌾 Farmer" 
+                              style="-fx-pref-width: 95px; -fx-pref-height: 40px;" toggleGroup="$roleGroup"/>
+                <ToggleButton fx:id="consumerToggle" text="👥 Consumer" 
+                              style="-fx-pref-width: 95px; -fx-pref-height: 40px;" toggleGroup="$roleGroup"/>
+                <ToggleButton fx:id="supplierToggle" text="🏭 Supplier" 
+                              style="-fx-pref-width: 95px; -fx-pref-height: 40px;" toggleGroup="$roleGroup"/>
+                <ToggleButton fx:id="adminToggle" text="🔧 Admin" 
+                              style="-fx-pref-width: 95px; -fx-pref-height: 40px;" toggleGroup="$roleGroup"/>
+            </HBox>
+            <Label fx:id="roleError" style="-fx-text-fill: #d32f2f; -fx-font-size: 11px;" managed="false" visible="false"/>
+        </VBox>
+
+        <!-- Action Buttons -->
+        <HBox spacing="15" alignment="CENTER" style="-fx-padding: 10 0 0 0;">
+            <Button text="Create Account" styleClass="success-button" 
+                    onAction="#handleRegister" 
+                    style="-fx-pref-width: 140px; -fx-pref-height: 40px; -fx-font-size: 13px;"/>
+            <Button text="Back to Login" styleClass="secondary-button" 
+                    onAction="#handleBackToLogin" 
+                    style="-fx-pref-width: 140px; -fx-pref-height: 40px; -fx-font-size: 13px;"/>
+        </HBox>
+
+        <!-- Status Message -->
+        <Label fx:id="statusLabel" style="-fx-font-size: 12px; -fx-padding: 10 0 0 0;" 
+               managed="false" visible="false" wrapText="true" textAlignment="CENTER"/>
+    </VBox>
+
+    <!-- Footer -->
+    <VBox spacing="5" alignment="CENTER" style="-fx-padding: 10 0 0 0;">
+        <Label text="* Required fields" style="-fx-font-size: 10px; -fx-text-fill: #888; -fx-font-style: italic;"/>
+        <Label text="🔒 Your password will be securely encrypted"
+               style="-fx-font-size: 10px; -fx-text-fill: #666; -fx-font-style: italic;"/>
+    </VBox>
+
+</VBox>

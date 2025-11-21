@@ -7,8 +7,8 @@
 <?import javafx.scene.shape.*?>
 
 <VBox xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
-      fx:controller="org.vericrop.gui.LoginController"
-      styleClass="login-container" spacing="30"
+      fx:controller="org.vericrop.gui.controller.EnhancedLoginController"
+      styleClass="login-container" spacing="25"
       stylesheets="@../css/styles.css"
       alignment="CENTER">
 
@@ -25,76 +25,52 @@
                 <Label text="Supply Chain Management Platform" style="-fx-font-size: 14px; -fx-text-fill: #666;"/>
             </VBox>
         </HBox>
-        <Label text="Select Your Role to Continue" style="-fx-font-size: 16px; -fx-text-fill: #555;"/>
+        <Label text="Sign In to Your Account" style="-fx-font-size: 16px; -fx-text-fill: #555;"/>
     </VBox>
 
-    <!-- Role Selection Cards -->
-    <HBox spacing="20" alignment="CENTER">
-        <!-- Farmer Card -->
-        <VBox styleClass="role-card" spacing="15" alignment="CENTER"
-              onMouseClicked="#handleFarmerLogin"
-              style="-fx-cursor: hand;">
-            <VBox spacing="8" alignment="CENTER">
-                <Label text="👨‍🌾" style="-fx-font-size: 48px;"/>
-                <Label text="Farmer" style="-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: #2E8B57;"/>
-                <Label text="Crop Producer" style="-fx-font-size: 12px; -fx-text-fill: #666;"/>
-            </VBox>
-            <VBox spacing="5" alignment="CENTER_LEFT" style="-fx-padding: 0 15;">
-                <Label text="• Create batches" style="-fx-font-size: 11px; -fx-text-fill: #555;"/>
-                <Label text="• Upload crop images" style="-fx-font-size: 11px; -fx-text-fill: #555;"/>
-                <Label text="• Quality analysis" style="-fx-font-size: 11px; -fx-text-fill: #555;"/>
-                <Label text="• Blockchain records" style="-fx-font-size: 11px; -fx-text-fill: #555;"/>
-            </VBox>
-            <Button text="Enter as Farmer" styleClass="success-button"
-                    onAction="#handleFarmerLogin" prefWidth="140"/>
+    <!-- Login Form -->
+    <VBox spacing="15" alignment="CENTER" style="-fx-max-width: 400px;">
+        
+        <!-- Username Field -->
+        <VBox spacing="5">
+            <Label text="Username" style="-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #555;"/>
+            <TextField fx:id="usernameField" promptText="Enter your username" 
+                       style="-fx-pref-width: 350px; -fx-pref-height: 38px;"/>
+            <Label fx:id="usernameError" style="-fx-text-fill: #d32f2f; -fx-font-size: 11px;" managed="false" visible="false"/>
         </VBox>
 
-        <!-- Supplier Card -->
-        <VBox styleClass="role-card" spacing="15" alignment="CENTER"
-              onMouseClicked="#handleSupplierLogin"
-              style="-fx-cursor: hand;">
-            <VBox spacing="8" alignment="CENTER">
-                <Label text="🏭" style="-fx-font-size: 48px;"/>
-                <Label text="Supplier" style="-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: #F59E0B;"/>
-                <Label text="Logistics & Storage" style="-fx-font-size: 12px; -fx-text-fill: #666;"/>
-            </VBox>
-            <VBox spacing="5" alignment="CENTER_LEFT" style="-fx-padding: 0 15;">
-                <Label text="• Monitor shipments" style="-fx-font-size: 11px; -fx-text-fill: #555;"/>
-                <Label text="• Track temperature" style="-fx-font-size: 11px; -fx-text-fill: #555;"/>
-                <Label text="• Manage inventory" style="-fx-font-size: 11px; -fx-text-fill: #555;"/>
-                <Label text="• Quality control" style="-fx-font-size: 11px; -fx-text-fill: #555;"/>
-            </VBox>
-            <Button text="Enter as Supplier" styleClass="warning-button"
-                    onAction="#handleSupplierLogin" prefWidth="140"/>
+        <!-- Password Field -->
+        <VBox spacing="5">
+            <Label text="Password" style="-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #555;"/>
+            <PasswordField fx:id="passwordField" promptText="Enter your password" 
+                           style="-fx-pref-width: 350px; -fx-pref-height: 38px;"/>
+            <Label fx:id="passwordError" style="-fx-text-fill: #d32f2f; -fx-font-size: 11px;" managed="false" visible="false"/>
         </VBox>
 
-        <!-- Consumer Card -->
-        <VBox styleClass="role-card" spacing="15" alignment="CENTER"
-              onMouseClicked="#handleConsumerLogin"
-              style="-fx-cursor: hand;">
-            <VBox spacing="8" alignment="CENTER">
-                <Label text="👥" style="-fx-font-size: 48px;"/>
-                <Label text="Consumer" style="-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: #10B981;"/>
-                <Label text="End User" style="-fx-font-size: 12px; -fx-text-fill: #666;"/>
-            </VBox>
-            <VBox spacing="5" alignment="CENTER_LEFT" style="-fx-padding: 0 15;">
-                <Label text="• Verify products" style="-fx-font-size: 11px; -fx-text-fill: #555;"/>
-                <Label text="• Scan QR codes" style="-fx-font-size: 11px; -fx-text-fill: #555;"/>
-                <Label text="• View journey" style="-fx-font-size: 11px; -fx-text-fill: #555;"/>
-                <Label text="• Check quality" style="-fx-font-size: 11px; -fx-text-fill: #555;"/>
-            </VBox>
-            <Button text="Enter as Consumer" styleClass="primary-button"
-                    onAction="#handleConsumerLogin" prefWidth="140"/>
-        </VBox>
-    </HBox>
+        <!-- Login Button -->
+        <Button text="Sign In" styleClass="success-button" 
+                onAction="#handleLogin" 
+                style="-fx-pref-width: 350px; -fx-pref-height: 42px; -fx-font-size: 14px; -fx-font-weight: bold;"/>
 
-    <!-- Demo Mode Toggle -->
-    <VBox spacing="10" alignment="CENTER" style="-fx-padding: 20 0 0 0;">
-        <CheckBox fx:id="demoModeCheckbox" text="Enable Demo Mode"
-                  style="-fx-font-size: 12px; -fx-text-fill: #555;"
-                  onAction="#handleDemoModeToggle"/>
-        <Label text="Demo mode includes sample data for testing"
-               style="-fx-font-size: 10px; -fx-text-fill: #888;"/>
+        <!-- Status Message -->
+        <Label fx:id="statusLabel" style="-fx-font-size: 12px;" 
+               managed="false" visible="false" wrapText="true" textAlignment="CENTER"/>
+
+        <!-- Register Link -->
+        <HBox spacing="5" alignment="CENTER" style="-fx-padding: 10 0 0 0;">
+            <Label text="Don't have an account?" style="-fx-font-size: 12px; -fx-text-fill: #666;"/>
+            <Hyperlink text="Register here" onAction="#handleRegister" 
+                       style="-fx-font-size: 12px; -fx-text-fill: #2E8B57;"/>
+        </HBox>
+        
+        <!-- Demo Mode Toggle -->
+        <VBox spacing="5" alignment="CENTER" style="-fx-padding: 10 0 0 0;">
+            <CheckBox fx:id="demoModeCheckbox" text="Enable Demo Mode (skip authentication)"
+                      style="-fx-font-size: 11px; -fx-text-fill: #666;"
+                      onAction="#handleDemoModeToggle"/>
+            <Label text="Demo: admin/admin123, farmer/farmer123, supplier/supplier123"
+                   style="-fx-font-size: 9px; -fx-text-fill: #888; -fx-font-style: italic;"/>
+        </VBox>
     </VBox>
 
     <!-- Footer -->
