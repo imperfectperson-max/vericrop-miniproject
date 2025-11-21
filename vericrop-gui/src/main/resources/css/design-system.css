@@ -1,0 +1,155 @@
+/**
+ * VeriCrop Design System
+ * CSS Variables and Design Tokens for consistent styling across the application
+ */
+
+.root {
+    /* ===== COLOR PALETTE ===== */
+    /* Primary Colors - Green for agriculture/growth */
+    -fx-primary-50: #f0fdf4;
+    -fx-primary-100: #dcfce7;
+    -fx-primary-200: #bbf7d0;
+    -fx-primary-300: #86efac;
+    -fx-primary-400: #4ade80;
+    -fx-primary-500: #22c55e;
+    -fx-primary-600: #16a34a;
+    -fx-primary-700: #15803d;
+    -fx-primary-800: #166534;
+    -fx-primary-900: #14532d;
+
+    /* Secondary Colors - Blue for trust/technology */
+    -fx-secondary-50: #eff6ff;
+    -fx-secondary-100: #dbeafe;
+    -fx-secondary-200: #bfdbfe;
+    -fx-secondary-300: #93c5fd;
+    -fx-secondary-400: #60a5fa;
+    -fx-secondary-500: #3b82f6;
+    -fx-secondary-600: #2563eb;
+    -fx-secondary-700: #1d4ed8;
+    -fx-secondary-800: #1e40af;
+    -fx-secondary-900: #1e3a8a;
+
+    /* Neutral Colors - Grays */
+    -fx-neutral-50: #f8fafc;
+    -fx-neutral-100: #f1f5f9;
+    -fx-neutral-200: #e2e8f0;
+    -fx-neutral-300: #cbd5e1;
+    -fx-neutral-400: #94a3b8;
+    -fx-neutral-500: #64748b;
+    -fx-neutral-600: #475569;
+    -fx-neutral-700: #334155;
+    -fx-neutral-800: #1e293b;
+    -fx-neutral-900: #0f172a;
+
+    /* Semantic Colors */
+    -fx-success-light: #d1fae5;
+    -fx-success: #10b981;
+    -fx-success-dark: #059669;
+
+    -fx-warning-light: #fed7aa;
+    -fx-warning: #f59e0b;
+    -fx-warning-dark: #d97706;
+
+    -fx-error-light: #fecaca;
+    -fx-error: #ef4444;
+    -fx-error-dark: #dc2626;
+
+    -fx-info-light: #bfdbfe;
+    -fx-info: #3b82f6;
+    -fx-info-dark: #2563eb;
+
+    /* ===== TYPOGRAPHY ===== */
+    -fx-font-family-base: "Segoe UI", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+    -fx-font-family-mono: "JetBrains Mono", "Fira Code", "Monaco", "Consolas", monospace;
+
+    -fx-font-size-xs: 10px;
+    -fx-font-size-sm: 12px;
+    -fx-font-size-base: 14px;
+    -fx-font-size-lg: 16px;
+    -fx-font-size-xl: 18px;
+    -fx-font-size-2xl: 20px;
+    -fx-font-size-3xl: 24px;
+    -fx-font-size-4xl: 32px;
+
+    -fx-font-weight-normal: 400;
+    -fx-font-weight-medium: 500;
+    -fx-font-weight-semibold: 600;
+    -fx-font-weight-bold: 700;
+
+    /* ===== SPACING ===== */
+    -fx-space-1: 4px;
+    -fx-space-2: 8px;
+    -fx-space-3: 12px;
+    -fx-space-4: 16px;
+    -fx-space-5: 20px;
+    -fx-space-6: 24px;
+    -fx-space-8: 32px;
+    -fx-space-10: 40px;
+    -fx-space-12: 48px;
+    -fx-space-16: 64px;
+
+    /* ===== BORDERS ===== */
+    -fx-border-radius-sm: 4px;
+    -fx-border-radius-base: 6px;
+    -fx-border-radius-lg: 8px;
+    -fx-border-radius-xl: 12px;
+    -fx-border-radius-full: 9999px;
+
+    -fx-border-width-thin: 1px;
+    -fx-border-width-base: 2px;
+    -fx-border-width-thick: 3px;
+
+    /* ===== SHADOWS ===== */
+    -fx-shadow-sm: dropshadow(gaussian, rgba(0,0,0,0.05), 4, 0, 0, 1);
+    -fx-shadow-base: dropshadow(gaussian, rgba(0,0,0,0.1), 8, 0, 0, 2);
+    -fx-shadow-md: dropshadow(gaussian, rgba(0,0,0,0.15), 12, 0, 0, 4);
+    -fx-shadow-lg: dropshadow(gaussian, rgba(0,0,0,0.2), 16, 0, 0, 8);
+    -fx-shadow-xl: dropshadow(gaussian, rgba(0,0,0,0.25), 24, 0, 0, 12);
+
+    /* ===== TRANSITIONS ===== */
+    -fx-transition-fast: 150ms;
+    -fx-transition-base: 200ms;
+    -fx-transition-slow: 300ms;
+
+    /* ===== Z-INDEX ===== */
+    -fx-z-dropdown: 1000;
+    -fx-z-sticky: 1020;
+    -fx-z-fixed: 1030;
+    -fx-z-modal-backdrop: 1040;
+    -fx-z-modal: 1050;
+    -fx-z-popover: 1060;
+    -fx-z-tooltip: 1070;
+}
+
+/* ===== ACCESSIBILITY ===== */
+/* Ensure minimum touch target size of 44x44px */
+.button {
+    -fx-min-width: 44px;
+    -fx-min-height: 44px;
+}
+
+/* Focus indicators for keyboard navigation */
+*:focused {
+    -fx-effect: dropshadow(gaussian, rgba(59, 130, 246, 0.5), 8, 0, 0, 0);
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .root {
+        -fx-border-width-base: 3px;
+    }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        -fx-transition-duration: 0ms !important;
+    }
+}
+
+/* ===== RESPONSIVE BREAKPOINTS ===== */
+/* Note: JavaFX doesn't have native media queries, but we use these as reference */
+/* Mobile: 0-767px */
+/* Tablet: 768px-1023px */
+/* Desktop: 1024px+ */
+/* Large Desktop: 1440px+ */

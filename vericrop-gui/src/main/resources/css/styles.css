@@ -1,6 +1,14 @@
-/* styles.css */
+/**
+ * VeriCrop Application Styles
+ * Production-ready styles with accessibility and responsiveness
+ * Import design-system.css first for variables
+ */
+
+/* ===== BASE STYLES ===== */
 .root {
-    -fx-font-family: "Segoe UI", "San Francisco", "Roboto", Arial, sans-serif;
+    -fx-font-family: "Segoe UI", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+    -fx-font-size: 14px;
+    -fx-background-color: #f8fafc;
 }
 
 .main-container {
