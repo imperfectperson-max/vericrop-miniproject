@@ -181,8 +181,10 @@ public class QualityDecayService {
                      currentReading.temperature, currentReading.humidity, decayRate));
         }
         
-        logger.info(String.format("Quality trace simulated: %d points, final quality: %.2f", 
-                   trace.size(), currentQuality));
+        if (logger.isInfoEnabled()) {
+            logger.info(String.format("Quality trace simulated: %d points, final quality: %.2f", 
+                       trace.size(), currentQuality));
+        }
         
         return trace;
     }
