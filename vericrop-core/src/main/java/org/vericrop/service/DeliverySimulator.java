@@ -159,14 +159,7 @@ public class DeliverySimulator {
         SimulationState state = new SimulationState(shipmentId, new ArrayList<>(route));
         state.running = true;
         
-        // Start simulation task with scheduled executor at fixed rate
-        state.task = executor.scheduleAtFixedRate(
-            () -> runSimulationStep(state),
-            0,
-            updateIntervalMs,
-            TimeUnit.MILLISECONDS
-        );
-        
+        // Add to active simulations before scheduling to avoid race condition
         activeSimulations.put(shipmentId, state);
         
         logger.info("Started simulation for shipment: {}", shipmentId);
@@ -174,6 +167,15 @@ public class DeliverySimulator {
         // Send initial message
         sendSimulationMessage(shipmentId, "Delivery simulation started", 
                             route.get(0).getLocation().toString());
+        
+        // Start simulation task with scheduled executor at fixed rate
+        // Use small initial delay to ensure setup is complete
+        state.task = executor.scheduleAtFixedRate(
+            () -> runSimulationStep(state),
+            updateIntervalMs / 10,  // Small initial delay (10% of update interval)
+            updateIntervalMs,
+            TimeUnit.MILLISECONDS
+        );
     }
     
     /**
@@ -207,7 +209,9 @@ public class DeliverySimulator {
             return new SimulationStatus(shipmentId, false, 0, 0, null);
         }
         
-        RouteWaypoint current = state.route.get(state.currentWaypointIndex);
+        RouteWaypoint current = state.currentWaypointIndex < state.route.size() 
+            ? state.route.get(state.currentWaypointIndex) 
+            : null;
         return new SimulationStatus(shipmentId, state.running, 
                                    state.currentWaypointIndex, state.route.size(), current);
     }
