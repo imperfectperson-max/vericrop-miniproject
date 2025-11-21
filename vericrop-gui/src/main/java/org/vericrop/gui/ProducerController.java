@@ -88,9 +88,18 @@ public class ProducerController {
     @FXML private Button analyticsButton;
     @FXML private Button logisticsButton;
     @FXML private Button consumerButton;
+    
+    // QR and Simulator controls
+    @FXML private Button generateQRButton;
+    @FXML private Label qrStatusLabel;
+    @FXML private Button startSimButton;
+    @FXML private Button stopSimButton;
+    @FXML private Label simStatusLabel;
 
     private String currentImagePath;
     private Map<String, Object> currentPrediction;
+    private String currentBatchId;
+    private String activeSimulationId;
 
     public void initialize() {
         backgroundExecutor = Executors.newFixedThreadPool(4);
@@ -272,6 +281,10 @@ public class ProducerController {
         String productType = productTypeField.getText().isEmpty() ? "Unknown Product" : productTypeField.getText().trim();
         int quantity = parseQuantity();
         String dataHash = safeGetString(currentPrediction, "data_hash");
+        
+        // Generate and store batch ID for QR/Simulator use
+        String batchId = "BATCH_" + System.currentTimeMillis();
+        this.currentBatchId = batchId;
 
         // Use actual prediction results for quality data
         Map<String, Object> qualityData = new HashMap<>();
@@ -988,8 +1001,141 @@ public class ProducerController {
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
         alert.setTitle("Delivery Simulator");
         alert.setHeaderText("Start Delivery Simulation");
-        alert.setContentText("Simulator controls will be implemented in the next iteration.");
+        alert.setContentText("Use the Start/Stop buttons in the left panel to control the simulator.");
         alert.showAndWait();
+    }
+    
+    // QR Code Generation
+    @FXML
+    private void handleGenerateQR() {
+        try {
+            // Get current batch info
+            String batchName = batchNameField.getText();
+            String farmer = farmerField.getText();
+            
+            if (batchName == null || batchName.trim().isEmpty()) {
+                qrStatusLabel.setText("⚠ Please create a batch first");
+                qrStatusLabel.setStyle("-fx-text-fill: #DC2626;");
+                return;
+            }
+            
+            // Generate batch ID if not exists
+            if (currentBatchId == null || currentBatchId.isEmpty()) {
+                currentBatchId = "BATCH-" + System.currentTimeMillis();
+            }
+            
+            String farmerId = (farmer != null && !farmer.isEmpty()) ? farmer : "unknown";
+            
+            // Generate QR code using QRGenerator utility
+            var qrPath = org.vericrop.gui.util.QRGenerator.generateProductQR(currentBatchId, farmerId);
+            
+            qrStatusLabel.setText("✅ QR code generated: " + qrPath.getFileName());
+            qrStatusLabel.setStyle("-fx-text-fill: #10B981;");
+            
+            // Broadcast QR generation event via AlertService
+            var alertService = MainApp.getInstance().getApplicationContext().getAlertService();
+            alertService.info("QR Code Generated", 
+                "QR code for batch " + currentBatchId + " saved to " + qrPath.toAbsolutePath(), 
+                "producer");
+            
+            System.out.println("✅ QR Code generated: " + qrPath.toAbsolutePath());
+            
+        } catch (Exception e) {
+            qrStatusLabel.setText("❌ Error: " + e.getMessage());
+            qrStatusLabel.setStyle("-fx-text-fill: #DC2626;");
+            e.printStackTrace();
+        }
+    }
+    
+    // Delivery Simulator Controls
+    @FXML
+    private void handleStartSimulation() {
+        try {
+            // Get batch info
+            String batchName = batchNameField.getText();
+            if (batchName == null || batchName.trim().isEmpty()) {
+                simStatusLabel.setText("⚠ Please create a batch first");
+                simStatusLabel.setStyle("-fx-text-fill: #DC2626;");
+                return;
+            }
+            
+            if (currentBatchId == null || currentBatchId.isEmpty()) {
+                currentBatchId = "BATCH-" + System.currentTimeMillis();
+            }
+            
+            // Get delivery simulator from ApplicationContext
+            var deliverySimulator = MainApp.getInstance().getApplicationContext().getDeliverySimulator();
+            
+            // Generate sample route: Farm to Warehouse
+            var origin = new org.vericrop.service.DeliverySimulator.GeoCoordinate(
+                42.3601, -71.0589, "Sunny Valley Farm"
+            );
+            var destination = new org.vericrop.service.DeliverySimulator.GeoCoordinate(
+                42.3736, -71.1097, "Metro Fresh Warehouse"
+            );
+            
+            // Generate route with 10 waypoints over next 2 hours (avg speed 50 km/h)
+            long startTime = System.currentTimeMillis();
+            var route = deliverySimulator.generateRoute(origin, destination, 10, startTime, 50.0);
+            
+            // Start simulation with 10-second update intervals
+            deliverySimulator.startSimulation(currentBatchId, route, 10000);
+            
+            activeSimulationId = currentBatchId;
+            
+            // Update UI
+            startSimButton.setDisable(true);
+            stopSimButton.setDisable(false);
+            simStatusLabel.setText("✅ Simulation running for: " + currentBatchId);
+            simStatusLabel.setStyle("-fx-text-fill: #10B981;");
+            
+            // Create alert
+            var alertService = MainApp.getInstance().getApplicationContext().getAlertService();
+            alertService.info("Simulation Started", 
+                "Delivery simulation for " + currentBatchId + " is now running", 
+                "simulator");
+            
+            System.out.println("✅ Simulation started for: " + currentBatchId);
+            
+        } catch (Exception e) {
+            simStatusLabel.setText("❌ Error: " + e.getMessage());
+            simStatusLabel.setStyle("-fx-text-fill: #DC2626;");
+            e.printStackTrace();
+        }
+    }
+    
+    @FXML
+    private void handleStopSimulation() {
+        try {
+            if (activeSimulationId == null) {
+                simStatusLabel.setText("⚠ No active simulation");
+                return;
+            }
+            
+            // Stop simulation
+            var deliverySimulator = MainApp.getInstance().getApplicationContext().getDeliverySimulator();
+            deliverySimulator.stopSimulation(activeSimulationId);
+            
+            // Update UI
+            startSimButton.setDisable(false);
+            stopSimButton.setDisable(true);
+            simStatusLabel.setText("⏹ Simulation stopped");
+            simStatusLabel.setStyle("-fx-text-fill: #6B7280;");
+            
+            // Create alert
+            var alertService = MainApp.getInstance().getApplicationContext().getAlertService();
+            alertService.info("Simulation Stopped", 
+                "Delivery simulation for " + activeSimulationId + " has been stopped", 
+                "simulator");
+            
+            System.out.println("⏹ Simulation stopped for: " + activeSimulationId);
+            activeSimulationId = null;
+            
+        } catch (Exception e) {
+            simStatusLabel.setText("❌ Error: " + e.getMessage());
+            simStatusLabel.setStyle("-fx-text-fill: #DC2626;");
+            e.printStackTrace();
+        }
     }
 
     private void sendKafkaEvents(String batchId, String batchName, String farmer,
