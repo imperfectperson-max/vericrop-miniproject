@@ -7,8 +7,16 @@ import javafx.scene.chart.XYChart;
 import javafx.scene.control.*;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.vericrop.gui.app.ApplicationContext;
+import org.vericrop.gui.services.*;
+
+import java.time.format.DateTimeFormatter;
+import java.util.Map;
 
 public class LogisticsController {
+    private static final Logger logger = LoggerFactory.getLogger(LogisticsController.class);
 
     @FXML private TableView<Shipment> shipmentsTable;
     @FXML private ListView<String> alertsList;
@@ -22,17 +30,38 @@ public class LogisticsController {
     @FXML private Button backToProducerButton;
     @FXML private Button analyticsButton;
     @FXML private Button consumerButton;
+    
+    // Simulation controls
+    @FXML private Button startSimulationButton;
+    @FXML private Button stopSimulationButton;
+    @FXML private Button seedTestDataButton;
 
     private ObservableList<Shipment> shipments = FXCollections.observableArrayList();
     private ObservableList<String> alerts = FXCollections.observableArrayList();
+    
+    // Services
+    private NavigationService navigationService;
+    private DeliverySimulationService deliverySimulationService;
+    private AlertsService alertsService;
+    private ReportGenerationService reportGenerationService;
 
     @FXML
     public void initialize() {
+        logger.info("Initializing LogisticsController");
+        
+        // Get services from ApplicationContext
+        ApplicationContext appContext = ApplicationContext.getInstance();
+        this.navigationService = appContext.getNavigationService();
+        this.deliverySimulationService = appContext.getDeliverySimulationService();
+        this.alertsService = appContext.getAlertsService();
+        this.reportGenerationService = appContext.getReportGenerationService();
+        
         setupShipmentsTable();
         setupAlertsList();
         setupReportCombo();
         setupTemperatureChart();
         setupNavigationButtons();
+        setupSimulationListeners();
     }
 
     private void setupNavigationButtons() {
@@ -124,29 +153,138 @@ public class LogisticsController {
         }
     }
 
+    /**
+     * Setup delivery simulation event listeners
+     */
+    private void setupSimulationListeners() {
+        deliverySimulationService.addEventListener(event -> {
+            logger.info("Delivery event received: {} - {}", event.getStatus(), event.getMessage());
+            
+            // Update alerts list
+            Platform.runLater(() -> {
+                String timestamp = event.getTimestamp().format(DateTimeFormatter.ofPattern("HH:mm:ss"));
+                String statusIcon = getStatusIcon(event.getStatus());
+                alerts.add(0, String.format("%s [%s] %s: %s", 
+                    statusIcon, timestamp, event.getShipmentId(), event.getMessage()));
+                
+                // Update shipments table if needed
+                updateShipmentFromEvent(event);
+            });
+        });
+        
+        logger.info("Simulation listeners configured");
+    }
+    
+    /**
+     * Get icon for delivery status
+     */
+    private String getStatusIcon(DeliverySimulationService.DeliveryStatus status) {
+        switch (status) {
+            case CREATED: return "📦";
+            case PICKED_UP: return "🚚";
+            case IN_TRANSIT: return "🛣️";
+            case DELAYED: return "⚠️";
+            case DELIVERED: return "✅";
+            default: return "•";
+        }
+    }
+    
+    /**
+     * Update shipment in table from simulation event
+     */
+    private void updateShipmentFromEvent(DeliverySimulationService.DeliveryEvent event) {
+        // Look for existing shipment
+        Shipment existing = shipments.stream()
+            .filter(s -> s.getBatchId().equals(event.getShipmentId()))
+            .findFirst()
+            .orElse(null);
+        
+        if (existing != null) {
+            // Remove and re-add with updated status
+            shipments.remove(existing);
+            shipments.add(0, new Shipment(
+                event.getShipmentId(),
+                event.getStatus().toString(),
+                event.getDestination(),
+                4.2, // Default temperature
+                65,  // Default humidity
+                "ETA varies",
+                "TRUCK_AUTO"
+            ));
+        } else if (event.getStatus() == DeliverySimulationService.DeliveryStatus.CREATED) {
+            // New shipment
+            shipments.add(0, new Shipment(
+                event.getShipmentId(),
+                event.getStatus().toString(),
+                event.getOrigin(),
+                4.2,
+                65,
+                "Calculating...",
+                null
+            ));
+        }
+    }
+
     // Navigation methods
     @FXML
     private void handleBackToProducer() {
-        MainApp mainApp = MainApp.getInstance();
-        if (mainApp != null) {
-            mainApp.showProducerScreen();
+        if (navigationService != null) {
+            navigationService.navigateToProducer();
+        } else {
+            MainApp mainApp = MainApp.getInstance();
+            if (mainApp != null) {
+                mainApp.showProducerScreen();
+            }
         }
     }
 
     @FXML
     private void handleShowAnalytics() {
-        MainApp mainApp = MainApp.getInstance();
-        if (mainApp != null) {
-            mainApp.showAnalyticsScreen();
+        if (navigationService != null) {
+            navigationService.navigateToAnalytics();
+        } else {
+            MainApp mainApp = MainApp.getInstance();
+            if (mainApp != null) {
+                mainApp.showAnalyticsScreen();
+            }
         }
     }
 
     @FXML
     private void handleShowConsumer() {
-        MainApp mainApp = MainApp.getInstance();
-        if (mainApp != null) {
-            mainApp.showConsumerScreen();
+        if (navigationService != null) {
+            navigationService.navigateToConsumer();
+        } else {
+            MainApp mainApp = MainApp.getInstance();
+            if (mainApp != null) {
+                mainApp.showConsumerScreen();
+            }
         }
+    }
+    
+    // Simulation control methods
+    @FXML
+    private void handleStartSimulation() {
+        logger.info("Starting delivery simulation");
+        deliverySimulationService.startSimulation();
+        showAlert(Alert.AlertType.INFORMATION, "Simulation Started", 
+            "Delivery simulation is now running");
+    }
+    
+    @FXML
+    private void handleStopSimulation() {
+        logger.info("Stopping delivery simulation");
+        deliverySimulationService.stopSimulation();
+        showAlert(Alert.AlertType.INFORMATION, "Simulation Stopped", 
+            "Delivery simulation has been stopped");
+    }
+    
+    @FXML
+    private void handleSeedTestData() {
+        logger.info("Seeding test shipments");
+        var shipmentIds = deliverySimulationService.seedTestShipments(5);
+        showAlert(Alert.AlertType.INFORMATION, "Test Data Seeded", 
+            "Created " + shipmentIds.size() + " test shipments");
     }
 
     // Action methods
@@ -165,14 +303,42 @@ public class LogisticsController {
 
     @FXML
     private void handleExportReport() {
-        System.out.println("Exporting logistics report...");
+        logger.info("Exporting logistics report...");
         String reportType = reportTypeCombo.getValue();
-        if (reportType != null) {
-            showAlert(Alert.AlertType.INFORMATION, "Export Complete", 
-                    "Report '" + reportType + "' has been exported successfully");
-        } else {
+        if (reportType == null || reportType.isEmpty()) {
             showAlert(Alert.AlertType.WARNING, "No Report Selected", 
                     "Please select a report type before exporting");
+            return;
+        }
+        
+        try {
+            // Convert shipments to map format for report generation
+            java.util.List<Map<String, Object>> deliveryData = new java.util.ArrayList<>();
+            for (Shipment s : shipments) {
+                Map<String, Object> record = new java.util.HashMap<>();
+                record.put("shipmentId", s.getBatchId());
+                record.put("batchId", s.getBatchId());
+                record.put("origin", s.getLocation());
+                record.put("destination", s.getLocation());
+                record.put("status", s.getStatus());
+                record.put("pickupTime", "N/A");
+                record.put("deliveryTime", s.getEta());
+                record.put("duration", "N/A");
+                deliveryData.add(record);
+            }
+            
+            String filepath = reportGenerationService.generateDeliveryReportCSV(deliveryData);
+            if (filepath != null) {
+                showAlert(Alert.AlertType.INFORMATION, "Export Complete", 
+                    "Report exported to:\n" + filepath);
+            } else {
+                showAlert(Alert.AlertType.ERROR, "Export Failed", 
+                    "Failed to export report. Check logs for details.");
+            }
+        } catch (Exception e) {
+            logger.error("Error exporting report", e);
+            showAlert(Alert.AlertType.ERROR, "Export Failed", 
+                "Error: " + e.getMessage());
         }
     }
 
