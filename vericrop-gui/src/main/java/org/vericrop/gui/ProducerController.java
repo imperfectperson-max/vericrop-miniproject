@@ -38,12 +38,15 @@ import org.vericrop.kafka.events.QualityAlertEvent;
 import org.vericrop.gui.util.BlockchainInitializer;
 
 public class ProducerController {
+    private static final int SHIPMENT_UPDATE_INTERVAL_MS = 2000;
+    
     private Blockchain blockchain;
     private BlockchainService blockchainService;
     private ObjectMapper mapper;
     private OkHttpClient httpClient;
     private FileLedgerService ledgerService;
     private ExecutorService backgroundExecutor;
+    private java.util.concurrent.ScheduledExecutorService scheduledExecutor;
     private boolean blockchainReady = false;
 
     // Kafka components
@@ -91,6 +94,7 @@ public class ProducerController {
 
     public void initialize() {
         backgroundExecutor = Executors.newFixedThreadPool(4);
+        scheduledExecutor = Executors.newScheduledThreadPool(2);
         mapper = new ObjectMapper();
         ledgerService = new FileLedgerService();
 
@@ -314,13 +318,19 @@ public class ProducerController {
                         .build();
 
                 try (Response response = httpClient.newCall(request).execute()) {
-                    if (response.isSuccessful() && response.body() != null) {
-                        String responseBody = response.body().string();
-                        Map<String, Object> result = mapper.readValue(responseBody, Map.class);
+                    ResponseBody responseBody = response.body();
+                    if (responseBody == null) {
+                        throw new IOException("Response body is null");
+                    }
+                    
+                    String responseBodyString = responseBody.string();
+                    
+                    if (response.isSuccessful()) {
+                        Map<String, Object> result = mapper.readValue(responseBodyString, Map.class);
                         result.put("batch_data", batchData);
 
-                        // Ensure all required fields exist
-                        result = ensureRequiredFields(result);
+                        // Ensure all required fields exist (modifies result in place)
+                        ensureRequiredFields(result);
 
                         // Store actual backend response data
                         result.put("backend_quality_score", result.get("quality_score"));
@@ -329,7 +339,7 @@ public class ProducerController {
 
                         return result;
                     } else {
-                        throw new IOException("Backend error: " + response.code() + " - " + response.message());
+                        throw new IOException("Backend error: " + response.code() + " - " + responseBodyString);
                     }
                 }
             } catch (Exception e) {
@@ -868,9 +878,15 @@ public class ProducerController {
                         .build();
 
                 try (Response response = httpClient.newCall(request).execute()) {
-                    if (response.isSuccessful() && response.body() != null) {
-                        String responseBody = response.body().string();
-                        currentPrediction = mapper.readValue(responseBody, Map.class);
+                    ResponseBody body = response.body();
+                    if (body == null) {
+                        throw new IOException("Response body is null");
+                    }
+                    
+                    String responseBodyString = body.string();
+                    
+                    if (response.isSuccessful()) {
+                        currentPrediction = mapper.readValue(responseBodyString, Map.class);
 
                         Platform.runLater(() -> {
                             updatePredictionUI();
@@ -880,7 +896,7 @@ public class ProducerController {
                             updateStatus("✅ Analysis complete - Ready to create batch");
                         });
                     } else {
-                        throw new IOException("Unexpected code " + response + ": " + response.body().string());
+                        throw new IOException("Unexpected code " + response.code() + ": " + responseBodyString);
                     }
                 }
             } catch (Exception e) {
@@ -1034,32 +1050,45 @@ public class ProducerController {
             events.get(0).setVehicleId("TRUCK_001");
             events.get(0).setDriverId("DRIVER_123");
 
-            new Thread(() -> {
+            // Use ScheduledExecutorService to send events periodically instead of busy-wait
+            final java.util.concurrent.atomic.AtomicInteger eventIndex = new java.util.concurrent.atomic.AtomicInteger(0);
+            final java.util.concurrent.atomic.AtomicReference<java.util.concurrent.ScheduledFuture<?>> scheduledTaskRef = 
+                new java.util.concurrent.atomic.AtomicReference<>();
+            
+            java.util.concurrent.ScheduledFuture<?> task = scheduledExecutor.scheduleAtFixedRate(() -> {
                 try {
-                    for (int i = 0; i < events.size(); i++) {
-                        LogisticsEvent event = events.get(i);
-                        logisticsProducer.sendLogisticsEvent(event);
-                        System.out.println("📦 Sent shipment update: " + event.getStatus() + " at " + event.getLocation());
-
-                        final int progress = i + 1;
+                    int i = eventIndex.getAndIncrement();
+                    if (i >= events.size()) {
+                        java.util.concurrent.ScheduledFuture<?> currentTask = scheduledTaskRef.get();
+                        if (currentTask != null) {
+                            currentTask.cancel(false);
+                        }
                         Platform.runLater(() -> {
-                            updateStatus("📦 Shipment progress: " + progress + "/" + events.size() + " - " + event.getStatus());
+                            showSuccess("Shipment simulation completed!\nBatch: " + batchId +
+                                    "\n6 events sent to Kafka");
+                            updateStatus("✅ Shipment simulation completed");
                         });
-
-                        Thread.sleep(2000);
+                        return;
                     }
+                    
+                    LogisticsEvent event = events.get(i);
+                    logisticsProducer.sendLogisticsEvent(event);
+                    System.out.println("📦 Sent shipment update: " + event.getStatus() + " at " + event.getLocation());
 
+                    final int progress = i + 1;
                     Platform.runLater(() -> {
-                        showSuccess("Shipment simulation completed!\nBatch: " + batchId +
-                                "\n6 events sent to Kafka");
-                        updateStatus("✅ Shipment simulation completed");
+                        updateStatus("📦 Shipment progress: " + progress + "/" + events.size() + " - " + event.getStatus());
                     });
-
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    Platform.runLater(() -> showError("Shipment simulation interrupted"));
+                } catch (Exception e) {
+                    java.util.concurrent.ScheduledFuture<?> currentTask = scheduledTaskRef.get();
+                    if (currentTask != null) {
+                        currentTask.cancel(false);
+                    }
+                    Platform.runLater(() -> showError("Shipment simulation error: " + e.getMessage()));
                 }
-            }).start();
+            }, 0, SHIPMENT_UPDATE_INTERVAL_MS, TimeUnit.MILLISECONDS);
+            
+            scheduledTaskRef.set(task);
 
         } catch (Exception e) {
             showError("Error simulating shipment: " + e.getMessage());
@@ -1346,6 +1375,9 @@ public class ProducerController {
         }
         if (backgroundExecutor != null && !backgroundExecutor.isShutdown()) {
             backgroundExecutor.shutdown();
+        }
+        if (scheduledExecutor != null && !scheduledExecutor.isShutdown()) {
+            scheduledExecutor.shutdownNow();
         }
         if (kafkaServiceManager != null) {
             kafkaServiceManager.stopAllConsumers();
