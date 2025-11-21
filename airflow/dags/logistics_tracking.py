@@ -61,13 +61,13 @@ def handle_delayed_shipments(**context):
     """Handle delayed or problematic shipments"""
     try:
         active_shipments = context['task_instance'].xcom_pull(task_ids='monitor_active_shipments', key='active_shipments')
-        delayed_shipments = [s for s in active_shipments if s['status'] == 'IN_TRANSIT']
+        delayed_shipments = [s for s in active_shipments if s.get('status') == 'IN_TRANSIT']
 
         for shipment in delayed_shipments:
-            batch_id = shipment['batch_id']
-            location = shipment['current_location']
-            temperature = shipment['temperature']
-            eta = shipment['eta']
+            batch_id = shipment.get('batch_id')
+            location = shipment.get('current_location')
+            temperature = shipment.get('temperature')
+            eta = shipment.get('eta')
 
             logger.info("🚚 Monitoring shipment: %s", batch_id)
             logger.info("   Location: %s, Temp: %s°C, ETA: %s", location, temperature, eta)
@@ -178,11 +178,11 @@ def generate_logistics_report(**context):
         report = {
             'timestamp': datetime.now().isoformat(),
             'total_active_shipments': len(active_shipments),
-            'in_transit': len([s for s in active_shipments if s['status'] == 'IN_TRANSIT']),
-            'at_warehouse': len([s for s in active_shipments if s['status'] == 'AT_WAREHOUSE']),
+            'in_transit': len([s for s in active_shipments if s.get('status') == 'IN_TRANSIT']),
+            'at_warehouse': len([s for s in active_shipments if s.get('status') == 'AT_WAREHOUSE']),
             'compliance_issues': len(compliance_issues),
-            'avg_temperature': sum(s['temperature'] for s in active_shipments) / len(active_shipments) if active_shipments else 0,
-            'avg_humidity': sum(s['humidity'] for s in active_shipments) / len(active_shipments) if active_shipments else 0
+            'avg_temperature': sum(s.get('temperature', 0) for s in active_shipments) / len(active_shipments) if active_shipments else 0,
+            'avg_humidity': sum(s.get('humidity', 0) for s in active_shipments) / len(active_shipments) if active_shipments else 0
         }
 
         logger.info("📦 Logistics Report: %s", report)
