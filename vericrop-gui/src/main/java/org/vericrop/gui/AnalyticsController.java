@@ -178,6 +178,38 @@ public class AnalyticsController {
             mainApp.showProducerScreen();
         }
     }
+    
+    @FXML
+    private void handleShowLogistics() {
+        MainApp mainApp = MainApp.getInstance();
+        if (mainApp != null) {
+            mainApp.showLogisticsScreen();
+        }
+    }
+    
+    @FXML
+    private void handleShowConsumer() {
+        MainApp mainApp = MainApp.getInstance();
+        if (mainApp != null) {
+            mainApp.showConsumerScreen();
+        }
+    }
+    
+    @FXML
+    private void handleShowMessages() {
+        MainApp mainApp = MainApp.getInstance();
+        if (mainApp != null) {
+            mainApp.showInboxScreen();
+        }
+    }
+    
+    @FXML
+    private void handleLogout() {
+        MainApp mainApp = MainApp.getInstance();
+        if (mainApp != null) {
+            mainApp.switchToScreen("login.fxml");
+        }
+    }
 
     private void showAlert(javafx.scene.control.Alert.AlertType type, String title, String message) {
         javafx.scene.control.Alert alert = new javafx.scene.control.Alert(type);

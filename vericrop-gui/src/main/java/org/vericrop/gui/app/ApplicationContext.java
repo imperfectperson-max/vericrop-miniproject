@@ -8,6 +8,8 @@ import org.vericrop.gui.dao.MessageDao;
 import org.vericrop.gui.dao.UserDao;
 import org.vericrop.gui.persistence.PostgresBatchRepository;
 import org.vericrop.gui.services.*;
+import org.vericrop.service.DeliverySimulator;
+import org.vericrop.service.MessageService;
 
 import javax.sql.DataSource;
 
@@ -36,6 +38,11 @@ public class ApplicationContext {
     private final AuthenticationService authenticationService;
     private final BatchService batchService;
     private final AnalyticsService analyticsService;
+    
+    // Core services from vericrop-core
+    private final MessageService messageService;
+    private final DeliverySimulator deliverySimulator;
+    private final AlertService alertService;
 
     /**
      * Private constructor - use getInstance() to get singleton
@@ -61,6 +68,11 @@ public class ApplicationContext {
         this.authenticationService = new AuthenticationService(dataSource);
         this.analyticsService = new AnalyticsService(mlClientService);
         this.batchService = new BatchService(mlClientService, kafkaMessagingService, batchRepository);
+        
+        // Initialize core services
+        this.messageService = new MessageService(true); // Enable persistence
+        this.deliverySimulator = new DeliverySimulator(messageService);
+        this.alertService = AlertService.getInstance();
         
         // Test connections
         testConnections();
@@ -147,12 +159,32 @@ public class ApplicationContext {
     public MessageDao getMessageDao() {
         return messageDao;
     }
+    
+    public MessageService getMessageService() {
+        return messageService;
+    }
+    
+    public DeliverySimulator getDeliverySimulator() {
+        return deliverySimulator;
+    }
+    
+    public AlertService getAlertService() {
+        return alertService;
+    }
 
     /**
      * Shutdown all services and release resources
      */
     public void shutdown() {
         logger.info("=== Shutting down Application Context ===");
+        
+        try {
+            if (deliverySimulator != null) {
+                deliverySimulator.shutdown();
+            }
+        } catch (Exception e) {
+            logger.error("Error shutting down delivery simulator", e);
+        }
         
         try {
             if (kafkaMessagingService != null) {

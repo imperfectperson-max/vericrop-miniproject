@@ -108,6 +108,22 @@ public class ConsumerController {
             mainApp.showLogisticsScreen();
         }
     }
+    
+    @FXML
+    private void handleShowMessages() {
+        MainApp mainApp = MainApp.getInstance();
+        if (mainApp != null) {
+            mainApp.showInboxScreen();
+        }
+    }
+    
+    @FXML
+    private void handleLogout() {
+        MainApp mainApp = MainApp.getInstance();
+        if (mainApp != null) {
+            mainApp.switchToScreen("login.fxml");
+        }
+    }
 
     private void verifyBatch(String batchId) {
         // Validation: if batchId non-empty -> attempt verification

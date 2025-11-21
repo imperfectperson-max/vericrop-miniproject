@@ -39,6 +39,15 @@
                     <Button fx:id="consumerButton" text="👥 Consumer"
                             style="-fx-background-color: #10B981; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8; -fx-padding: 8 12;"
                             onAction="#handleShowConsumer"/>
+                    <Button fx:id="messagesButton" text="💬 Messages"
+                            style="-fx-background-color: #8B5CF6; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8; -fx-padding: 8 12;"
+                            onAction="#handleShowMessages"/>
+                    <Button fx:id="simulatorButton" text="🚀 Simulator"
+                            style="-fx-background-color: #EC4899; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8; -fx-padding: 8 12;"
+                            onAction="#handleShowSimulator"/>
+                    <Button fx:id="logoutButton" text="🚪 Logout"
+                            style="-fx-background-color: #DC2626; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8; -fx-padding: 8 12;"
+                            onAction="#handleLogout"/>
                 </HBox>
 
                 <Label text="🌱 Smart Farming • 🔗 Blockchain • 🤖 AI Powered" style="-fx-text-fill: #666; -fx-font-size: 12px; -fx-font-style: italic;"/>
@@ -113,6 +122,31 @@
                             <Button text="🔄 Refresh" onAction="#handleRefreshDashboard"
                                     style="-fx-background-color: linear-gradient(to right, #9C27B0, #7B1FA2); -fx-text-fill: white; -fx-font-weight: bold; -fx-pref-width: 165; -fx-background-radius: 8; -fx-padding: 8;"/>
                         </HBox>
+                    </VBox>
+                    
+                    <!-- QR Code Generation -->
+                    <VBox spacing="10" style="-fx-padding: 15 0 0 0;">
+                        <Separator/>
+                        <Label text="📱 QR Code Generation" style="-fx-font-weight: bold; -fx-font-size: 14px; -fx-text-fill: #555;"/>
+                        <Button fx:id="generateQRButton" text="🔳 Generate Product QR Code"
+                                onAction="#handleGenerateQR"
+                                style="-fx-background-color: linear-gradient(to right, #8B5CF6, #7C3AED); -fx-text-fill: white; -fx-font-weight: bold; -fx-pref-width: 340; -fx-background-radius: 8; -fx-padding: 10;"/>
+                        <Label fx:id="qrStatusLabel" text="" style="-fx-font-size: 11px; -fx-text-fill: #666; -fx-wrap-text: true;" wrapText="true"/>
+                    </VBox>
+                    
+                    <!-- Delivery Simulator Controls -->
+                    <VBox spacing="10" style="-fx-padding: 15 0 0 0;">
+                        <Separator/>
+                        <Label text="🚀 Delivery Simulator" style="-fx-font-weight: bold; -fx-font-size: 14px; -fx-text-fill: #555;"/>
+                        <HBox spacing="10">
+                            <Button fx:id="startSimButton" text="▶ Start Simulation"
+                                    onAction="#handleStartSimulation"
+                                    style="-fx-background-color: linear-gradient(to right, #10B981, #059669); -fx-text-fill: white; -fx-font-weight: bold; -fx-pref-width: 165; -fx-background-radius: 8; -fx-padding: 8;"/>
+                            <Button fx:id="stopSimButton" text="⏹ Stop Simulation"
+                                    onAction="#handleStopSimulation" disable="true"
+                                    style="-fx-background-color: linear-gradient(to right, #EF4444, #DC2626); -fx-text-fill: white; -fx-font-weight: bold; -fx-pref-width: 165; -fx-background-radius: 8; -fx-padding: 8;"/>
+                        </HBox>
+                        <Label fx:id="simStatusLabel" text="Status: Not running" style="-fx-font-size: 11px; -fx-text-fill: #666;"/>
                     </VBox>
                 </VBox>
 

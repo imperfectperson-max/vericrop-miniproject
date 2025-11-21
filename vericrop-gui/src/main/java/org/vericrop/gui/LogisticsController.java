@@ -148,6 +148,22 @@ public class LogisticsController {
             mainApp.showConsumerScreen();
         }
     }
+    
+    @FXML
+    private void handleShowMessages() {
+        MainApp mainApp = MainApp.getInstance();
+        if (mainApp != null) {
+            mainApp.showInboxScreen();
+        }
+    }
+    
+    @FXML
+    private void handleLogout() {
+        MainApp mainApp = MainApp.getInstance();
+        if (mainApp != null) {
+            mainApp.switchToScreen("login.fxml");
+        }
+    }
 
     // Action methods
     @FXML

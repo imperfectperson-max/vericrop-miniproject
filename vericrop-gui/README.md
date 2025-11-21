@@ -90,6 +90,92 @@ The application will:
 2. Connect to Postgres, Kafka, and ML Service
 3. Launch the JavaFX GUI
 
+## 🎯 Key Features
+
+### QR Code Generation
+
+The producer dashboard includes QR code generation for product traceability:
+
+**How to Use:**
+1. Create a batch with product details
+2. Click **"🔳 Generate Product QR Code"** button
+3. QR code is saved to `generated_qr/product_{batchId}.png`
+4. QR code contains JSON payload with product ID, farmer ID, and verification URL
+5. Generated QR codes are scannable RGB PNG images (300x300px by default)
+
+**Output Location:** `generated_qr/` directory (created automatically)
+
+**QR Code Payload Format:**
+```json
+{
+  "type": "product",
+  "id": "BATCH-1234567890",
+  "farmer": "farmer123",
+  "verifyUrl": "https://vericrop.app/verify?id=BATCH-1234567890"
+}
+```
+
+### Delivery Simulator
+
+Real-time delivery simulation for testing supply chain tracking:
+
+**How to Use:**
+1. Create a batch with product details
+2. Click **"▶ Start Simulation"** button
+3. Simulator generates a route with 10 waypoints from farm to warehouse
+4. Location updates broadcast every 10 seconds via MessageService
+5. Temperature and humidity readings simulated at each waypoint
+6. Click **"⏹ Stop Simulation"** to end the simulation
+
+**Features:**
+- Simulated GPS coordinates along delivery route
+- Environmental readings (temperature, humidity)
+- Real-time alerts for temperature violations
+- Integration with MessageService for event broadcasting
+- Updates visible in logistics dashboard
+
+**Configuration:**
+- Route: Sunny Valley Farm (42.3601, -71.0589) → Metro Fresh Warehouse (42.3736, -71.1097)
+- Update Interval: 10 seconds
+- Waypoints: 10 (configurable in code)
+- Average Speed: 50 km/h
+
+### Reports Generation
+
+Generate CSV and JSON reports for quality, journey, and analytics data:
+
+**Available Reports:**
+- **Journey Reports**: CSV/JSON with waypoint data, timestamps, temperature, humidity
+- **Quality Reports**: CSV with batch metrics and quality scores
+- **Analytics Reports**: CSV with custom data and columns
+
+**Output Location:** `generated_reports/` directory (created automatically)
+
+**Example Usage:**
+```java
+// Generate journey report
+Path report = ReportGenerator.generateJourneyReportCSV(shipmentId, waypoints);
+
+// Generate quality report
+Path report = ReportGenerator.generateQualityReportCSV(batchId, qualityData);
+```
+
+### Real-Time Alerts
+
+AlertService provides real-time notifications throughout the application:
+
+**Alert Types:**
+- INFO: General information
+- WARNING: Potential issues
+- ERROR: Errors requiring attention
+- CRITICAL: Critical failures
+
+**Features:**
+- Observable alerts list for UI binding
+- Alert listener pattern for custom handlers
+- Acknowledgement tracking
+- Filtering by severity level
+
 ## ⚙️ Configuration
 
 ### Environment Variables
