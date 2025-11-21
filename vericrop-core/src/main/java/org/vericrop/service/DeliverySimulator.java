@@ -142,8 +142,10 @@ public class DeliverySimulator {
             route.add(new RouteWaypoint(location, timestamp, temp, humidity));
         }
         
-        logger.info("Generated route: {} waypoints, distance: {:.1f} km, duration: {:.1f} hours",
-                   numWaypoints, distance, totalTravelTimeMs / 3600000.0);
+        if (logger.isInfoEnabled()) {
+            logger.info(String.format("Generated route: %d waypoints, distance: %.1f km, duration: %.1f hours",
+                       numWaypoints, distance, totalTravelTimeMs / 3600000.0));
+        }
         
         return route;
     }
@@ -320,9 +322,13 @@ public class DeliverySimulator {
         activeSimulations.values().forEach(state -> state.running = false);
         executor.shutdownNow();
         try {
-            executor.awaitTermination(5, TimeUnit.SECONDS);
+            boolean terminated = executor.awaitTermination(5, TimeUnit.SECONDS);
+            if (!terminated) {
+                logger.warn("Executor did not terminate within timeout, some tasks may still be running");
+            }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            logger.warn("Shutdown interrupted while waiting for executor termination");
         }
         logger.info("DeliverySimulator shut down");
     }

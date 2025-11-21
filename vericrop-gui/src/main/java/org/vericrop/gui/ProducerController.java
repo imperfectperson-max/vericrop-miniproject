@@ -809,7 +809,7 @@ public class ProducerController {
     private double normalizeQualityScore(Object scoreObj) {
         try {
             if (scoreObj == null) return 0.0;
-            double v = 0.0;
+            double v;
             if (scoreObj instanceof Number) {
                 v = ((Number) scoreObj).doubleValue();
             } else {
