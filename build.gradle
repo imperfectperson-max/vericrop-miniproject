@@ -127,6 +127,9 @@ project(':vericrop-gui') {
         // Micrometer for Prometheus metrics
         implementation 'io.micrometer:micrometer-registry-prometheus'
         
+        // OpenAPI/Swagger for API documentation
+        implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.2.0'
+        
         // HTTP client for ML service integration
         implementation 'com.squareup.okhttp3:okhttp:4.11.0'
         
@@ -137,6 +140,7 @@ project(':vericrop-gui') {
         // Logging
         implementation 'org.slf4j:slf4j-api:2.0.7'
         implementation 'ch.qos.logback:logback-classic:1.4.8'
+        implementation 'net.logstash.logback:logstash-logback-encoder:7.4'
 
         // Testing dependencies
         testImplementation 'org.springframework.boot:spring-boot-starter-test'
