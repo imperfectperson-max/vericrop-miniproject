@@ -140,8 +140,13 @@ public class DeliverySimulator {
             route.add(new RouteWaypoint(location, timestamp, temp, humidity));
         }
         
-        logger.info("Generated route: {} waypoints, distance: {:.1f} km, duration: {:.1f} hours",
-                   numWaypoints, distance, totalTravelTimeMs / 3600000.0);
+        double distanceKm = distance;
+        double durationHours = totalTravelTimeMs / 3600000.0;
+        String distanceStr = String.format("%.1f", distanceKm);
+        String durationStr = String.format("%.1f", durationHours);
+        
+        logger.info("Generated route: {} waypoints, distance: {} km, duration: {} hours",
+                    numWaypoints, distanceStr, durationStr);
         
         return route;
     }
