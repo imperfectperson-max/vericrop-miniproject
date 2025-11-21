@@ -179,7 +179,7 @@ Before you begin, ensure you have the following tools installed with the specifi
    ```bash
    # Check version
    git --version
-   # Expected: git version 2.30+ or higher
+   # Expected: git version 2.30 or higher
    ```
 
 2. **Java 11+** (Java 17 recommended)
