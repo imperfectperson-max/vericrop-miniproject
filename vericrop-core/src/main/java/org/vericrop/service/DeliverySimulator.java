@@ -17,6 +17,7 @@ import java.util.concurrent.*;
 public class DeliverySimulator {
     private static final Logger logger = LoggerFactory.getLogger(DeliverySimulator.class);
     private static final int SIMULATOR_THREAD_POOL_SIZE = 10;
+    private static final int INITIAL_DELAY_DIVISOR = 10;  // Initial delay is 1/10 of update interval
     
     private final MessageService messageService;
     private final ScheduledExecutorService executor;
@@ -173,7 +174,7 @@ public class DeliverySimulator {
         // Use small initial delay to ensure setup is complete
         state.task = executor.scheduleAtFixedRate(
             () -> runSimulationStep(state),
-            updateIntervalMs / 10,  // Small initial delay (10% of update interval)
+            updateIntervalMs / INITIAL_DELAY_DIVISOR,  // Small initial delay (1/10 of update interval)
             updateIntervalMs,
             TimeUnit.MILLISECONDS
         );

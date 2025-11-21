@@ -38,6 +38,8 @@ import org.vericrop.kafka.events.QualityAlertEvent;
 import org.vericrop.gui.util.BlockchainInitializer;
 
 public class ProducerController {
+    private static final int SHIPMENT_UPDATE_INTERVAL_MS = 2000;
+    
     private Blockchain blockchain;
     private BlockchainService blockchainService;
     private ObjectMapper mapper;
@@ -1084,7 +1086,7 @@ public class ProducerController {
                     }
                     Platform.runLater(() -> showError("Shipment simulation error: " + e.getMessage()));
                 }
-            }, 0, 2000, TimeUnit.MILLISECONDS);
+            }, 0, SHIPMENT_UPDATE_INTERVAL_MS, TimeUnit.MILLISECONDS);
             
             scheduledTaskRef.set(task);
 
