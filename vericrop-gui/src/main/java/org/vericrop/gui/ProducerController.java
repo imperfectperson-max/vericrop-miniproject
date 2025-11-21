@@ -1050,14 +1050,16 @@ public class ProducerController {
 
             // Use ScheduledExecutorService to send events periodically instead of busy-wait
             final java.util.concurrent.atomic.AtomicInteger eventIndex = new java.util.concurrent.atomic.AtomicInteger(0);
-            final java.util.concurrent.ScheduledFuture<?>[] scheduledTask = new java.util.concurrent.ScheduledFuture<?>[1];
+            final java.util.concurrent.atomic.AtomicReference<java.util.concurrent.ScheduledFuture<?>> scheduledTaskRef = 
+                new java.util.concurrent.atomic.AtomicReference<>();
             
-            scheduledTask[0] = scheduledExecutor.scheduleAtFixedRate(() -> {
+            java.util.concurrent.ScheduledFuture<?> task = scheduledExecutor.scheduleAtFixedRate(() -> {
                 try {
                     int i = eventIndex.getAndIncrement();
                     if (i >= events.size()) {
-                        if (scheduledTask[0] != null) {
-                            scheduledTask[0].cancel(false);
+                        java.util.concurrent.ScheduledFuture<?> currentTask = scheduledTaskRef.get();
+                        if (currentTask != null) {
+                            currentTask.cancel(false);
                         }
                         Platform.runLater(() -> {
                             showSuccess("Shipment simulation completed!\nBatch: " + batchId +
@@ -1076,12 +1078,15 @@ public class ProducerController {
                         updateStatus("📦 Shipment progress: " + progress + "/" + events.size() + " - " + event.getStatus());
                     });
                 } catch (Exception e) {
-                    if (scheduledTask[0] != null) {
-                        scheduledTask[0].cancel(false);
+                    java.util.concurrent.ScheduledFuture<?> currentTask = scheduledTaskRef.get();
+                    if (currentTask != null) {
+                        currentTask.cancel(false);
                     }
                     Platform.runLater(() -> showError("Shipment simulation error: " + e.getMessage()));
                 }
             }, 0, 2000, TimeUnit.MILLISECONDS);
+            
+            scheduledTaskRef.set(task);
 
         } catch (Exception e) {
             showError("Error simulating shipment: " + e.getMessage());

@@ -16,6 +16,7 @@ import java.util.concurrent.*;
  */
 public class DeliverySimulator {
     private static final Logger logger = LoggerFactory.getLogger(DeliverySimulator.class);
+    private static final int SIMULATOR_THREAD_POOL_SIZE = 10;
     
     private final MessageService messageService;
     private final ScheduledExecutorService executor;
@@ -89,7 +90,7 @@ public class DeliverySimulator {
     
     public DeliverySimulator(MessageService messageService) {
         this.messageService = messageService;
-        this.executor = Executors.newScheduledThreadPool(10);
+        this.executor = Executors.newScheduledThreadPool(SIMULATOR_THREAD_POOL_SIZE);
         this.activeSimulations = new ConcurrentHashMap<>();
         this.random = new Random();
         
