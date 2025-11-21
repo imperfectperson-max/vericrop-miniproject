@@ -9,6 +9,7 @@ import javafx.stage.Stage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.vericrop.gui.app.ApplicationContext;
+import org.vericrop.gui.services.NavigationService;
 
 import java.net.URL;
 
@@ -34,6 +35,11 @@ public class MainApp extends Application {
             this.appContext = ApplicationContext.getInstance();
             logger.info("Application context initialized");
             
+            // Initialize NavigationService
+            NavigationService navigationService = NavigationService.getInstance();
+            navigationService.initialize(primaryStage);
+            logger.info("NavigationService initialized");
+            
             primaryStage.setTitle("VeriCrop - Supply Chain Management");
 
             try {
@@ -55,8 +61,8 @@ public class MainApp extends Application {
                 shutdown();
             });
 
-            // Start with login screen
-            switchToScreen("login.fxml");
+            // Start with login screen using NavigationService
+            navigationService.navigateToLogin();
             logger.info("Application started successfully");
 
         } catch (Exception e) {
