@@ -37,7 +37,7 @@ import org.vericrop.kafka.events.BlockchainEvent;
 import org.vericrop.kafka.events.QualityAlertEvent;
 import org.vericrop.gui.util.BlockchainInitializer;
 
-public class ProducerController {
+public class ProducerController extends BaseController {
     private static final int SHIPMENT_UPDATE_INTERVAL_MS = 2000;
     
     private Blockchain blockchain;
@@ -88,11 +88,16 @@ public class ProducerController {
     @FXML private Button analyticsButton;
     @FXML private Button logisticsButton;
     @FXML private Button consumerButton;
+    @FXML private Button logoutButton;
+    @FXML private Label userLabel;
 
     private String currentImagePath;
     private Map<String, Object> currentPrediction;
 
     public void initialize() {
+        // Initialize base controller (authentication check)
+        initializeBaseController();
+        
         backgroundExecutor = Executors.newFixedThreadPool(4);
         scheduledExecutor = Executors.newScheduledThreadPool(2);
         mapper = new ObjectMapper();
@@ -147,6 +152,14 @@ public class ProducerController {
         }
         if (consumerButton != null) {
             consumerButton.setOnAction(e -> handleShowConsumer());
+        }
+        if (logoutButton != null) {
+            logoutButton.setOnAction(e -> handleLogout());
+        }
+        
+        // Update user label if present
+        if (userLabel != null) {
+            userLabel.setText("👤 " + getCurrentUsername() + " (" + getCurrentRole() + ")");
         }
     }
 

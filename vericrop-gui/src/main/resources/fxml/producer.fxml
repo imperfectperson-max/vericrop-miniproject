@@ -41,6 +41,12 @@
                             onAction="#handleShowConsumer"/>
                 </HBox>
 
+                <VBox spacing="5" alignment="CENTER_RIGHT">
+                    <Label fx:id="userLabel" text="👤 User" style="-fx-text-fill: #555; -fx-font-size: 11px; -fx-font-weight: bold;"/>
+                    <Button fx:id="logoutButton" text="🚪 Logout"
+                            style="-fx-background-color: #EF4444; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 6; -fx-padding: 5 10; -fx-font-size: 11px;"/>
+                </VBox>
+
                 <Label text="🌱 Smart Farming • 🔗 Blockchain • 🤖 AI Powered" style="-fx-text-fill: #666; -fx-font-size: 12px; -fx-font-style: italic;"/>
             </HBox>
 

@@ -6,18 +6,23 @@ import javafx.scene.control.*;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 
-public class ConsumerController {
+public class ConsumerController extends BaseController {
 
     @FXML private TextField batchIdField;
     @FXML private ListView<String> verificationHistoryList;
     @FXML private Button backToProducerButton;
     @FXML private Button analyticsButton;
     @FXML private Button logisticsButton;
+    @FXML private Button logoutButton;
+    @FXML private Label userLabel;
 
     private ObservableList<String> verificationHistory = FXCollections.observableArrayList();
 
     @FXML
     public void initialize() {
+        // Initialize base controller (authentication check)
+        initializeBaseController();
+        
         setupVerificationHistory();
         setupNavigationButtons();
     }
@@ -31,6 +36,14 @@ public class ConsumerController {
         }
         if (logisticsButton != null) {
             logisticsButton.setOnAction(e -> handleShowLogistics());
+        }
+        if (logoutButton != null) {
+            logoutButton.setOnAction(e -> handleLogout());
+        }
+        
+        // Update user label if present
+        if (userLabel != null) {
+            userLabel.setText("👤 " + getCurrentUsername() + " (" + getCurrentRole() + ")");
         }
     }
 

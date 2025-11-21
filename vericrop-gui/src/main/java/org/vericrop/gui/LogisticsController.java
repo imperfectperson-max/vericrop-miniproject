@@ -8,7 +8,7 @@ import javafx.scene.control.*;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 
-public class LogisticsController {
+public class LogisticsController extends BaseController {
 
     @FXML private TableView<Shipment> shipmentsTable;
     @FXML private ListView<String> alertsList;
@@ -22,12 +22,17 @@ public class LogisticsController {
     @FXML private Button backToProducerButton;
     @FXML private Button analyticsButton;
     @FXML private Button consumerButton;
+    @FXML private Button logoutButton;
+    @FXML private Label userLabel;
 
     private ObservableList<Shipment> shipments = FXCollections.observableArrayList();
     private ObservableList<String> alerts = FXCollections.observableArrayList();
 
     @FXML
     public void initialize() {
+        // Initialize base controller (authentication check)
+        initializeBaseController();
+        
         setupShipmentsTable();
         setupAlertsList();
         setupReportCombo();
@@ -44,6 +49,14 @@ public class LogisticsController {
         }
         if (consumerButton != null) {
             consumerButton.setOnAction(e -> handleShowConsumer());
+        }
+        if (logoutButton != null) {
+            logoutButton.setOnAction(e -> handleLogout());
+        }
+        
+        // Update user label if present
+        if (userLabel != null) {
+            userLabel.setText("👤 " + getCurrentUsername() + " (" + getCurrentRole() + ")");
         }
     }
 

@@ -9,7 +9,7 @@ import javafx.scene.control.*;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 
-public class AnalyticsController {
+public class AnalyticsController extends BaseController {
 
     @FXML private Label totalBatchesLabel;
     @FXML private Label avgQualityLabel;
@@ -29,12 +29,17 @@ public class AnalyticsController {
 
     // Navigation button
     @FXML private Button backToProducerButton;
+    @FXML private Button logoutButton;
+    @FXML private Label userLabel;
 
     private ObservableList<Supplier> suppliers = FXCollections.observableArrayList();
     private ObservableList<Alert> alerts = FXCollections.observableArrayList();
 
     @FXML
     public void initialize() {
+        // Initialize base controller (authentication check)
+        initializeBaseController();
+        
         setupKPIs();
         setupSupplierTable();
         setupAlertsTable();
@@ -46,6 +51,14 @@ public class AnalyticsController {
     private void setupNavigation() {
         if (backToProducerButton != null) {
             backToProducerButton.setOnAction(e -> handleBackToProducer());
+        }
+        if (logoutButton != null) {
+            logoutButton.setOnAction(e -> handleLogout());
+        }
+        
+        // Update user label if present
+        if (userLabel != null) {
+            userLabel.setText("👤 " + getCurrentUsername() + " (" + getCurrentRole() + ")");
         }
     }
 
