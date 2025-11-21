@@ -23,7 +23,7 @@ profile:
 #    paths:
 #      - <path/where/not/run/inspection>
 
-projectJDK: "23" #(Applied in CI/CD pipeline)
+projectJDK: "17" #(Applied in CI/CD pipeline)
 
 #Execute shell command before Qodana execution (Applied in CI/CD pipeline)
 # Use the Gradle wrapper to ensure Gradle is available and avoid network downloads
