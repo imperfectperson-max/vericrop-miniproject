@@ -1,5 +1,13 @@
 package org.vericrop.gui.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,6 +38,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api")
 @CrossOrigin(origins = "*")
+@Tag(name = "Evaluation", description = "Quality evaluation and assessment API")
 public class EvaluationController {
     private static final Logger logger = LoggerFactory.getLogger(EvaluationController.class);
     
@@ -52,12 +61,23 @@ public class EvaluationController {
      * POST /api/evaluate
      * Evaluate fruit quality from uploaded image or base64 data.
      */
+    @Operation(
+        summary = "Evaluate fruit quality from image",
+        description = "Upload an image for AI-powered quality assessment. Returns quality score, classification, and blockchain ledger record."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Evaluation successful",
+            content = @Content(mediaType = "application/json",
+                examples = @ExampleObject(value = "{\"success\":true,\"batch_id\":\"BATCH_001\",\"quality_score\":0.92,\"pass_fail\":\"PASS\",\"prediction\":\"Fresh\",\"confidence\":0.95}"))),
+        @ApiResponse(responseCode = "400", description = "Invalid input"),
+        @ApiResponse(responseCode = "500", description = "Internal server error")
+    })
     @PostMapping(value = "/evaluate", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Map<String, Object>> evaluateImage(
-            @RequestParam(value = "file", required = false) MultipartFile file,
-            @RequestParam(value = "batch_id", required = false) String batchId,
-            @RequestParam(value = "product_type", required = false) String productType,
-            @RequestParam(value = "farmer_id", required = false) String farmerId) {
+            @Parameter(description = "Image file to evaluate") @RequestParam(value = "file", required = false) MultipartFile file,
+            @Parameter(description = "Batch identifier") @RequestParam(value = "batch_id", required = false) String batchId,
+            @Parameter(description = "Product type (e.g., apple, banana)") @RequestParam(value = "product_type", required = false) String productType,
+            @Parameter(description = "Farmer identifier") @RequestParam(value = "farmer_id", required = false) String farmerId) {
         
         logger.info("Received evaluation request for batch: {}", batchId);
         
