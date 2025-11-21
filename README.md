@@ -239,16 +239,28 @@ Before you begin, ensure you have the following tools installed with the specifi
 
 #### Verify All Prerequisites
 
-Run all checks at once:
+Run all checks individually (recommended for troubleshooting):
 
 ```bash
-# Unix/Mac
-echo "Git: $(git --version)" && \
+# Check each tool individually
+git --version
+java -version
+./gradlew --version
+docker --version
+docker-compose --version
+python3 --version
+```
+
+Or run all checks at once (requires all tools in PATH):
+
+```bash
+# Unix/Mac - Combined check (may fail silently if tools missing)
+echo "Git: $(git --version 2>/dev/null || echo 'NOT FOUND')" && \
 echo "Java: $(java -version 2>&1 | head -n 1)" && \
-echo "Gradle: $(./gradlew --version | grep Gradle)" && \
-echo "Docker: $(docker --version)" && \
-echo "Docker Compose: $(docker-compose --version)" && \
-echo "Python: $(python3 --version)"
+echo "Gradle: $(./gradlew --version 2>/dev/null | grep Gradle || echo 'NOT FOUND')" && \
+echo "Docker: $(docker --version 2>/dev/null || echo 'NOT FOUND')" && \
+echo "Docker Compose: $(docker-compose --version 2>/dev/null || echo 'NOT FOUND')" && \
+echo "Python: $(python3 --version 2>/dev/null || echo 'NOT FOUND')"
 
 # Windows (PowerShell)
 Write-Host "Git: $(git --version)"; `
@@ -294,7 +306,10 @@ notepad .env
 - **ML Service**: `ML_SERVICE_URL`, `VERICROP_LOAD_DEMO` (set to `true` if model files missing)
 - **Airflow**: `AIRFLOW_ADMIN_USERNAME`, `AIRFLOW_ADMIN_PASSWORD`
 
-⚠️ **Security Warning**: Never commit `.env` files to version control! The `.gitignore` already excludes it.
+⚠️ **Security Warnings**:
+- Never commit `.env` files to version control! The `.gitignore` already excludes it.
+- For production environments, use strong passwords (16+ characters, mixed case, numbers, special chars).
+- Default credentials in `.env.example` are for development only - change them for production!
 
 #### Step 3: Build Java Artifacts
 
@@ -1083,8 +1098,8 @@ netstat -ano | findstr :8080
 Run all verification checks at once:
 
 ```bash
-# Create a verification script
-cat > /tmp/verify_vericrop.sh << 'EOF'
+# Create a verification script in project directory
+cat > ./scripts/verify_vericrop.sh << 'EOF'
 #!/bin/bash
 echo "=== VeriCrop Service Verification ==="
 echo ""
@@ -1109,8 +1124,8 @@ echo ""
 echo "=== Verification Complete ==="
 EOF
 
-chmod +x /tmp/verify_vericrop.sh
-/tmp/verify_vericrop.sh
+chmod +x ./scripts/verify_vericrop.sh
+./scripts/verify_vericrop.sh
 
 # Windows (PowerShell) - Run commands individually
 ```
@@ -1686,18 +1701,23 @@ docker container prune
 
 ### Complete Cleanup
 
-**⚠️ Warning**: This removes ALL Docker resources, not just VeriCrop
+**⚠️⚠️⚠️ DANGER WARNING ⚠️⚠️⚠️**: This removes ALL Docker resources system-wide, not just VeriCrop!
+
+**This will delete**:
+- All stopped containers (all projects)
+- All networks not in use (all projects)  
+- All images without containers (all projects)
+- All build cache (all projects)
+- All volumes not in use (all projects)
+
+**Only use if you want to completely reset Docker on your machine!**
 
 ```bash
-# Nuclear option - removes everything Docker-related
+# Nuclear option - removes EVERYTHING Docker-related on your system
 docker system prune -a --volumes
 
-# This removes:
-# - All stopped containers
-# - All networks not used by at least one container
-# - All images without at least one container associated
-# - All build cache
-# - All volumes not used by at least one container
+# You will be prompted to confirm. Type 'y' only if you're absolutely sure!
+# This affects ALL Docker projects, not just VeriCrop!
 ```
 
 ### Clean Logs
@@ -2203,9 +2223,13 @@ docker-compose up -d
    sudo systemctl stop postgresql  # Linux
    brew services stop postgresql   # Mac
    
-   # Or kill the process
-   kill -9 <PID>                   # Unix/Mac
-   taskkill /PID <PID> /F          # Windows
+   # Or kill the process (try graceful shutdown first)
+   kill <PID>                      # Unix/Mac - SIGTERM (graceful)
+   # If process doesn't stop after 10 seconds:
+   kill -9 <PID>                   # Unix/Mac - SIGKILL (force)
+   
+   taskkill /PID <PID>             # Windows - graceful
+   taskkill /PID <PID> /F          # Windows - force
    ```
 
 3. **Change port in `.env`** (alternative solution):
@@ -2223,7 +2247,10 @@ docker-compose up -d
 
 **One-line fix**:
 ```bash
-lsof -ti :5432 | xargs kill -9  # Unix/Mac - kills process on port 5432
+# Try graceful shutdown first
+lsof -ti :5432 | xargs kill  # Unix/Mac - graceful shutdown
+# If that doesn't work after 10 seconds:
+lsof -ti :5432 | xargs kill -9  # Unix/Mac - force kill
 ```
 
 ### Docker Compose Issues
