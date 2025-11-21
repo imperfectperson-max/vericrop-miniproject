@@ -28,8 +28,10 @@ spec:
     spec:
       containers:
       - name: ml-service
-        image: your-registry.com/vericrop-ml-service:latest
-        imagePullPolicy: Always
+        # IMPORTANT: Use specific version tags in production, not 'latest'
+        # Example: your-registry.com/vericrop-ml-service:1.0.0
+        image: your-registry.com/vericrop-ml-service:1.0.0
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8000
           name: http

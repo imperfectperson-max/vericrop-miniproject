@@ -12,6 +12,9 @@ Validates all DAG files for:
 - Timeout settings
 - Scheduling configuration
 
+Requirements:
+    Python 3.8+ (uses ast.Constant)
+
 Usage:
     python scripts/validate-airflow-dags.py
     python scripts/validate-airflow-dags.py --dag-folder airflow/dags
@@ -25,6 +28,11 @@ import importlib.util
 from pathlib import Path
 from typing import List, Dict, Any
 import ast
+
+# Verify Python version
+if sys.version_info < (3, 8):
+    print("Error: This script requires Python 3.8 or higher")
+    sys.exit(1)
 
 
 def parse_arguments():

@@ -27,6 +27,21 @@ public class OpenApiConfig {
     @Value("${vericrop.api.version:1.0.0}")
     private String apiVersion;
 
+    @Value("${vericrop.api.server.prod.url:https://api.vericrop.example.com}")
+    private String prodServerUrl;
+
+    @Value("${vericrop.api.server.staging.url:https://staging-api.vericrop.example.com}")
+    private String stagingServerUrl;
+
+    @Value("${vericrop.api.contact.name:VeriCrop Team}")
+    private String contactName;
+
+    @Value("${vericrop.api.contact.email:support@vericrop.example.com}")
+    private String contactEmail;
+
+    @Value("${vericrop.api.contact.url:https://github.com/imperfectperson-max/vericrop-miniproject}")
+    private String contactUrl;
+
     @Bean
     public OpenAPI vericropOpenAPI() {
         return new OpenAPI()
@@ -56,9 +71,9 @@ public class OpenApiConfig {
                                 """)
                         .version(apiVersion)
                         .contact(new Contact()
-                                .name("VeriCrop Team")
-                                .url("https://github.com/imperfectperson-max/vericrop-miniproject")
-                                .email("support@vericrop.example.com"))
+                                .name(contactName)
+                                .url(contactUrl)
+                                .email(contactEmail))
                         .license(new License()
                                 .name("Apache 2.0")
                                 .url("https://www.apache.org/licenses/LICENSE-2.0.html")))
@@ -67,10 +82,10 @@ public class OpenApiConfig {
                                 .url("http://localhost:" + serverPort)
                                 .description("Local Development Server"),
                         new Server()
-                                .url("https://api.vericrop.example.com")
+                                .url(prodServerUrl)
                                 .description("Production Server"),
                         new Server()
-                                .url("https://staging-api.vericrop.example.com")
+                                .url(stagingServerUrl)
                                 .description("Staging Server")))
                 .tags(List.of(
                         new Tag()

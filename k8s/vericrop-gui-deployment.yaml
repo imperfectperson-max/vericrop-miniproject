@@ -28,8 +28,11 @@ spec:
     spec:
       containers:
       - name: vericrop-gui
-        image: your-registry.com/vericrop-gui:latest
-        imagePullPolicy: Always
+        # IMPORTANT: Use specific version tags in production, not 'latest'
+        # Example: your-registry.com/vericrop-gui:1.0.0
+        # Or use digest: your-registry.com/vericrop-gui@sha256:abc123...
+        image: your-registry.com/vericrop-gui:1.0.0
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080
           name: http
