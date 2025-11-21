@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.vericrop.gui.util.ValidationUtil;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -94,12 +95,12 @@ public class RestAuthService implements AuthService {
             return false;
         }
         
-        if (password == null || password.trim().isEmpty() || password.length() < 6) {
+        if (!ValidationUtil.isValidPassword(password, 6)) {
             logger.warn("Registration failed: password must be at least 6 characters");
             return false;
         }
         
-        if (email == null || !email.contains("@")) {
+        if (!ValidationUtil.isValidEmail(email)) {
             logger.warn("Registration failed: invalid email");
             return false;
         }

@@ -5,7 +5,14 @@ import org.slf4j.LoggerFactory;
 import org.vericrop.gui.clients.MLClientService;
 import org.vericrop.gui.config.ConfigService;
 import org.vericrop.gui.persistence.PostgresBatchRepository;
-import org.vericrop.gui.services.*;
+import org.vericrop.gui.services.AnalyticsService;
+import org.vericrop.gui.services.AuthService;
+import org.vericrop.gui.services.AuthenticationService;
+import org.vericrop.gui.services.BatchService;
+import org.vericrop.gui.services.FallbackAuthService;
+import org.vericrop.gui.services.KafkaMessagingService;
+import org.vericrop.gui.services.RestAuthService;
+import org.vericrop.gui.services.RoleRouter;
 
 /**
  * Application Context for VeriCrop GUI.

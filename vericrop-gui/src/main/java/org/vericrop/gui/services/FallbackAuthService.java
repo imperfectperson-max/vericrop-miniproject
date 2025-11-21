@@ -2,6 +2,7 @@ package org.vericrop.gui.services;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.vericrop.gui.util.ValidationUtil;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -58,12 +59,12 @@ public class FallbackAuthService implements AuthService {
             return false;
         }
         
-        if (password == null || password.trim().isEmpty() || password.length() < 6) {
+        if (!ValidationUtil.isValidPassword(password, 6)) {
             logger.warn("Registration failed: password must be at least 6 characters");
             return false;
         }
         
-        if (email == null || !email.contains("@")) {
+        if (!ValidationUtil.isValidEmail(email)) {
             logger.warn("Registration failed: invalid email");
             return false;
         }

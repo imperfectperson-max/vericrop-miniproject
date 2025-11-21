@@ -184,7 +184,8 @@ public class FallbackAuthServiceTest {
             FallbackAuthService service = new FallbackAuthService();
             boolean result = service.login(user, "password");
             assertTrue(result, "Should be able to login with " + user);
-            assertEquals(user, service.getCurrentRole().toLowerCase(), 
+            assertNotNull(service.getCurrentRole(), "Role should not be null for " + user);
+            assertEquals(user.toLowerCase(), service.getCurrentRole().toLowerCase(), 
                         "Role should match username for " + user);
         }
     }

@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.vericrop.gui.app.ApplicationContext;
 import org.vericrop.gui.services.AuthService;
+import org.vericrop.gui.util.ValidationUtil;
 
 import java.util.concurrent.CompletableFuture;
 
@@ -132,7 +133,7 @@ public class LoginController {
             return;
         }
         
-        if (!email.contains("@") || !email.contains(".")) {
+        if (!ValidationUtil.isValidEmail(email)) {
             showRegisterError("Please enter a valid email address");
             return;
         }
