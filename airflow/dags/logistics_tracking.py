@@ -73,7 +73,7 @@ def handle_delayed_shipments(**context):
             logger.info("   Location: %s, Temp: %s°C, ETA: %s", location, temperature, eta)
 
             # Check for issues
-            if temperature > 7.0:
+            if temperature is not None and temperature > 7.0:
                 logger.warning("🌡️ Temperature alert for %s: %s°C", batch_id, temperature)
 
             # Simulate sending status update
@@ -175,14 +175,20 @@ def generate_logistics_report(**context):
         active_shipments = context['task_instance'].xcom_pull(task_ids='monitor_active_shipments', key='active_shipments') or []
         compliance_issues = context['task_instance'].xcom_pull(task_ids='check_environmental_compliance', key='compliance_issues') or []
 
+        # Calculate averages using validated sensor data
+        valid_temps = [_clamp_temperature(s.get('temperature')) for s in active_shipments]
+        valid_temps = [t for t in valid_temps if t is not None]
+        valid_humidities = [_clamp_humidity(s.get('humidity')) for s in active_shipments]
+        valid_humidities = [h for h in valid_humidities if h is not None]
+        
         report = {
             'timestamp': datetime.now().isoformat(),
             'total_active_shipments': len(active_shipments),
             'in_transit': len([s for s in active_shipments if s.get('status') == 'IN_TRANSIT']),
             'at_warehouse': len([s for s in active_shipments if s.get('status') == 'AT_WAREHOUSE']),
             'compliance_issues': len(compliance_issues),
-            'avg_temperature': sum(s.get('temperature', 0) for s in active_shipments) / len(active_shipments) if active_shipments else 0,
-            'avg_humidity': sum(s.get('humidity', 0) for s in active_shipments) / len(active_shipments) if active_shipments else 0
+            'avg_temperature': sum(valid_temps) / len(valid_temps) if valid_temps else 0,
+            'avg_humidity': sum(valid_humidities) / len(valid_humidities) if valid_humidities else 0
         }
 
         logger.info("📦 Logistics Report: %s", report)
