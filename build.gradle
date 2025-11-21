@@ -141,6 +141,10 @@ project(':vericrop-gui') {
         implementation 'org.slf4j:slf4j-api:2.0.7'
         implementation 'ch.qos.logback:logback-classic:1.4.8'
         implementation 'net.logstash.logback:logstash-logback-encoder:7.4'
+        
+        // QR Code generation with ZXing
+        implementation 'com.google.zxing:core:3.5.2'
+        implementation 'com.google.zxing:javase:3.5.2'
 
         // Testing dependencies
         testImplementation 'org.springframework.boot:spring-boot-starter-test'
