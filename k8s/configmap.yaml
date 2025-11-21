@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vericrop-config
+  namespace: vericrop
+data:
+  # Application Mode
+  VERICROP_MODE: "prod"
+  LOG_LEVEL: "INFO"
+  LOG_FORMAT: "json"
+  
+  # Kafka Configuration
+  KAFKA_ENABLED: "true"
+  KAFKA_ACKS: "all"
+  KAFKA_IDEMPOTENCE: "true"
+  KAFKA_RETRIES: "3"
+  KAFKA_TOPIC_BATCH_EVENTS: "batch-events"
+  KAFKA_TOPIC_QUALITY_ALERTS: "quality-alerts"
+  KAFKA_TOPIC_LOGISTICS_EVENTS: "logistics-events"
+  KAFKA_TOPIC_BLOCKCHAIN_EVENTS: "blockchain-events"
+  
+  # ML Service Configuration
+  ML_SERVICE_TIMEOUT: "30000"
+  ML_SERVICE_RETRIES: "3"
+  
+  # Database Configuration
+  POSTGRES_DB: "vericrop"
+  POSTGRES_HOST: "postgres-service"
+  POSTGRES_PORT: "5432"
+  DB_POOL_SIZE: "20"
+  DB_CONNECTION_TIMEOUT: "30000"
+  
+  # Monitoring
+  ENABLE_METRICS: "true"
+  PROMETHEUS_PORT: "9090"
