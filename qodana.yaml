@@ -26,7 +26,8 @@ profile:
 projectJDK: "23" #(Applied in CI/CD pipeline)
 
 #Execute shell command before Qodana execution (Applied in CI/CD pipeline)
-#bootstrap: sh ./prepare-qodana.sh
+# Use the Gradle wrapper to ensure Gradle is available and avoid network downloads
+bootstrap: chmod +x ./gradlew && ./gradlew --version
 
 #Install IDE plugins before Qodana execution (Applied in CI/CD pipeline)
 #plugins:
