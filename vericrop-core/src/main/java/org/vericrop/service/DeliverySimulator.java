@@ -133,8 +133,9 @@ public class DeliverySimulator {
             // Generate environmental readings with some variation
             double temp = 5.0 + random.nextGaussian() * 2.0;  // Mean 5°C, std dev 2°C
             double humidity = 75.0 + random.nextGaussian() * 10.0;  // Mean 75%, std dev 10%
-            // Clamp humidity to valid range [0, 100]
-            humidity = Math.max(0.0, Math.min(100.0, humidity));
+            // Clamp values to realistic ranges
+            temp = Math.max(-50.0, Math.min(50.0, temp));  // Temperature range [-50, 50]°C
+            humidity = Math.max(0.0, Math.min(100.0, humidity));  // Humidity range [0, 100]%
             
             route.add(new RouteWaypoint(location, timestamp, temp, humidity));
         }
