@@ -15,6 +15,7 @@
 - [Quickstart](#quickstart)
 - [Local Development](#local-development)
 - [Configuration](#configuration)
+- [Authentication and Messaging](#authentication-and-messaging)
 - [ML Service Contract](#ml-service-contract)
 - [Testing](#testing)
 - [Contributing](#contributing)
@@ -83,15 +84,17 @@ VeriCrop follows a microservices architecture with event-driven communication:
 
 **Location**: `vericrop-gui/`
 
-JavaFX desktop application with Spring Boot integration. Provides four interactive dashboards:
+JavaFX desktop application with Spring Boot integration. Provides four interactive dashboards plus user authentication and messaging:
+- **User Authentication**: Secure login/registration with BCrypt password hashing
+- **User Messaging**: In-app messaging system with inbox and compose features
 - **Farm Management**: Batch creation, quality assessment
 - **Logistics Tracking**: Shipment monitoring, condition alerts
 - **Consumer Verification**: QR code scanning, product journey
 - **Analytics Dashboard**: KPI monitoring, trend analysis
 
-**Tech Stack**: Java 17, JavaFX, Spring Boot, HikariCP, Kafka Client
+**Tech Stack**: Java 17, JavaFX, Spring Boot, HikariCP, BCrypt, Flyway, Kafka Client
 
-**Details**: See [vericrop-gui/README.md](vericrop-gui/README.md)
+**Details**: See [vericrop-gui/README.md](vericrop-gui/README.md) and [docs/GUI-setup.md](docs/GUI-setup.md)
 
 ### vericrop-core
 
@@ -527,6 +530,74 @@ nano .env
 ```
 
 **Important**: Never commit `.env` files with real credentials to version control. The `.env.example` is tracked for reference only.
+
+## Authentication and Messaging
+
+VeriCrop now includes a complete user authentication and messaging system with PostgreSQL backend.
+
+### Features
+
+- **User Registration**: Create accounts with username, email, password, and role selection
+- **Secure Authentication**: BCrypt password hashing, account lockout protection
+- **Role-Based Access**: Four role types (FARMER, CONSUMER, ADMIN, SUPPLIER)
+- **User Messaging**: Send and receive messages between users
+- **Inbox/Sent Items**: Manage messages with read/unread status
+- **Session Management**: Secure session handling with role-based navigation
+
+### Quick Start
+
+1. **Start the application** - Login screen appears automatically
+2. **Use demo accounts** or register a new account:
+   - Username: `admin`, Password: `admin123` (ADMIN role)
+   - Username: `farmer`, Password: `farmer123` (FARMER role)
+   - Username: `supplier`, Password: `supplier123` (SUPPLIER role)
+3. **Access messaging** - Navigate to inbox to send/receive messages
+
+### Database Migrations
+
+Four Flyway migrations manage the database schema:
+
+- **V1**: Batches and quality tracking tables
+- **V2**: Users table with BCrypt authentication
+- **V3**: Shipments tracking table
+- **V4**: Messages table for user-to-user messaging
+
+Migrations run automatically on application startup. No manual setup required!
+
+### Authentication Features
+
+- **BCrypt Password Hashing**: Secure password storage (never plaintext)
+- **Failed Login Tracking**: Account locks after 5 failed attempts
+- **Lockout Duration**: 30 minutes automatic unlock
+- **Role-Based Access**: Different dashboards for each role
+- **Session Persistence**: Sessions maintained until application close
+
+### Messaging Features
+
+- **Compose Messages**: Send messages to any active user
+- **Inbox View**: List of received messages with unread count
+- **Sent Items**: View all messages you've sent
+- **Mark as Read/Unread**: Toggle message read status
+- **Reply**: Quick reply with pre-filled recipient and subject
+- **Delete**: Soft delete (hidden but preserved for audit)
+- **Message Preview**: See first 100 characters in message list
+- **Auto-mark Read**: Inbox messages marked read when viewed
+
+### Documentation
+
+For detailed setup instructions, user guides, and troubleshooting:
+
+📖 **[GUI Setup Guide](docs/GUI-setup.md)** - Complete guide for authentication and messaging
+
+### Security Best Practices
+
+For production deployment:
+
+1. **Change default passwords** in V2 migration or via SQL
+2. **Use environment variables** for database credentials
+3. **Enable SSL/TLS** for database connections
+4. **Review audit logs** regularly (check `last_login` and `failed_login_attempts`)
+5. **Update passwords** periodically
 
 ## ML Service Contract
 

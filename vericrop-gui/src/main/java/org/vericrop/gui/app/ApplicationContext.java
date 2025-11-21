@@ -4,8 +4,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.vericrop.gui.clients.MLClientService;
 import org.vericrop.gui.config.ConfigService;
+import org.vericrop.gui.dao.MessageDao;
+import org.vericrop.gui.dao.UserDao;
 import org.vericrop.gui.persistence.PostgresBatchRepository;
 import org.vericrop.gui.services.*;
+
+import javax.sql.DataSource;
 
 /**
  * Application Context for VeriCrop GUI.
@@ -23,6 +27,10 @@ public class ApplicationContext {
     private final MLClientService mlClientService;
     private final KafkaMessagingService kafkaMessagingService;
     private final PostgresBatchRepository batchRepository;
+    
+    // DAO layer
+    private final UserDao userDao;
+    private final MessageDao messageDao;
     
     // Business services
     private final AuthenticationService authenticationService;
@@ -44,8 +52,13 @@ public class ApplicationContext {
         this.kafkaMessagingService = new KafkaMessagingService(configService);
         this.batchRepository = new PostgresBatchRepository(configService);
         
+        // Initialize DAO layer with shared DataSource
+        DataSource dataSource = this.batchRepository.getDataSource();
+        this.userDao = new UserDao(dataSource);
+        this.messageDao = new MessageDao(dataSource);
+        
         // Initialize business services
-        this.authenticationService = new AuthenticationService();
+        this.authenticationService = new AuthenticationService(dataSource);
         this.analyticsService = new AnalyticsService(mlClientService);
         this.batchService = new BatchService(mlClientService, kafkaMessagingService, batchRepository);
         
@@ -125,6 +138,14 @@ public class ApplicationContext {
 
     public AnalyticsService getAnalyticsService() {
         return analyticsService;
+    }
+
+    public UserDao getUserDao() {
+        return userDao;
+    }
+
+    public MessageDao getMessageDao() {
+        return messageDao;
     }
 
     /**

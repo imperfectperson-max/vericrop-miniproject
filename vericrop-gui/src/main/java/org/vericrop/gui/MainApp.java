@@ -55,7 +55,8 @@ public class MainApp extends Application {
                 shutdown();
             });
 
-            showProducerScreen();
+            // Start with login screen
+            switchToScreen("login.fxml");
             logger.info("Application started successfully");
 
         } catch (Exception e) {
@@ -147,6 +148,10 @@ public class MainApp extends Application {
 
     public void showAnalyticsScreen() {
         switchToScreen("analytics.fxml");
+    }
+
+    public void showInboxScreen() {
+        switchToScreen("inbox.fxml");
     }
 
     public static MainApp getInstance() {
