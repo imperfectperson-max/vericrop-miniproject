@@ -77,9 +77,6 @@ public class FileLedgerService {
             throw new IllegalArgumentException("Shipment record cannot be null");
         }
 
-        java.nio.channels.FileChannel channel = null;
-        java.nio.channels.FileLock lock = null;
-        
         try {
             // Generate unique ledger ID if not present
             if (record.getLedgerId() == null || record.getLedgerId().isEmpty()) {
@@ -96,19 +93,18 @@ public class FileLedgerService {
             // Serialize to JSON
             String jsonLine = objectMapper.writeValueAsString(record) + System.lineSeparator();
 
-            // Use file locking for atomic append operation
-            RandomAccessFile raf = new RandomAccessFile(ledgerPath.toFile(), "rw");
-            channel = raf.getChannel();
-            
-            // Acquire exclusive lock for writing (blocks until available)
-            lock = channel.lock();
-            
-            // Move to end of file and append
-            raf.seek(raf.length());
-            raf.write(jsonLine.getBytes(StandardCharsets.UTF_8));
-            
-            // Force writes to disk for durability
-            channel.force(true);
+            // Use file locking for atomic append operation with try-with-resources
+            try (RandomAccessFile raf = new RandomAccessFile(ledgerPath.toFile(), "rw");
+                 java.nio.channels.FileChannel channel = raf.getChannel();
+                 java.nio.channels.FileLock lock = channel.lock()) {
+                
+                // Move to end of file and append
+                raf.seek(raf.length());
+                raf.write(jsonLine.getBytes(StandardCharsets.UTF_8));
+                
+                // Force writes to disk for durability
+                channel.force(true);
+            }
 
             logger.info("Recorded shipment {} in ledger with hash {} (chain: {})",
                     record.getShipmentId(), recordHash.substring(0, 8), 
@@ -119,18 +115,6 @@ public class FileLedgerService {
         } catch (IOException e) {
             logger.error("Failed to record shipment {}: {}", record.getShipmentId(), e.getMessage());
             throw new RuntimeException("Failed to record shipment in ledger", e);
-        } finally {
-            // Release lock and close channel
-            try {
-                if (lock != null && lock.isValid()) {
-                    lock.release();
-                }
-                if (channel != null) {
-                    channel.close();
-                }
-            } catch (IOException e) {
-                logger.error("Error releasing file lock: {}", e.getMessage());
-            }
         }
     }
 
@@ -395,9 +379,11 @@ public class FileLedgerService {
                 return 0;
             }
 
-            return (int) Files.lines(ledgerPath)
-                    .filter(line -> !line.trim().isEmpty())
-                    .count();
+            try (java.util.stream.Stream<String> lines = Files.lines(ledgerPath)) {
+                return (int) lines
+                        .filter(line -> !line.trim().isEmpty())
+                        .count();
+            }
 
         } catch (IOException e) {
             logger.error("Failed to count records: {}", e.getMessage());

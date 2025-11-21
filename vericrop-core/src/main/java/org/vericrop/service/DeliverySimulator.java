@@ -18,7 +18,7 @@ public class DeliverySimulator {
     private static final Logger logger = LoggerFactory.getLogger(DeliverySimulator.class);
     
     private final MessageService messageService;
-    private final ExecutorService executor;
+    private final ScheduledExecutorService executor;
     private final ConcurrentHashMap<String, SimulationState> activeSimulations;
     private final Random random;
     
@@ -77,7 +77,7 @@ public class DeliverySimulator {
         final List<RouteWaypoint> route;
         int currentWaypointIndex;
         boolean running;
-        Future<?> task;
+        ScheduledFuture<?> task;
         
         SimulationState(String shipmentId, List<RouteWaypoint> route) {
             this.shipmentId = shipmentId;
@@ -89,7 +89,7 @@ public class DeliverySimulator {
     
     public DeliverySimulator(MessageService messageService) {
         this.messageService = messageService;
-        this.executor = Executors.newCachedThreadPool();
+        this.executor = Executors.newScheduledThreadPool(10);
         this.activeSimulations = new ConcurrentHashMap<>();
         this.random = new Random();
         
@@ -159,8 +159,13 @@ public class DeliverySimulator {
         SimulationState state = new SimulationState(shipmentId, new ArrayList<>(route));
         state.running = true;
         
-        // Start simulation task
-        state.task = executor.submit(() -> runSimulation(state, updateIntervalMs));
+        // Start simulation task with scheduled executor at fixed rate
+        state.task = executor.scheduleAtFixedRate(
+            () -> runSimulationStep(state),
+            0,
+            updateIntervalMs,
+            TimeUnit.MILLISECONDS
+        );
         
         activeSimulations.put(shipmentId, state);
         
@@ -208,49 +213,56 @@ public class DeliverySimulator {
     }
     
     /**
-     * Run the simulation.
+     * Run a single simulation step (called periodically by ScheduledExecutorService).
      */
-    private void runSimulation(SimulationState state, long updateIntervalMs) {
+    private void runSimulationStep(SimulationState state) {
         try {
-            while (state.running && state.currentWaypointIndex < state.route.size()) {
-                RouteWaypoint waypoint = state.route.get(state.currentWaypointIndex);
-                
-                // Send location update message
-                String content = String.format(
-                    "Location: %s | Temp: %.1f°C | Humidity: %.1f%%",
-                    waypoint.getLocation().toString(),
-                    waypoint.getTemperature(),
-                    waypoint.getHumidity()
-                );
-                
-                sendSimulationMessage(state.shipmentId, "Location Update", content);
-                
-                // Check for environmental alerts
-                if (waypoint.getTemperature() < 4.0 || waypoint.getTemperature() > 8.0) {
-                    sendSimulationMessage(state.shipmentId, "Temperature Alert",
-                        String.format("Temperature outside range: %.1f°C", waypoint.getTemperature()));
+            if (!state.running || state.currentWaypointIndex >= state.route.size()) {
+                // Simulation complete or stopped
+                if (state.task != null) {
+                    state.task.cancel(false);
                 }
-                
-                state.currentWaypointIndex++;
-                
-                // Check if delivery is complete
-                if (state.currentWaypointIndex >= state.route.size()) {
-                    sendSimulationMessage(state.shipmentId, "Delivery Complete",
-                        "Shipment arrived at destination");
-                    state.running = false;
-                    break;
-                }
-                
-                // Wait for next update
-                Thread.sleep(updateIntervalMs);
+                activeSimulations.remove(state.shipmentId);
+                return;
             }
             
-        } catch (InterruptedException e) {
-            logger.info("Simulation interrupted for shipment: {}", state.shipmentId);
-            Thread.currentThread().interrupt();
+            RouteWaypoint waypoint = state.route.get(state.currentWaypointIndex);
+            
+            // Send location update message
+            String content = String.format(
+                "Location: %s | Temp: %.1f°C | Humidity: %.1f%%",
+                waypoint.getLocation().toString(),
+                waypoint.getTemperature(),
+                waypoint.getHumidity()
+            );
+            
+            sendSimulationMessage(state.shipmentId, "Location Update", content);
+            
+            // Check for environmental alerts
+            if (waypoint.getTemperature() < 4.0 || waypoint.getTemperature() > 8.0) {
+                sendSimulationMessage(state.shipmentId, "Temperature Alert",
+                    String.format("Temperature outside range: %.1f°C", waypoint.getTemperature()));
+            }
+            
+            state.currentWaypointIndex++;
+            
+            // Check if delivery is complete
+            if (state.currentWaypointIndex >= state.route.size()) {
+                sendSimulationMessage(state.shipmentId, "Delivery Complete",
+                    "Shipment arrived at destination");
+                state.running = false;
+                if (state.task != null) {
+                    state.task.cancel(false);
+                }
+                activeSimulations.remove(state.shipmentId);
+            }
+            
         } catch (Exception e) {
             logger.error("Simulation error for shipment: {}", state.shipmentId, e);
-        } finally {
+            state.running = false;
+            if (state.task != null) {
+                state.task.cancel(false);
+            }
             activeSimulations.remove(state.shipmentId);
         }
     }
