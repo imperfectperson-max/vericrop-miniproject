@@ -59,7 +59,7 @@ public class QualityController {
             response.put("humidity_ideal", qualityDecayService.isHumidityIdeal(humidity));
             
             logger.info("Quality prediction: {} -> {} over {} hours", 
-                       currentQuality, predictedQuality, hoursInFuture);
+                       String.format("%.2f", currentQuality), String.format("%.2f", predictedQuality), String.format("%.1f", hoursInFuture));
             
             return ResponseEntity.ok(response);
             
@@ -115,7 +115,7 @@ public class QualityController {
             response.put("num_points", trace.size());
             
             logger.info("Quality simulation: {} -> {} over {} readings", 
-                       initialQuality, trace.get(trace.size() - 1).getQuality(), readings.size());
+                       String.format("%.2f", initialQuality), String.format("%.2f", trace.get(trace.size() - 1).getQuality()), readings.size());
             
             return ResponseEntity.ok(response);
             

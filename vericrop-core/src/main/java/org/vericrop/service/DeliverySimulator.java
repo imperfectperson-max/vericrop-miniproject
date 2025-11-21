@@ -143,7 +143,7 @@ public class DeliverySimulator {
         }
         
         logger.info("Generated route: {} waypoints, distance: {} km, duration: {} hours",
-                   numWaypoints, distance, totalTravelTimeMs / 3600000.0);
+                   numWaypoints, String.format("%.1f", distance), String.format("%.1f", totalTravelTimeMs / 3600000.0));
         
         return route;
     }

@@ -182,7 +182,7 @@ public class QualityDecayService {
         }
         
         logger.info("Quality trace simulated: {} points, final quality: {}", 
-                   trace.size(), currentQuality);
+                   trace.size(), String.format("%.2f", currentQuality));
         
         return trace;
     }
