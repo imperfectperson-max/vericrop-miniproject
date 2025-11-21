@@ -55,7 +55,8 @@ public class MainApp extends Application {
                 shutdown();
             });
 
-            showProducerScreen();
+            // Always show login screen first
+            showLoginScreen();
             logger.info("Application started successfully");
 
         } catch (Exception e) {
@@ -147,6 +148,34 @@ public class MainApp extends Application {
 
     public void showAnalyticsScreen() {
         switchToScreen("analytics.fxml");
+    }
+    
+    public void showLoginScreen() {
+        switchToScreen("login.fxml");
+    }
+    
+    /**
+     * Show role-specific screen based on authenticated user
+     */
+    public void showRoleBasedScreen() {
+        if (appContext == null) {
+            logger.error("Application context not initialized");
+            showLoginScreen();
+            return;
+        }
+        
+        var authService = appContext.getAuthService();
+        if (authService == null || !authService.isAuthenticated()) {
+            logger.warn("User not authenticated, showing login screen");
+            showLoginScreen();
+            return;
+        }
+        
+        String role = authService.getCurrentRole();
+        String screen = appContext.getRoleRouter().getScreenForRole(role);
+        logger.info("Routing authenticated user '{}' with role '{}' to screen '{}'", 
+                    authService.getCurrentUser(), role, screen);
+        switchToScreen(screen);
     }
 
     public static MainApp getInstance() {

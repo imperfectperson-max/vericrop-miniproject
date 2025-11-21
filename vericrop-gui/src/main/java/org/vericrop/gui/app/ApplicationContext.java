@@ -26,6 +26,8 @@ public class ApplicationContext {
     
     // Business services
     private final AuthenticationService authenticationService;
+    private final AuthService authService;
+    private final RoleRouter roleRouter;
     private final BatchService batchService;
     private final AnalyticsService analyticsService;
 
@@ -46,6 +48,11 @@ public class ApplicationContext {
         
         // Initialize business services
         this.authenticationService = new AuthenticationService();
+        
+        // Initialize AuthService with fallback logic
+        this.authService = initializeAuthService();
+        this.roleRouter = new RoleRouter();
+        
         this.analyticsService = new AnalyticsService(mlClientService);
         this.batchService = new BatchService(mlClientService, kafkaMessagingService, batchRepository);
         
@@ -63,6 +70,36 @@ public class ApplicationContext {
             instance = new ApplicationContext();
         }
         return instance;
+    }
+    
+    /**
+     * Initialize AuthService with fallback logic
+     */
+    private AuthService initializeAuthService() {
+        // Check for environment variable to force fallback mode
+        String useFallback = System.getenv("VERICROP_AUTH_FALLBACK");
+        String backendUrl = System.getenv("VERICROP_BACKEND_URL");
+        
+        if ("true".equalsIgnoreCase(useFallback)) {
+            logger.info("🔧 Forcing fallback authentication mode (VERICROP_AUTH_FALLBACK=true)");
+            return new FallbackAuthService();
+        }
+        
+        // Default backend URL
+        if (backendUrl == null || backendUrl.trim().isEmpty()) {
+            backendUrl = "http://localhost:8080/api";
+        }
+        
+        logger.info("Testing REST backend at: {}", backendUrl);
+        RestAuthService restAuth = new RestAuthService(backendUrl);
+        
+        if (restAuth.testConnection()) {
+            logger.info("✅ Backend API available - using REST authentication");
+            return restAuth;
+        } else {
+            logger.warn("⚠️  Backend API not available - falling back to in-memory authentication");
+            return new FallbackAuthService();
+        }
     }
 
     /**
@@ -117,6 +154,14 @@ public class ApplicationContext {
 
     public AuthenticationService getAuthenticationService() {
         return authenticationService;
+    }
+    
+    public AuthService getAuthService() {
+        return authService;
+    }
+    
+    public RoleRouter getRoleRouter() {
+        return roleRouter;
     }
 
     public BatchService getBatchService() {

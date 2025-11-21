@@ -640,3 +640,81 @@
     -fx-vgap: 15;
     -fx-padding: 20;
 }
+/* Login/Auth Styles */
+.login-container {
+    -fx-background-color: linear-gradient(to bottom, #f0f4f8, #e8eef5);
+}
+
+.auth-field {
+    -fx-background-color: white;
+    -fx-border-color: #d0d0d0;
+    -fx-border-width: 1;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+    -fx-padding: 8 12;
+    -fx-font-size: 13px;
+}
+
+.auth-field:focused {
+    -fx-border-color: #4CAF50;
+    -fx-border-width: 2;
+    -fx-effect: dropshadow(gaussian, rgba(76,175,80,0.2), 8, 0, 0, 1);
+}
+
+.role-card {
+    -fx-background-color: white;
+    -fx-background-radius: 12;
+    -fx-padding: 20;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 12, 0, 0, 2);
+    -fx-min-width: 200;
+    -fx-max-width: 200;
+}
+
+.role-card:hover {
+    -fx-effect: dropshadow(gaussian, rgba(76,175,80,0.3), 15, 0, 0, 3);
+    -fx-scale-x: 1.02;
+    -fx-scale-y: 1.02;
+}
+
+.warning-button {
+    -fx-background-color: linear-gradient(to right, #F59E0B, #D97706);
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-background-radius: 8;
+    -fx-padding: 10 16;
+    -fx-cursor: hand;
+}
+
+.warning-button:hover {
+    -fx-background-color: linear-gradient(to right, #D97706, #F59E0B);
+    -fx-effect: dropshadow(gaussian, rgba(245,158,11,0.3), 10, 0, 0, 2);
+}
+
+.tab-pane {
+    -fx-background-color: white;
+    -fx-background-radius: 10;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 12, 0, 0, 2);
+}
+
+.tab-pane .tab-header-area .tab-header-background {
+    -fx-background-color: #f8f9fa;
+}
+
+.tab-pane .tab {
+    -fx-background-color: #e9ecef;
+    -fx-background-radius: 8 8 0 0;
+    -fx-padding: 10 20;
+}
+
+.tab-pane .tab:selected {
+    -fx-background-color: white;
+}
+
+.tab-pane .tab-label {
+    -fx-text-fill: #666;
+    -fx-font-weight: bold;
+}
+
+.tab-pane .tab:selected .tab-label {
+    -fx-text-fill: #2E8B57;
+}
