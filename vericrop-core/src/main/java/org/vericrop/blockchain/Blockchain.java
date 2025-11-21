@@ -3,6 +3,9 @@ package org.vericrop.blockchain;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -114,7 +117,12 @@ public class Blockchain {
             // Create parent directories if they don't exist
             File parentDir = file.getParentFile();
             if (parentDir != null && !parentDir.exists()) {
-                parentDir.mkdirs();
+                try {
+                    Files.createDirectories(parentDir.toPath());
+                } catch (IOException e) {
+                    System.err.println("❌ Failed to create parent directories: " + e.getMessage());
+                    throw e;
+                }
             }
             mapper.writerWithDefaultPrettyPrinter().writeValue(file, chain);
             System.out.println("✅ Blockchain saved to file: " + chain.size() + " blocks");
@@ -148,9 +156,14 @@ public class Blockchain {
             } else {
                 System.err.println("❌ Loaded blockchain is invalid. Starting fresh.");
                 // Create backup of corrupted file
-                File backup = new File(blockchainFile + ".corrupted." + System.currentTimeMillis());
-                file.renameTo(backup);
-                System.out.println("💾 Corrupted file backed up as: " + backup.getName());
+                Path sourcePath = file.toPath();
+                Path backupPath = Path.of(blockchainFile + ".corrupted." + System.currentTimeMillis());
+                try {
+                    Files.move(sourcePath, backupPath, StandardCopyOption.REPLACE_EXISTING);
+                    System.out.println("💾 Corrupted file backed up as: " + backupPath.getFileName());
+                } catch (IOException moveEx) {
+                    System.err.println("⚠️ Failed to backup corrupted file: " + moveEx.getMessage());
+                }
 
                 this.chain = new ArrayList<>();
                 createGenesisBlock();

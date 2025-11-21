@@ -252,7 +252,7 @@ public class MLClientService {
                 // Wait before retrying (except on last attempt)
                 if (attempt < retries) {
                     try {
-                        Thread.sleep(retryDelay * (attempt + 1)); // Exponential backoff
+                        Thread.sleep((long) retryDelay * (attempt + 1)); // Exponential backoff with explicit long cast
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
                         throw new IOException("Retry interrupted", ie);

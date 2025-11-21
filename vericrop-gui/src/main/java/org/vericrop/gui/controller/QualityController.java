@@ -58,7 +58,7 @@ public class QualityController {
             response.put("temperature_ideal", qualityDecayService.isTemperatureIdeal(temperature));
             response.put("humidity_ideal", qualityDecayService.isHumidityIdeal(humidity));
             
-            logger.info("Quality prediction: {:.2f} -> {:.2f} over {:.1f} hours", 
+            logger.info("Quality prediction: {} -> {} over {} hours", 
                        currentQuality, predictedQuality, hoursInFuture);
             
             return ResponseEntity.ok(response);
@@ -114,7 +114,7 @@ public class QualityController {
             response.put("trace", traceData);
             response.put("num_points", trace.size());
             
-            logger.info("Quality simulation: {:.2f} -> {:.2f} over {} readings", 
+            logger.info("Quality simulation: {} -> {} over {} readings", 
                        initialQuality, trace.get(trace.size() - 1).getQuality(), readings.size());
             
             return ResponseEntity.ok(response);
