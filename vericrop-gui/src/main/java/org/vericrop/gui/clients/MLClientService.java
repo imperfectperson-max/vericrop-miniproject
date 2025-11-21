@@ -131,8 +131,13 @@ public class MLClientService {
                 throw new IOException("Unexpected response code: " + response.code());
             }
             
-            String responseBody = response.body().string();
-            Map<String, Object> result = objectMapper.readValue(responseBody, Map.class);
+            ResponseBody responseBody = response.body();
+            if (responseBody == null) {
+                throw new IOException("Response body is null");
+            }
+            
+            String bodyString = responseBody.string();
+            Map<String, Object> result = objectMapper.readValue(bodyString, Map.class);
             List<Map<String, Object>> batchMaps = (List<Map<String, Object>>) result.get("batches");
             
             return batchMaps.stream()
@@ -217,14 +222,19 @@ public class MLClientService {
                 logger.debug("Executing request: {} (attempt {}/{})", request.url(), attempt + 1, retries + 1);
                 
                 try (Response response = httpClient.newCall(request).execute()) {
-                    if (!response.isSuccessful()) {
-                        String errorBody = response.body() != null ? response.body().string() : "No error body";
-                        throw new IOException(String.format("HTTP %d: %s - %s", 
-                                response.code(), response.message(), errorBody));
+                    ResponseBody body = response.body();
+                    if (body == null) {
+                        throw new IOException("Response body is null");
                     }
                     
-                    String responseBody = response.body().string();
-                    T result = objectMapper.readValue(responseBody, responseType);
+                    String responseBodyString = body.string();
+                    
+                    if (!response.isSuccessful()) {
+                        throw new IOException(String.format("HTTP %d: %s - %s", 
+                                response.code(), response.message(), responseBodyString));
+                    }
+                    
+                    T result = objectMapper.readValue(responseBodyString, responseType);
                     
                     logger.debug("Request successful: {}", request.url());
                     return result;

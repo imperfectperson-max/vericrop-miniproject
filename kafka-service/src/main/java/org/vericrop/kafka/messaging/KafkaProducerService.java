@@ -70,28 +70,8 @@ public class KafkaProducerService {
         
         try {
             String json = objectMapper.writeValueAsString(request);
-            
-            if (kafkaEnabled && producer != null) {
-                ProducerRecord<String, String> record = new ProducerRecord<>(
-                    TOPIC_EVALUATION_REQUEST,
-                    request.getBatchId(),
-                    json
-                );
-                
-                Future<RecordMetadata> future = producer.send(record);
-                RecordMetadata metadata = future.get();
-                
-                logger.info("Sent evaluation request for batch {} to topic {} partition {} offset {}",
-                    request.getBatchId(), metadata.topic(), metadata.partition(), metadata.offset());
-                    
-                return true;
-            } else {
-                // In-memory mode - just log
-                logger.info("In-memory mode: Would send evaluation request for batch {}", 
-                    request.getBatchId());
-                return true;
-            }
-            
+            return sendMessage(TOPIC_EVALUATION_REQUEST, request.getBatchId(), json, 
+                             "evaluation request", "batch " + request.getBatchId());
         } catch (Exception e) {
             logger.error("Failed to send evaluation request for batch {}: {}", 
                 request.getBatchId(), e.getMessage());
@@ -113,28 +93,9 @@ public class KafkaProducerService {
         
         try {
             String json = objectMapper.writeValueAsString(result);
-            
-            if (kafkaEnabled && producer != null) {
-                ProducerRecord<String, String> record = new ProducerRecord<>(
-                    TOPIC_EVALUATION_RESULT,
-                    result.getBatchId(),
-                    json
-                );
-                
-                Future<RecordMetadata> future = producer.send(record);
-                RecordMetadata metadata = future.get();
-                
-                logger.info("Sent evaluation result for batch {} to topic {} partition {} offset {}",
-                    result.getBatchId(), metadata.topic(), metadata.partition(), metadata.offset());
-                    
-                return true;
-            } else {
-                // In-memory mode - just log
-                logger.info("In-memory mode: Would send evaluation result for batch {} (score: {})", 
-                    result.getBatchId(), result.getQualityScore());
-                return true;
-            }
-            
+            return sendMessage(TOPIC_EVALUATION_RESULT, result.getBatchId(), json,
+                             "evaluation result", "batch " + result.getBatchId() + 
+                             " (score: " + result.getQualityScore() + ")");
         } catch (Exception e) {
             logger.error("Failed to send evaluation result for batch {}: {}", 
                 result.getBatchId(), e.getMessage());
@@ -156,33 +117,33 @@ public class KafkaProducerService {
         
         try {
             String json = objectMapper.writeValueAsString(record);
-            
-            if (kafkaEnabled && producer != null) {
-                ProducerRecord<String, String> kafkaRecord = new ProducerRecord<>(
-                    TOPIC_SHIPMENT_RECORD,
-                    record.getShipmentId(),
-                    json
-                );
-                
-                Future<RecordMetadata> future = producer.send(kafkaRecord);
-                RecordMetadata metadata = future.get();
-                
-                logger.info("Sent shipment record {} to topic {} partition {} offset {}",
-                    record.getShipmentId(), metadata.topic(), metadata.partition(), metadata.offset());
-                    
-                return true;
-            } else {
-                // In-memory mode - just log
-                logger.info("In-memory mode: Would send shipment record {} for batch {}", 
-                    record.getShipmentId(), record.getBatchId());
-                return true;
-            }
-            
+            return sendMessage(TOPIC_SHIPMENT_RECORD, record.getShipmentId(), json,
+                             "shipment record", record.getShipmentId() + 
+                             " for batch " + record.getBatchId());
         } catch (Exception e) {
             logger.error("Failed to send shipment record {}: {}", 
                 record.getShipmentId(), e.getMessage());
             return false;
         }
+    }
+    
+    /**
+     * Helper method to send a message to Kafka or log in in-memory mode.
+     * Extracts common logic from send methods to avoid code duplication.
+     */
+    private boolean sendMessage(String topic, String key, String json, String messageType, String id) throws Exception {
+        if (kafkaEnabled && producer != null) {
+            ProducerRecord<String, String> record = new ProducerRecord<>(topic, key, json);
+            Future<RecordMetadata> future = producer.send(record);
+            RecordMetadata metadata = future.get();
+            
+            logger.info("Sent {} for {} to topic {} partition {} offset {}",
+                messageType, id, metadata.topic(), metadata.partition(), metadata.offset());
+        } else {
+            // In-memory mode - just log
+            logger.info("In-memory mode: Would send {} for {}", messageType, id);
+        }
+        return true;
     }
     
     /**
