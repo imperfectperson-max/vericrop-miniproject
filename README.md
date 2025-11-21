@@ -13,6 +13,7 @@
 - [Architecture](#architecture)
 - [Components](#components)
 - [Quickstart](#quickstart)
+- [Database Setup & User Provisioning](#database-setup--user-provisioning)
 - [Local Development](#local-development)
 - [Verify Services](#verify-services)
 - [Configuration](#configuration)
