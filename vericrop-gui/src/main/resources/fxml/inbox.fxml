@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.*?>
+
+<BorderPane xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="org.vericrop.gui.controller.InboxController"
+            stylesheets="@../css/styles.css">
+
+    <!-- Top Bar -->
+    <top>
+        <VBox spacing="10" style="-fx-background-color: #f8f9fa; -fx-padding: 15;">
+            <HBox spacing="15" alignment="CENTER_LEFT">
+                <Label text="📬 Messages" style="-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: #2E8B57;"/>
+                <Region HBox.hgrow="ALWAYS"/>
+                <Label fx:id="unreadCountLabel" text="0 unread" 
+                       style="-fx-font-size: 12px; -fx-text-fill: #666; -fx-padding: 5 10; -fx-background-color: #e3f2fd; -fx-background-radius: 10;"/>
+                <Button text="Compose" styleClass="success-button" onAction="#handleCompose" 
+                        style="-fx-pref-width: 100px; -fx-pref-height: 32px;"/>
+                <Button text="Refresh" onAction="#handleRefresh" 
+                        style="-fx-pref-width: 80px; -fx-pref-height: 32px;"/>
+                <Button text="Back" onAction="#handleBack" 
+                        style="-fx-pref-width: 80px; -fx-pref-height: 32px;"/>
+            </HBox>
+            
+            <!-- Tab Bar -->
+            <HBox spacing="0">
+                <ToggleButton fx:id="inboxTab" text="📥 Inbox" toggleGroup="$messageViewGroup"
+                              selected="true" onAction="#handleTabChange"
+                              style="-fx-pref-width: 100px; -fx-pref-height: 35px;"/>
+                <ToggleButton fx:id="sentTab" text="📤 Sent" toggleGroup="$messageViewGroup"
+                              onAction="#handleTabChange"
+                              style="-fx-pref-width: 100px; -fx-pref-height: 35px;"/>
+            </HBox>
+        </VBox>
+    </top>
+
+    <!-- Main Content -->
+    <center>
+        <SplitPane dividerPositions="0.35" style="-fx-background-color: white;">
+            
+            <!-- Message List (Left) -->
+            <VBox spacing="0" style="-fx-background-color: #f8f9fa;">
+                <Label text="Messages" style="-fx-font-size: 14px; -fx-font-weight: bold; -fx-padding: 10; -fx-text-fill: #555;"/>
+                <ListView fx:id="messageListView" style="-fx-background-color: white;">
+                    <!-- Custom cell factory will be set in controller -->
+                </ListView>
+            </VBox>
+
+            <!-- Message Detail (Right) -->
+            <VBox spacing="15" style="-fx-padding: 20; -fx-background-color: white;">
+                
+                <!-- Empty State -->
+                <VBox fx:id="emptyStatePane" spacing="10" alignment="CENTER" 
+                      style="-fx-padding: 50;" managed="true" visible="true">
+                    <Label text="📭" style="-fx-font-size: 48px;"/>
+                    <Label text="No message selected" 
+                           style="-fx-font-size: 16px; -fx-text-fill: #666;"/>
+                    <Label text="Select a message from the list to read it" 
+                           style="-fx-font-size: 12px; -fx-text-fill: #999;"/>
+                </VBox>
+
+                <!-- Message Detail Content -->
+                <VBox fx:id="messageDetailPane" spacing="15" managed="false" visible="false">
+                    
+                    <!-- Message Header -->
+                    <VBox spacing="8" style="-fx-padding: 0 0 15 0; -fx-border-color: #e0e0e0; -fx-border-width: 0 0 1 0;">
+                        <Label fx:id="messageSubject" text="Subject" 
+                               style="-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: #333;" wrapText="true"/>
+                        <HBox spacing="10" alignment="CENTER_LEFT">
+                            <Label text="From:" style="-fx-font-size: 12px; -fx-text-fill: #666; -fx-font-weight: bold;"/>
+                            <Label fx:id="messageSender" text="Sender" style="-fx-font-size: 12px; -fx-text-fill: #333;"/>
+                            <Region HBox.hgrow="ALWAYS"/>
+                            <Label fx:id="messageSentAt" text="Date" style="-fx-font-size: 11px; -fx-text-fill: #999;"/>
+                        </HBox>
+                        <HBox spacing="10" alignment="CENTER_LEFT">
+                            <Label text="To:" style="-fx-font-size: 12px; -fx-text-fill: #666; -fx-font-weight: bold;"/>
+                            <Label fx:id="messageRecipient" text="Recipient" style="-fx-font-size: 12px; -fx-text-fill: #333;"/>
+                        </HBox>
+                    </VBox>
+
+                    <!-- Message Body -->
+                    <ScrollPane fitToWidth="true" style="-fx-background-color: white; -fx-border-color: transparent;">
+                        <TextArea fx:id="messageBody" editable="false" wrapText="true"
+                                  style="-fx-background-color: white; -fx-border-color: transparent; -fx-font-size: 13px; -fx-text-fill: #333;"
+                                  prefRowCount="15"/>
+                    </ScrollPane>
+
+                    <!-- Message Actions -->
+                    <HBox spacing="10" style="-fx-padding: 15 0 0 0; -fx-border-color: #e0e0e0; -fx-border-width: 1 0 0 0;">
+                        <Button text="Reply" onAction="#handleReply" styleClass="primary-button"
+                                style="-fx-pref-width: 90px; -fx-pref-height: 32px;"/>
+                        <Button fx:id="markReadButton" text="Mark as Read" onAction="#handleMarkAsRead"
+                                style="-fx-pref-width: 110px; -fx-pref-height: 32px;"/>
+                        <Region HBox.hgrow="ALWAYS"/>
+                        <Button text="Delete" onAction="#handleDelete" styleClass="danger-button"
+                                style="-fx-pref-width: 80px; -fx-pref-height: 32px;"/>
+                    </HBox>
+                </VBox>
+            </VBox>
+        </SplitPane>
+    </center>
+
+</BorderPane>

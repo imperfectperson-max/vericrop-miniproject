@@ -150,6 +150,10 @@ public class MainApp extends Application {
         switchToScreen("analytics.fxml");
     }
 
+    public void showInboxScreen() {
+        switchToScreen("inbox.fxml");
+    }
+
     public static MainApp getInstance() {
         return instance;
     }
