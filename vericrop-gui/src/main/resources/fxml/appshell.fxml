@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.shape.Circle?>
+
+<BorderPane xmlns="http://javafx.com/javafx/17" 
+            xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="org.vericrop.gui.controller.AppShellController"
+            styleClass="app-shell"
+            stylesheets="@../css/vericrop.css">
+
+    <!-- Top Navigation Bar -->
+    <top>
+        <HBox styleClass="top-navbar" spacing="20" alignment="CENTER_LEFT">
+            <padding>
+                <Insets top="10" right="20" bottom="10" left="20"/>
+            </padding>
+            
+            <!-- Logo and Title -->
+            <HBox spacing="12" alignment="CENTER">
+                <Circle radius="20" fill="white"/>
+                <VBox spacing="2">
+                    <Label text="VeriCrop" styleClass="navbar-title"/>
+                    <Label text="Supply Chain Management" styleClass="navbar-subtitle"/>
+                </VBox>
+            </HBox>
+            
+            <!-- Spacer -->
+            <Region HBox.hgrow="ALWAYS"/>
+            
+            <!-- Navigation Buttons -->
+            <HBox spacing="10" alignment="CENTER">
+                <Button fx:id="dashboardButton" text="🏠 Dashboard" styleClass="navbar-button"
+                        onAction="#handleDashboard"/>
+                <Button fx:id="analyticsNavButton" text="📊 Analytics" styleClass="navbar-button"
+                        onAction="#handleAnalytics"/>
+                <Button fx:id="logisticsNavButton" text="🚚 Logistics" styleClass="navbar-button"
+                        onAction="#handleLogistics"/>
+                <Button fx:id="inboxNavButton" text="✉️ Messages" styleClass="navbar-button"
+                        onAction="#handleInbox"/>
+            </HBox>
+            
+            <!-- Alerts Toggle -->
+            <CheckBox fx:id="alertsToggle" text="🔔 Alerts" styleClass="alert-toggle"
+                     selected="true" onAction="#handleAlertsToggle"/>
+            
+            <!-- User Info -->
+            <HBox spacing="10" alignment="CENTER">
+                <Label fx:id="userAvatarLabel" text="U" styleClass="user-avatar"/>
+                <VBox spacing="2">
+                    <Label fx:id="usernameLabel" text="User" style="-fx-text-fill: white; -fx-font-weight: bold;"/>
+                    <Label fx:id="userRoleLabel" text="Role" styleClass="navbar-subtitle"/>
+                </VBox>
+            </HBox>
+            
+            <!-- Logout Button -->
+            <Button fx:id="logoutButton" text="🚪 Logout" styleClass="logout-button"
+                    onAction="#handleLogout"/>
+        </HBox>
+    </top>
+    
+    <!-- Main Content Area -->
+    <center>
+        <StackPane fx:id="contentArea" styleClass="content-area">
+            <!-- Content views will be loaded here dynamically -->
+            <Label text="Select a view from the navigation" style="-fx-font-size: 16px; -fx-text-fill: #666;"/>
+        </StackPane>
+    </center>
+    
+    <!-- Optional Status Bar -->
+    <bottom>
+        <HBox styleClass="status-bar" spacing="10" alignment="CENTER_LEFT" 
+              style="-fx-background-color: white; -fx-padding: 8 20; -fx-border-color: #e0e0e0; -fx-border-width: 1 0 0 0;">
+            <Label fx:id="statusLabel" text="Ready" style="-fx-text-fill: #666; -fx-font-size: 12px;"/>
+            <Region HBox.hgrow="ALWAYS"/>
+            <Label fx:id="connectionStatusLabel" text="● Connected" 
+                   style="-fx-text-fill: #2E8B57; -fx-font-size: 12px; -fx-font-weight: bold;"/>
+        </HBox>
+    </bottom>
+
+</BorderPane>
