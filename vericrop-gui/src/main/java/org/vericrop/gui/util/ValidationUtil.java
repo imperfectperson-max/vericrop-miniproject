@@ -8,9 +8,11 @@ import java.util.regex.Pattern;
 public class ValidationUtil {
     
     // RFC 5322 compliant email regex (simplified but robust version)
+    // Pattern is compiled once and reused for efficiency
     private static final Pattern EMAIL_PATTERN = Pattern.compile(
         "^[a-zA-Z0-9_+&*-]+(?:\\.[a-zA-Z0-9_+&*-]+)*@" +
-        "(?:[a-zA-Z0-9-]+\\.)+[a-zA-Z]{2,7}$"
+        "(?:[a-zA-Z0-9-]+\\.)+[a-zA-Z]{2,7}$",
+        Pattern.CASE_INSENSITIVE
     );
     
     /**

@@ -1,9 +1,11 @@
 package org.vericrop.gui;
 
+import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
+import javafx.util.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.vericrop.gui.app.ApplicationContext;
@@ -182,15 +184,10 @@ public class LoginController {
                 registerPasswordField.clear();
                 registerConfirmPasswordField.clear();
                 
-                // Switch to login tab after 2 seconds
-                new Thread(() -> {
-                    try {
-                        Thread.sleep(2000);
-                        Platform.runLater(() -> authTabPane.getSelectionModel().selectFirst());
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                    }
-                }).start();
+                // Switch to login tab after 2 seconds using JavaFX PauseTransition
+                PauseTransition pause = new PauseTransition(Duration.seconds(2));
+                pause.setOnFinished(event -> authTabPane.getSelectionModel().selectFirst());
+                pause.play();
             } else {
                 showRegisterError("Registration failed. Username may already exist.");
             }
