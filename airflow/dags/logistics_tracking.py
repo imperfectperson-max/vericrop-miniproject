@@ -86,6 +86,19 @@ def handle_delayed_shipments(**context):
         raise
 
 def _clamp_temperature(value):
+    """
+    Validate and clamp temperature sensor value to realistic hardware bounds.
+    
+    Args:
+        value: Raw temperature sensor reading (numeric or convertible to float)
+        
+    Returns:
+        float: Clamped temperature in °C (-40 to 60), or None if invalid
+        
+    Note:
+        Range -40°C to 60°C represents conservative hardware sensor bounds.
+        Business compliance thresholds (2-7°C) are checked separately.
+    """
     try:
         t = float(value)
     except (TypeError, ValueError):
@@ -95,6 +108,19 @@ def _clamp_temperature(value):
 
 
 def _clamp_humidity(value):
+    """
+    Validate and clamp humidity sensor value to valid percentage range.
+    
+    Args:
+        value: Raw humidity sensor reading (numeric or convertible to float)
+        
+    Returns:
+        float: Clamped humidity percentage (0 to 100), or None if invalid
+        
+    Note:
+        Humidity is measured as a percentage and must be between 0-100%.
+        Business compliance thresholds (50-80%) are checked separately.
+    """
     try:
         h = float(value)
     except (TypeError, ValueError):
