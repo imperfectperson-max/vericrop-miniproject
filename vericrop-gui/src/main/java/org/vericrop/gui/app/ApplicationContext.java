@@ -36,6 +36,13 @@ public class ApplicationContext {
     private final AuthenticationService authenticationService;
     private final BatchService batchService;
     private final AnalyticsService analyticsService;
+    
+    // New integrated services
+    private final NavigationService navigationService;
+    private final DeliverySimulationService deliverySimulationService;
+    private final AlertsService alertsService;
+    private final MessageServiceEnhanced messageServiceEnhanced;
+    private final ReportGenerationService reportGenerationService;
 
     /**
      * Private constructor - use getInstance() to get singleton
@@ -61,6 +68,14 @@ public class ApplicationContext {
         this.authenticationService = new AuthenticationService(dataSource);
         this.analyticsService = new AnalyticsService(mlClientService);
         this.batchService = new BatchService(mlClientService, kafkaMessagingService, batchRepository);
+        
+        // Initialize new integrated services
+        this.navigationService = NavigationService.getInstance();
+        this.deliverySimulationService = DeliverySimulationService.getInstance();
+        this.alertsService = AlertsService.getInstance();
+        this.messageServiceEnhanced = MessageServiceEnhanced.getInstance();
+        this.messageServiceEnhanced.initialize(messageDao);
+        this.reportGenerationService = ReportGenerationService.getInstance();
         
         // Test connections
         testConnections();
@@ -147,12 +162,40 @@ public class ApplicationContext {
     public MessageDao getMessageDao() {
         return messageDao;
     }
+    
+    public NavigationService getNavigationService() {
+        return navigationService;
+    }
+    
+    public DeliverySimulationService getDeliverySimulationService() {
+        return deliverySimulationService;
+    }
+    
+    public AlertsService getAlertsService() {
+        return alertsService;
+    }
+    
+    public MessageServiceEnhanced getMessageServiceEnhanced() {
+        return messageServiceEnhanced;
+    }
+    
+    public ReportGenerationService getReportGenerationService() {
+        return reportGenerationService;
+    }
 
     /**
      * Shutdown all services and release resources
      */
     public void shutdown() {
         logger.info("=== Shutting down Application Context ===");
+        
+        try {
+            if (deliverySimulationService != null) {
+                deliverySimulationService.shutdown();
+            }
+        } catch (Exception e) {
+            logger.error("Error shutting down delivery simulation service", e);
+        }
         
         try {
             if (kafkaMessagingService != null) {
