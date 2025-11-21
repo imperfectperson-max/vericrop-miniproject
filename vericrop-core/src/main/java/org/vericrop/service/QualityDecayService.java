@@ -181,8 +181,8 @@ public class QualityDecayService {
                      currentReading.temperature, currentReading.humidity, decayRate));
         }
         
-        logger.info("Quality trace simulated: {} points, final quality: {}", 
-                   trace.size(), String.format("%.2f", currentQuality));
+        logger.info(String.format("Quality trace simulated: %d points, final quality: %.2f", 
+                   trace.size(), currentQuality));
         
         return trace;
     }
