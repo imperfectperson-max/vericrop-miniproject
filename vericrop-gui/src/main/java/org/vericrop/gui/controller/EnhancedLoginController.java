@@ -93,10 +93,13 @@ public class EnhancedLoginController {
                 setFormDisabled(false);
                 
                 if (success) {
-                    // Set session with authenticated user info
+                    // Set session with full authenticated user info
+                    // Note: In production, retrieve full User object from AuthenticationService
                     User user = new User();
                     user.setUsername(username);
                     user.setRole(authService.getCurrentRole());
+                    // Additional user data (email, fullName, etc.) should be populated here
+                    // from AuthenticationService.getUserDetails() or similar method
                     sessionManager.setCurrentUser(user);
                     
                     logger.info("✅ Login successful for user: {} (role: {})", 

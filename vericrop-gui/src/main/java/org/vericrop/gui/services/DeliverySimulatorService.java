@@ -14,6 +14,7 @@ import org.vericrop.dto.Message;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -158,6 +159,9 @@ public class DeliverySimulatorService {
     private void startMessageBridge() {
         Thread bridgeThread = new Thread(() -> {
             logger.debug("Message bridge thread started");
+            // Track processed message IDs to avoid reprocessing
+            Set<String> processedIds = new java.util.concurrent.ConcurrentHashMap<String, Boolean>().keySet(Boolean.TRUE);
+            
             while (!Thread.currentThread().isInterrupted()) {
                 try {
                     // Poll for new messages periodically
@@ -165,6 +169,11 @@ public class DeliverySimulatorService {
                     
                     List<org.vericrop.dto.Message> messages = messageService.getAllMessages();
                     for (org.vericrop.dto.Message msg : messages) {
+                        // Skip if already processed
+                        if (processedIds.contains(msg.getMessageId())) {
+                            continue;
+                        }
+                        
                         // Check if this is a simulator message
                         if ("delivery_simulator".equals(msg.getSenderId())) {
                             String subject = msg.getSubject();
@@ -184,13 +193,16 @@ public class DeliverySimulatorService {
                                         AlertRaised.Severity.WARNING,
                                         "DeliverySimulator"));
                                 }
+                                
+                                // Mark as processed
+                                processedIds.add(msg.getMessageId());
                             }
                         }
                     }
                     
-                    // Clear processed messages to avoid reprocessing
-                    // Note: This is a simple approach; production would use message IDs
-                    if (!messages.isEmpty()) {
+                    // Clean up old processed IDs if list gets too large
+                    if (processedIds.size() > 1000) {
+                        processedIds.clear();
                         messageService.clearAll();
                     }
                     
@@ -203,6 +215,8 @@ public class DeliverySimulatorService {
             }
             logger.debug("Message bridge thread stopped");
         });
+        // Keep as daemon but note: messages in-flight during shutdown may be lost
+        // For production, implement graceful shutdown
         bridgeThread.setDaemon(true);
         bridgeThread.setName("DeliverySimulator-MessageBridge");
         bridgeThread.start();
