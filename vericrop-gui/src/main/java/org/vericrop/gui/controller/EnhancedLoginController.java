@@ -8,7 +8,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.vericrop.gui.MainApp;
 import org.vericrop.gui.app.ApplicationContext;
+import org.vericrop.gui.models.User;
 import org.vericrop.gui.services.AuthenticationService;
+import org.vericrop.gui.services.SessionManager;
 
 /**
  * Enhanced Login Controller with actual authentication.
@@ -26,6 +28,7 @@ public class EnhancedLoginController {
     
     private ApplicationContext appContext;
     private AuthenticationService authService;
+    private SessionManager sessionManager;
     
     @FXML
     public void initialize() {
@@ -34,10 +37,12 @@ public class EnhancedLoginController {
         // Get application context
         appContext = ApplicationContext.getInstance();
         authService = appContext.getAuthenticationService();
+        sessionManager = SessionManager.getInstance();
         
         // Check if already authenticated
-        if (authService.isAuthenticated()) {
-            logger.info("User already authenticated: {}", authService.getCurrentUser());
+        if (authService.isAuthenticated() || sessionManager.isLoggedIn()) {
+            logger.info("User already authenticated: {}", 
+                       sessionManager.isLoggedIn() ? sessionManager.getCurrentUsername() : authService.getCurrentUser());
             navigateToRoleBasedScreen();
         }
         
@@ -88,6 +93,12 @@ public class EnhancedLoginController {
                 setFormDisabled(false);
                 
                 if (success) {
+                    // Set session with authenticated user info
+                    User user = new User();
+                    user.setUsername(username);
+                    user.setRole(authService.getCurrentRole());
+                    sessionManager.setCurrentUser(user);
+                    
                     logger.info("✅ Login successful for user: {} (role: {})", 
                                authService.getCurrentUser(), authService.getCurrentRole());
                     showStatus("✅ Login successful! Redirecting...", "success");

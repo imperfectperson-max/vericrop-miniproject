@@ -109,16 +109,27 @@ public class MainApp extends Application {
             Scene scene = new Scene(root, 1400, 900);
 
             try {
+                // Load vericrop.css first (global styles)
+                URL vericropCssUrl = getClass().getResource("/css/vericrop.css");
+                if (vericropCssUrl != null) {
+                    scene.getStylesheets().add(vericropCssUrl.toExternalForm());
+                    logger.debug("Loaded vericrop.css");
+                }
+                
+                // Load styles.css second (additional/override styles)
                 URL cssUrl = getClass().getResource("/css/styles.css");
                 if (cssUrl == null) {
                     cssUrl = getClass().getResource("css/styles.css");
                 }
                 if (cssUrl != null) {
                     scene.getStylesheets().add(cssUrl.toExternalForm());
-                } else {
+                    logger.debug("Loaded styles.css");
+                } else if (vericropCssUrl == null) {
+                    // Only use fallback if no CSS loaded
                     scene.getStylesheets().add(createFallbackCSS());
                 }
             } catch (Exception e) {
+                logger.warn("Error loading CSS, using fallback", e);
                 scene.getStylesheets().add(createFallbackCSS());
             }
 

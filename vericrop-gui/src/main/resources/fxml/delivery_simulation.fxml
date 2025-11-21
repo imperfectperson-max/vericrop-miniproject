@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.control.cell.PropertyValueFactory?>
+<?import javafx.scene.layout.*?>
+
+<VBox xmlns="http://javafx.com/javafx/17" 
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="org.vericrop.gui.controller.DeliverySimulationController"
+      spacing="20"
+      stylesheets="@../css/vericrop.css">
+    
+    <padding>
+        <Insets top="20" right="20" bottom="20" left="20"/>
+    </padding>
+
+    <!-- Header -->
+    <VBox spacing="10" styleClass="card">
+        <Label text="🚚 Delivery Simulation" style="-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: #2E8B57;"/>
+        <Label text="Simulate delivery routes with environmental monitoring and real-time updates" 
+               style="-fx-font-size: 14px; -fx-text-fill: #666;"/>
+    </VBox>
+
+    <!-- Control Panel -->
+    <VBox spacing="15" styleClass="card">
+        <Label text="Simulation Control" styleClass="panel-header"/>
+        
+        <GridPane hgap="15" vgap="10">
+            <!-- Shipment ID -->
+            <Label text="Shipment ID:" GridPane.columnIndex="0" GridPane.rowIndex="0"
+                   style="-fx-font-weight: bold;"/>
+            <TextField fx:id="shipmentIdField" promptText="e.g., SHIP-001" 
+                      GridPane.columnIndex="1" GridPane.rowIndex="0"
+                      prefWidth="200"/>
+            
+            <!-- Origin -->
+            <Label text="Origin:" GridPane.columnIndex="0" GridPane.rowIndex="1"
+                   style="-fx-font-weight: bold;"/>
+            <TextField fx:id="originField" promptText="e.g., Farm Location A" 
+                      GridPane.columnIndex="1" GridPane.rowIndex="1"
+                      prefWidth="200"/>
+            
+            <!-- Destination -->
+            <Label text="Destination:" GridPane.columnIndex="0" GridPane.rowIndex="2"
+                   style="-fx-font-weight: bold;"/>
+            <TextField fx:id="destinationField" promptText="e.g., Warehouse B" 
+                      GridPane.columnIndex="1" GridPane.rowIndex="2"
+                      prefWidth="200"/>
+            
+            <!-- Number of Waypoints -->
+            <Label text="Waypoints:" GridPane.columnIndex="2" GridPane.rowIndex="0"
+                   style="-fx-font-weight: bold;"/>
+            <Spinner fx:id="waypointsSpinner" 
+                    GridPane.columnIndex="3" GridPane.rowIndex="0"
+                    prefWidth="100" editable="true"/>
+            
+            <!-- Average Speed -->
+            <Label text="Avg Speed (km/h):" GridPane.columnIndex="2" GridPane.rowIndex="1"
+                   style="-fx-font-weight: bold;"/>
+            <Spinner fx:id="speedSpinner" 
+                    GridPane.columnIndex="3" GridPane.rowIndex="1"
+                    prefWidth="100" editable="true"/>
+            
+            <!-- Update Interval -->
+            <Label text="Update Interval (ms):" GridPane.columnIndex="2" GridPane.rowIndex="2"
+                   style="-fx-font-weight: bold;"/>
+            <Spinner fx:id="intervalSpinner" 
+                    GridPane.columnIndex="3" GridPane.rowIndex="2"
+                    prefWidth="100" editable="true"/>
+        </GridPane>
+        
+        <!-- Action Buttons -->
+        <HBox spacing="10" alignment="CENTER_LEFT">
+            <Button fx:id="startButton" text="▶️ Start Simulation" styleClass="primary-button"
+                    onAction="#handleStartSimulation"/>
+            <Button fx:id="stopButton" text="⏹️ Stop Simulation" styleClass="danger-button"
+                    onAction="#handleStopSimulation" disable="true"/>
+            <Button text="🗑️ Clear All" styleClass="secondary-button"
+                    onAction="#handleClearAll"/>
+            <Region HBox.hgrow="ALWAYS"/>
+            <Label fx:id="statusLabel" text="Status: Ready" 
+                   style="-fx-font-size: 12px; -fx-text-fill: #666;"/>
+        </HBox>
+    </VBox>
+
+    <!-- Active Simulations Table -->
+    <VBox spacing="10" styleClass="card" VBox.vgrow="ALWAYS">
+        <Label text="Active Simulations" styleClass="panel-header"/>
+        
+        <TableView fx:id="simulationsTable" VBox.vgrow="ALWAYS">
+            <columns>
+                <TableColumn text="Shipment ID" prefWidth="120">
+                    <cellValueFactory>
+                        <PropertyValueFactory property="shipmentId"/>
+                    </cellValueFactory>
+                </TableColumn>
+                <TableColumn text="Status" prefWidth="100">
+                    <cellValueFactory>
+                        <PropertyValueFactory property="status"/>
+                    </cellValueFactory>
+                </TableColumn>
+                <TableColumn text="Origin" prefWidth="150">
+                    <cellValueFactory>
+                        <PropertyValueFactory property="origin"/>
+                    </cellValueFactory>
+                </TableColumn>
+                <TableColumn text="Destination" prefWidth="150">
+                    <cellValueFactory>
+                        <PropertyValueFactory property="destination"/>
+                    </cellValueFactory>
+                </TableColumn>
+                <TableColumn text="Current Location" prefWidth="200">
+                    <cellValueFactory>
+                        <PropertyValueFactory property="currentLocation"/>
+                    </cellValueFactory>
+                </TableColumn>
+                <TableColumn text="Progress" prefWidth="100">
+                    <cellValueFactory>
+                        <PropertyValueFactory property="progress"/>
+                    </cellValueFactory>
+                </TableColumn>
+                <TableColumn text="Start Time" prefWidth="150">
+                    <cellValueFactory>
+                        <PropertyValueFactory property="startTime"/>
+                    </cellValueFactory>
+                </TableColumn>
+            </columns>
+        </TableView>
+    </VBox>
+
+    <!-- Recent Events Log -->
+    <VBox spacing="10" styleClass="card" prefHeight="150">
+        <Label text="Recent Events" styleClass="panel-header"/>
+        <ListView fx:id="eventsListView" prefHeight="100"/>
+    </VBox>
+
+</VBox>
