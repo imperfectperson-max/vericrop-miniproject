@@ -51,6 +51,14 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
     
+    - name: Run code quality checks (Checkstyle)
+      run: ./gradlew checkstyleMain checkstyleTest --no-daemon --stacktrace
+      continue-on-error: true
+    
+    - name: Run security analysis (SpotBugs)
+      run: ./gradlew spotbugsMain --no-daemon --stacktrace
+      continue-on-error: true
+    
     - name: Build with Gradle
       run: ./gradlew build --no-daemon --stacktrace
     
@@ -72,6 +80,24 @@ jobs:
         path: |
           **/build/reports/tests/**
           **/build/test-results/**
+    
+    - name: Upload Checkstyle reports
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: checkstyle-reports
+        path: |
+          **/build/reports/checkstyle/**
+        retention-days: 7
+    
+    - name: Upload SpotBugs reports
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: spotbugs-reports
+        path: |
+          **/build/reports/spotbugs/**
+        retention-days: 7
     
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4

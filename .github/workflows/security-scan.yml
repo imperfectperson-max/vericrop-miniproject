@@ -1,0 +1,175 @@
+name: Security Scanning
+
+on:
+  push:
+    branches: [ main, develop, 'copilot/**' ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run security scan daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  trivy-scan:
+    name: Trivy Vulnerability Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Build Docker images for scanning
+      run: |
+        docker build -t vericrop-gui:scan -f vericrop-gui/Dockerfile . || echo "GUI build failed"
+        docker build -t vericrop-ml:scan -f docker/ml-service/Dockerfile docker/ml-service/ || echo "ML build failed"
+    
+    - name: Run Trivy vulnerability scanner on GUI image
+      uses: aquasecurity/trivy-action@master
+      continue-on-error: true
+      with:
+        image-ref: 'vericrop-gui:scan'
+        format: 'sarif'
+        output: 'trivy-gui-results.sarif'
+        severity: 'CRITICAL,HIGH,MEDIUM'
+    
+    - name: Upload Trivy GUI results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'trivy-gui-results.sarif'
+        category: 'trivy-gui'
+    
+    - name: Run Trivy vulnerability scanner on ML Service image
+      uses: aquasecurity/trivy-action@master
+      continue-on-error: true
+      with:
+        image-ref: 'vericrop-ml:scan'
+        format: 'sarif'
+        output: 'trivy-ml-results.sarif'
+        severity: 'CRITICAL,HIGH,MEDIUM'
+    
+    - name: Upload Trivy ML results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'trivy-ml-results.sarif'
+        category: 'trivy-ml'
+    
+    - name: Generate human-readable report
+      run: |
+        echo "# Security Scan Results" > security-report.md
+        echo "" >> security-report.md
+        echo "## GUI Service" >> security-report.md
+        docker run --rm aquasec/trivy:latest image --format table vericrop-gui:scan >> security-report.md || echo "No results" >> security-report.md
+        echo "" >> security-report.md
+        echo "## ML Service" >> security-report.md
+        docker run --rm aquasec/trivy:latest image --format table vericrop-ml:scan >> security-report.md || echo "No results" >> security-report.md
+      continue-on-error: true
+    
+    - name: Upload security report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: security-scan-report
+        path: security-report.md
+        retention-days: 30
+
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Dependency Review
+      uses: actions/dependency-review-action@v4
+      with:
+        fail-on-severity: moderate
+        deny-licenses: GPL-3.0, AGPL-3.0
+
+  codeql-analysis:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'java', 'python' ]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: ${{ matrix.language }}
+        queries: security-extended,security-and-quality
+    
+    - name: Set up JDK 17 (for Java)
+      if: matrix.language == 'java'
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: 'gradle'
+    
+    - name: Build Java code
+      if: matrix.language == 'java'
+      run: ./gradlew build -x test --no-daemon
+    
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+      with:
+        category: "/language:${{ matrix.language }}"
+
+  secret-scan:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: TruffleHog OSS
+      uses: trufflesecurity/trufflehog@main
+      with:
+        path: ./
+        base: ${{ github.event.repository.default_branch }}
+        head: HEAD
+        extra_args: --debug --only-verified
+
+  security-summary:
+    name: Security Summary
+    runs-on: ubuntu-latest
+    needs: [trivy-scan, codeql-analysis, secret-scan]
+    if: always()
+    
+    steps:
+    - name: Security Scan Summary
+      run: |
+        echo "# 🔒 Security Scan Summary"
+        echo ""
+        echo "| Check | Status |"
+        echo "|-------|--------|"
+        echo "| Trivy Vulnerability Scan | ${{ needs.trivy-scan.result }} |"
+        echo "| CodeQL Analysis | ${{ needs.codeql-analysis.result }} |"
+        echo "| Secret Scanning | ${{ needs.secret-scan.result }} |"
+        echo ""
+        echo "View detailed results in the Security tab: https://github.com/${{ github.repository }}/security"

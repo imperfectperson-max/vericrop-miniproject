@@ -1,0 +1,264 @@
+# Alert rules for VeriCrop monitoring
+groups:
+  - name: vericrop_service_alerts
+    interval: 30s
+    rules:
+      # Service Down Alerts
+      - alert: ServiceDown
+        expr: up{job=~"vericrop-.*"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "VeriCrop service {{ $labels.job }} is down"
+          description: "Service {{ $labels.job }} on {{ $labels.instance }} has been down for more than 1 minute."
+      
+      # High Error Rate
+      - alert: HighErrorRate
+        expr: rate(http_server_requests_seconds_count{status=~"5..",job="vericrop-gui"}[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "High error rate on {{ $labels.job }}"
+          description: "Error rate is {{ $value | humanizePercentage }} for {{ $labels.job }} on {{ $labels.instance }}."
+      
+      # High Response Time
+      - alert: HighResponseTime
+        expr: histogram_quantile(0.99, rate(http_server_requests_seconds_bucket{job="vericrop-gui"}[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "High response time on {{ $labels.job }}"
+          description: "99th percentile response time is {{ $value }}s for {{ $labels.uri }} on {{ $labels.instance }}."
+
+  - name: vericrop_database_alerts
+    interval: 30s
+    rules:
+      # Database Connection Pool Exhaustion
+      - alert: DatabaseConnectionPoolExhausted
+        expr: hikaricp_connections_active / hikaricp_connections_max > 0.9
+        for: 2m
+        labels:
+          severity: warning
+          team: database
+        annotations:
+          summary: "Database connection pool nearly exhausted"
+          description: "Connection pool for {{ $labels.pool }} is {{ $value | humanizePercentage }} full."
+      
+      # High Database Query Time
+      - alert: HighDatabaseQueryTime
+        expr: rate(hikaricp_connections_acquire_seconds_sum[5m]) / rate(hikaricp_connections_acquire_seconds_count[5m]) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          team: database
+        annotations:
+          summary: "High database query acquisition time"
+          description: "Average connection acquisition time is {{ $value }}s."
+      
+      # Database Down
+      - alert: PostgresDown
+        expr: up{job="postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: database
+        annotations:
+          summary: "PostgreSQL database is down"
+          description: "PostgreSQL on {{ $labels.instance }} has been down for more than 1 minute."
+
+  - name: vericrop_kafka_alerts
+    interval: 30s
+    rules:
+      # Kafka Broker Down
+      - alert: KafkaBrokerDown
+        expr: kafka_brokers < 1
+        for: 1m
+        labels:
+          severity: critical
+          team: messaging
+        annotations:
+          summary: "Kafka broker is down"
+          description: "No Kafka brokers are available."
+      
+      # High Consumer Lag
+      - alert: HighConsumerLag
+        expr: kafka_consumer_group_lag > 1000
+        for: 5m
+        labels:
+          severity: warning
+          team: messaging
+        annotations:
+          summary: "High Kafka consumer lag"
+          description: "Consumer group {{ $labels.group }} has lag of {{ $value }} messages on topic {{ $labels.topic }}."
+      
+      # Kafka Disk Usage
+      - alert: KafkaHighDiskUsage
+        expr: kafka_log_log_size > 50 * 1024 * 1024 * 1024  # 50GB
+        for: 10m
+        labels:
+          severity: warning
+          team: messaging
+        annotations:
+          summary: "Kafka log size is high"
+          description: "Kafka log size for {{ $labels.topic }} is {{ $value | humanize1024 }}B."
+
+  - name: vericrop_ml_alerts
+    interval: 30s
+    rules:
+      # ML Service Down
+      - alert: MLServiceDown
+        expr: up{job="vericrop-ml"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: ml
+        annotations:
+          summary: "ML service is down"
+          description: "ML service on {{ $labels.instance }} has been down for more than 1 minute."
+      
+      # High ML Prediction Latency
+      - alert: HighMLPredictionLatency
+        expr: histogram_quantile(0.95, rate(ml_prediction_duration_seconds_bucket[5m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+          team: ml
+        annotations:
+          summary: "High ML prediction latency"
+          description: "95th percentile prediction latency is {{ $value }}s."
+      
+      # High ML Error Rate
+      - alert: HighMLErrorRate
+        expr: rate(ml_prediction_errors_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          team: ml
+        annotations:
+          summary: "High ML prediction error rate"
+          description: "ML prediction error rate is {{ $value | humanizePercentage }}."
+
+  - name: vericrop_resource_alerts
+    interval: 30s
+    rules:
+      # High CPU Usage
+      - alert: HighCPUUsage
+        expr: 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "High CPU usage on {{ $labels.instance }}"
+          description: "CPU usage is {{ $value }}% on {{ $labels.instance }}."
+      
+      # High Memory Usage
+      - alert: HighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "High memory usage on {{ $labels.instance }}"
+          description: "Memory usage is {{ $value }}% on {{ $labels.instance }}."
+      
+      # High Disk Usage
+      - alert: HighDiskUsage
+        expr: (1 - (node_filesystem_avail_bytes{fstype!~"tmpfs|fuse.lxcfs"} / node_filesystem_size_bytes)) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "High disk usage on {{ $labels.instance }}"
+          description: "Disk usage is {{ $value }}% on {{ $labels.mountpoint }} ({{ $labels.instance }})."
+      
+      # Out of Disk Space
+      - alert: OutOfDiskSpace
+        expr: (1 - (node_filesystem_avail_bytes{fstype!~"tmpfs|fuse.lxcfs"} / node_filesystem_size_bytes)) * 100 > 95
+        for: 1m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "Critically low disk space on {{ $labels.instance }}"
+          description: "Disk usage is {{ $value }}% on {{ $labels.mountpoint }} ({{ $labels.instance }}). Immediate action required!"
+
+  - name: vericrop_application_alerts
+    interval: 30s
+    rules:
+      # Failed Login Attempts
+      - alert: HighFailedLoginAttempts
+        expr: rate(vericrop_login_attempts_total{status="failure"}[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          team: security
+        annotations:
+          summary: "High rate of failed login attempts"
+          description: "More than 10 failed login attempts per minute in the last 5 minutes. Possible brute force attack."
+      
+      # Blockchain Validation Failures
+      - alert: BlockchainValidationFailure
+        expr: vericrop_blockchain_validation_failures_total > 0
+        for: 1m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "Blockchain validation failed"
+          description: "Blockchain integrity check failed. Data corruption possible!"
+      
+      # Batch Creation Failures
+      - alert: HighBatchCreationFailureRate
+        expr: rate(vericrop_batch_creation_failures_total[5m]) / rate(vericrop_batch_creation_attempts_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "High batch creation failure rate"
+          description: "Batch creation failure rate is {{ $value | humanizePercentage }}."
+
+  - name: vericrop_jvm_alerts
+    interval: 30s
+    rules:
+      # High JVM Memory Usage
+      - alert: HighJVMMemoryUsage
+        expr: jvm_memory_used_bytes{area="heap"} / jvm_memory_max_bytes{area="heap"} > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "High JVM heap memory usage"
+          description: "JVM heap memory usage is {{ $value | humanizePercentage }} on {{ $labels.instance }}."
+      
+      # High GC Time
+      - alert: HighGCTime
+        expr: rate(jvm_gc_pause_seconds_sum[5m]) / rate(jvm_gc_pause_seconds_count[5m]) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "High JVM garbage collection time"
+          description: "Average GC pause time is {{ $value }}s on {{ $labels.instance }}."
+      
+      # Too Many Threads
+      - alert: HighJVMThreadCount
+        expr: jvm_threads_live > 500
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "High JVM thread count"
+          description: "JVM has {{ $value }} live threads on {{ $labels.instance }}. Possible thread leak."

@@ -1,0 +1,109 @@
+# Prometheus configuration for VeriCrop
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'vericrop-production'
+    environment: 'production'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+# Load rules once and periodically evaluate them
+rule_files:
+  - '/etc/prometheus/rules/*.yml'
+
+# Scrape configurations
+scrape_configs:
+  # VeriCrop GUI Service
+  - job_name: 'vericrop-gui'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets:
+          - 'vericrop-gui:8080'
+        labels:
+          service: 'gui'
+          component: 'backend'
+    
+  # ML Service
+  - job_name: 'vericrop-ml'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets:
+          - 'ml-service:8000'
+        labels:
+          service: 'ml'
+          component: 'ml-inference'
+  
+  # PostgreSQL Exporter
+  - job_name: 'postgres'
+    static_configs:
+      - targets:
+          - 'postgres-exporter:9187'
+        labels:
+          service: 'postgres'
+          component: 'database'
+  
+  # Kafka Exporter
+  - job_name: 'kafka'
+    static_configs:
+      - targets:
+          - 'kafka-exporter:9308'
+        labels:
+          service: 'kafka'
+          component: 'messaging'
+  
+  # Node Exporter (System Metrics)
+  - job_name: 'node'
+    static_configs:
+      - targets:
+          - 'node-exporter:9100'
+        labels:
+          service: 'node'
+          component: 'infrastructure'
+  
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets:
+          - 'localhost:9090'
+        labels:
+          service: 'prometheus'
+          component: 'monitoring'
+
+# Kubernetes service discovery (if using Kubernetes)
+  - job_name: 'kubernetes-pods'
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names:
+            - vericrop
+    relabel_configs:
+      # Only scrape pods with prometheus.io/scrape: true annotation
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: true
+      # Use custom scrape port if specified
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        target_label: __address__
+        regex: (.+)
+        replacement: $1:__meta_kubernetes_pod_annotation_prometheus_io_port
+      # Use custom metrics path if specified
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+      # Add pod labels
+      - action: labelmap
+        regex: __meta_kubernetes_pod_label_(.+)
+      # Add namespace
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: kubernetes_namespace
+      # Add pod name
+      - source_labels: [__meta_kubernetes_pod_name]
+        target_label: kubernetes_pod_name
