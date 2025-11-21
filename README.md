@@ -1054,6 +1054,85 @@ If you encounter issues not covered here:
    - Error messages and logs
    - Environment details (OS, Java version, Docker version)
 
+## Production Deployment
+
+For production deployment, please refer to our comprehensive guides:
+
+### 📚 Essential Documentation
+
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Complete production deployment guide
+  - Docker Compose deployment
+  - Kubernetes deployment with Helm
+  - Post-deployment validation
+  - Backup & disaster recovery
+  - Nginx reverse proxy configuration
+
+- **[SECURITY.md](SECURITY.md)** - Security best practices and guidelines
+  - Authentication & authorization
+  - Data protection and encryption
+  - Network security and firewall rules
+  - Secrets management
+  - Container security
+  - Monitoring & auditing
+  - Incident response
+
+- **[monitoring/README.md](monitoring/README.md)** - Monitoring and observability
+  - Prometheus configuration
+  - Grafana dashboards
+  - Alert rules and routing
+  - Custom metrics
+  - Troubleshooting
+
+- **[CHANGELOG.md](CHANGELOG.md)** - Version history and migration guides
+
+### 🚀 Quick Production Setup
+
+```bash
+# 1. Clone and configure
+git clone https://github.com/imperfectperson-max/vericrop-miniproject.git
+cd vericrop-miniproject
+cp .env.template .env
+# Edit .env with production values
+
+# 2. Build production images
+./vericrop-gui/build-production.sh
+
+# 3. Deploy with Docker Compose
+docker-compose -f docker-compose.prod.yml up -d
+
+# 4. Or deploy to Kubernetes
+kubectl apply -f k8s/vericrop-gui-deployment.yaml
+
+# 5. Verify deployment
+curl https://your-domain.com/actuator/health
+```
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed instructions.
+
+### 🔒 Security Checklist
+
+Before deploying to production:
+
+- [ ] Change all default passwords in `.env`
+- [ ] Configure TLS/SSL for all services
+- [ ] Set up firewall rules
+- [ ] Configure secrets management (Vault, AWS Secrets Manager, etc.)
+- [ ] Enable security scanning in CI/CD
+- [ ] Configure monitoring and alerting
+- [ ] Set up backup strategy
+- [ ] Review and apply security best practices from [SECURITY.md](SECURITY.md)
+
+### 📊 Monitoring Stack
+
+VeriCrop includes production-ready monitoring:
+
+- **Prometheus**: Metrics collection with 40+ alert rules
+- **Grafana**: Pre-built dashboards for visualization
+- **AlertManager**: Alert routing to Slack/PagerDuty/Email
+- **Exporters**: PostgreSQL, Kafka, Node, JVM metrics
+
+See [monitoring/README.md](monitoring/README.md) for setup.
+
 ## License
 
 **TODO**: License to be determined. Please contact the maintainer for licensing information.
