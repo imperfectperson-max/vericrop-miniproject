@@ -90,12 +90,22 @@ VeriCrop follows a microservices architecture with event-driven communication:
 JavaFX desktop application with Spring Boot integration. Provides four interactive dashboards plus user authentication and messaging:
 - **User Authentication**: Secure login/registration with BCrypt password hashing
 - **User Messaging**: In-app messaging system with inbox and compose features
-- **Farm Management**: Batch creation, quality assessment
-- **Logistics Tracking**: Shipment monitoring, condition alerts
+- **Farm Management**: Batch creation, quality assessment, **QR code generation**
+- **Logistics Tracking**: Shipment monitoring, condition alerts, **delivery simulation**
 - **Consumer Verification**: QR code scanning, product journey
 - **Analytics Dashboard**: KPI monitoring, trend analysis
+- **Real-Time Alerts**: AlertService for notifications across all screens
+- **Reports Generation**: CSV/JSON reports for quality, journey, and analytics
 
-**Tech Stack**: Java 17, JavaFX, Spring Boot, HikariCP, BCrypt, Flyway, Kafka Client
+**New Features:**
+- 🔳 **QR Code Generation**: Scannable RGB PNG QR codes for product traceability
+- 🚀 **Delivery Simulator**: Real-time simulation with GPS tracking and environmental monitoring
+- 📊 **Report Generator**: CSV/JSON reports with journey data, quality metrics, analytics
+- 🔔 **Alert System**: Real-time alerts with severity levels and acknowledgement tracking
+- 🚪 **Logout Buttons**: Consistent logout functionality across all user screens
+- 💬 **Messages Navigation**: Easy access to messaging system from all dashboards
+
+**Tech Stack**: Java 17, JavaFX, Spring Boot, HikariCP, BCrypt, Flyway, Kafka Client, ZXing (QR codes)
 
 **Details**: See [vericrop-gui/README.md](vericrop-gui/README.md) and [docs/GUI-setup.md](docs/GUI-setup.md)
 
@@ -740,6 +750,40 @@ Get-Content logs\vericrop-gui.log -Tail 50  # Windows PowerShell
 - Only restart the GUI application when you make code changes
 - Use `./gradlew :vericrop-gui:run --continuous` for continuous build (experimental)
 - Check logs in real-time for debugging
+
+## Generated Output Directories
+
+The VeriCrop GUI generates various output files during operation:
+
+### QR Codes
+- **Location**: `generated_qr/`
+- **Format**: RGB PNG images (300x300px)
+- **Naming**: `product_{batchId}.png`, `shipment_{shipmentId}.png`
+- **Content**: JSON payload with product/shipment details
+- **Usage**: Scannable by QR readers for product verification
+
+### Reports
+- **Location**: `generated_reports/`
+- **Formats**: CSV, JSON
+- **Types**:
+  - Journey reports: `journey_report_{shipmentId}_{timestamp}.csv/json`
+  - Quality reports: `quality_report_{batchId}_{timestamp}.csv`
+  - Analytics reports: `analytics_{reportName}_{timestamp}.csv`
+- **Usage**: Export data for analysis, auditing, compliance
+
+### Message Ledger
+- **Location**: `ledger/messages.jsonl`
+- **Format**: JSON Lines (one message per line)
+- **Content**: All user-to-user and system messages
+- **Persistence**: Automatic, survives application restarts
+
+### Blockchain Ledger
+- **Location**: `blockchain.json`, `vericrop_chain.json`
+- **Format**: JSON
+- **Content**: Immutable blockchain records for batches
+- **Usage**: Audit trail, verification
+
+**Note**: All generated directories are excluded from version control via `.gitignore`.
 
 ## Configuration
 
