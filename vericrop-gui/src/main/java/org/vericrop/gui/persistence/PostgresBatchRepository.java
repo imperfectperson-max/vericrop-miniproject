@@ -348,6 +348,13 @@ public class PostgresBatchRepository {
     }
 
     /**
+     * Get the underlying DataSource for use by other DAOs
+     */
+    public DataSource getDataSource() {
+        return dataSource;
+    }
+
+    /**
      * Close data source and release all connections
      */
     public void shutdown() {
