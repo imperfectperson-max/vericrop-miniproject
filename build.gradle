@@ -102,6 +102,7 @@ project(':vericrop-gui') {
         
         // Apache Kafka client for messaging
         implementation 'org.apache.kafka:kafka-clients:3.4.0'
+        implementation 'org.springframework.kafka:spring-kafka'
         
         // Database - PostgreSQL and HikariCP connection pool
         implementation 'org.postgresql:postgresql:42.6.0'

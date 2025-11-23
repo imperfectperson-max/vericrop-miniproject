@@ -69,6 +69,11 @@ vericrop:
   mode: ${VERICROP_MODE:dev}  # dev or prod - controls blockchain initialization speed
   load-demo: ${VERICROP_LOAD_DEMO:false}  # Demo mode disabled by default in production
 
+# Simulation coordination configuration
+simulation:
+  coordination:
+    enabled: ${SIMULATION_COORDINATION_ENABLED:false}  # Feature flag for simulation coordination
+
 # Ledger configuration
 ledger:
   path: ${LEDGER_PATH:ledger}
