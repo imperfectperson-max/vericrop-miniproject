@@ -54,10 +54,22 @@ public class OrchestratorController {
             
             if (request != null) {
                 if (request.containsKey("subsystems")) {
-                    subsystems = (List<String>) request.get("subsystems");
+                    Object subsystemsObj = request.get("subsystems");
+                    if (subsystemsObj instanceof List) {
+                        subsystems = (List<String>) subsystemsObj;
+                    } else {
+                        logger.warn("Invalid subsystems value, expected List but got: {}", 
+                                    subsystemsObj != null ? subsystemsObj.getClass().getName() : "null");
+                    }
                 }
                 if (request.containsKey("runId")) {
-                    runId = (String) request.get("runId");
+                    Object runIdObj = request.get("runId");
+                    if (runIdObj instanceof String) {
+                        runId = (String) runIdObj;
+                    } else {
+                        logger.warn("Invalid runId value, expected String but got: {}", 
+                                    runIdObj != null ? runIdObj.getClass().getName() : "null");
+                    }
                 }
             }
             

@@ -3,6 +3,7 @@ package org.vericrop.orchestrator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.vericrop.kafka.KafkaPublisher;
 
@@ -18,13 +19,24 @@ public class OrchestratorService {
     
     private static final Logger logger = LoggerFactory.getLogger(OrchestratorService.class);
     
-    // Kafka topic names for each subsystem
-    public static final String TOPIC_SCENARIOS = "vericrop.scenarios.start";
-    public static final String TOPIC_DELIVERY = "vericrop.delivery.start";
-    public static final String TOPIC_MAP = "vericrop.map.start";
-    public static final String TOPIC_TEMPERATURE = "vericrop.temperature.start";
-    public static final String TOPIC_SUPPLIER_COMPLIANCE = "vericrop.supplier_compliance.start";
-    public static final String TOPIC_SIMULATIONS = "vericrop.simulations.start";
+    // Kafka topic names for each subsystem (injected from configuration)
+    @Value("${orchestrator.topics.scenarios:vericrop.scenarios.start}")
+    private String topicScenarios;
+    
+    @Value("${orchestrator.topics.delivery:vericrop.delivery.start}")
+    private String topicDelivery;
+    
+    @Value("${orchestrator.topics.map:vericrop.map.start}")
+    private String topicMap;
+    
+    @Value("${orchestrator.topics.temperature:vericrop.temperature.start}")
+    private String topicTemperature;
+    
+    @Value("${orchestrator.topics.supplier_compliance:vericrop.supplier_compliance.start}")
+    private String topicSupplierCompliance;
+    
+    @Value("${orchestrator.topics.simulations:vericrop.simulations.start}")
+    private String topicSimulations;
     
     private final KafkaPublisher kafkaPublisher;
     
@@ -105,18 +117,18 @@ public class OrchestratorService {
     private String getTopicForSubsystem(String subsystem) {
         switch (subsystem.toLowerCase()) {
             case "scenarios":
-                return TOPIC_SCENARIOS;
+                return topicScenarios;
             case "delivery":
-                return TOPIC_DELIVERY;
+                return topicDelivery;
             case "map":
-                return TOPIC_MAP;
+                return topicMap;
             case "temperature":
-                return TOPIC_TEMPERATURE;
+                return topicTemperature;
             case "supplier-compliance":
             case "supplier_compliance":
-                return TOPIC_SUPPLIER_COMPLIANCE;
+                return topicSupplierCompliance;
             case "simulations":
-                return TOPIC_SIMULATIONS;
+                return topicSimulations;
             default:
                 return null;
         }

@@ -67,9 +67,12 @@ public class KafkaPublisher {
      * @param key The message key (optional, can be null)
      * @param message The message object to serialize as JSON
      * @return RecordMetadata containing partition and offset information
-     * @throws Exception if publishing fails
+     * @throws JsonProcessingException if message serialization fails
+     * @throws InterruptedException if the thread is interrupted while waiting
+     * @throws java.util.concurrent.ExecutionException if the send operation fails
      */
-    public RecordMetadata publish(String topic, String key, Object message) throws Exception {
+    public RecordMetadata publish(String topic, String key, Object message) 
+            throws JsonProcessingException, InterruptedException, java.util.concurrent.ExecutionException {
         String jsonMessage = objectMapper.writeValueAsString(message);
         ProducerRecord<String, String> record = new ProducerRecord<>(topic, key, jsonMessage);
         
@@ -89,9 +92,11 @@ public class KafkaPublisher {
      * @param key The message key (optional, can be null)
      * @param jsonMessage The JSON message string
      * @return RecordMetadata containing partition and offset information
-     * @throws Exception if publishing fails
+     * @throws InterruptedException if the thread is interrupted while waiting
+     * @throws java.util.concurrent.ExecutionException if the send operation fails
      */
-    public RecordMetadata publishRaw(String topic, String key, String jsonMessage) throws Exception {
+    public RecordMetadata publishRaw(String topic, String key, String jsonMessage) 
+            throws InterruptedException, java.util.concurrent.ExecutionException {
         ProducerRecord<String, String> record = new ProducerRecord<>(topic, key, jsonMessage);
         
         Future<RecordMetadata> future = producer.send(record);
