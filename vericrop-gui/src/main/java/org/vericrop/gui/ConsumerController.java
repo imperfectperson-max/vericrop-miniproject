@@ -5,6 +5,14 @@ import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.stage.FileChooser;
+import javafx.stage.Stage;
+import java.util.Set;
+import java.util.HashSet;
+import java.io.File;
+import java.io.IOException;
+import org.vericrop.gui.util.QRDecoder;
+import com.google.zxing.NotFoundException;
 
 public class ConsumerController {
 
@@ -15,6 +23,7 @@ public class ConsumerController {
     @FXML private Button logisticsButton;
 
     private ObservableList<String> verificationHistory = FXCollections.observableArrayList();
+    private Set<String> knownBatchIds = new HashSet<>();
 
     @FXML
     public void initialize() {
@@ -41,15 +50,64 @@ public class ConsumerController {
                     "2024-03-07 14:30: BATCH_A2385 - ✅ VERIFIED (Organic Carrots)",
                     "2024-03-06 11:20: BATCH_A2384 - ✅ VERIFIED (Fresh Lettuce)"
             );
+            // Populate known batch IDs from demo entries
+            knownBatchIds.add("BATCH_A2386");
+            knownBatchIds.add("BATCH_A2385");
+            knownBatchIds.add("BATCH_A2384");
         } else {
             verificationHistory.add("No verification history. Scan a QR code or enter a Batch ID to verify products.");
+            // In non-demo mode, leave knownBatchIds empty or load placeholder IDs if available
         }
-        verificationHistoryList.setItems(verificationHistory);
+        if (verificationHistoryList != null) {
+            verificationHistoryList.setItems(verificationHistory);
+        }
     }
 
     @FXML
     private void handleScanQR() {
-        showAlert(Alert.AlertType.INFORMATION, "QR Scanner", "QR scanner would activate here");
+        // Create file chooser for image upload
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Select QR Code Image");
+        fileChooser.getExtensionFilters().addAll(
+            new FileChooser.ExtensionFilter("Image Files", "*.png", "*.jpg", "*.jpeg", "*.gif", "*.bmp"),
+            new FileChooser.ExtensionFilter("All Files", "*.*")
+        );
+        
+        // Get the current stage (window)
+        Stage stage = (Stage) batchIdField.getScene().getWindow();
+        
+        // Show file chooser dialog
+        File selectedFile = fileChooser.showOpenDialog(stage);
+        
+        if (selectedFile != null) {
+            try {
+                // Decode the QR code from the image
+                String qrContent = QRDecoder.decodeQRCode(selectedFile);
+                
+                // Extract batch ID from QR content
+                String batchId = QRDecoder.extractBatchId(qrContent);
+                
+                if (batchId != null && !batchId.trim().isEmpty()) {
+                    // Set the batch ID in the text field
+                    batchIdField.setText(batchId);
+                    
+                    // Automatically verify the batch
+                    verifyBatch(batchId);
+                } else {
+                    showAlert(Alert.AlertType.WARNING, "Invalid QR Code", 
+                        "Could not extract batch ID from the QR code.");
+                }
+            } catch (NotFoundException e) {
+                showAlert(Alert.AlertType.ERROR, "QR Code Not Found", 
+                    "No QR code was found in the selected image. Please select an image containing a valid QR code.");
+            } catch (IOException e) {
+                showAlert(Alert.AlertType.ERROR, "File Error", 
+                    "Failed to read the image file: " + e.getMessage());
+            } catch (Exception e) {
+                showAlert(Alert.AlertType.ERROR, "Error Reading QR Code", 
+                    "An unexpected error occurred while reading the QR code: " + e.getMessage());
+            }
+        }
     }
 
     @FXML
@@ -134,6 +192,32 @@ public class ConsumerController {
         if (batchId == null || batchId.trim().isEmpty()) {
             showAlert(Alert.AlertType.WARNING, "Invalid Input", "Batch ID cannot be empty");
             return;
+        }
+
+        // Check if batch ID exists in knownBatchIds (case-insensitive)
+        if (shouldLoadDemoData() && !knownBatchIds.isEmpty()) {
+            boolean found = false;
+            for (String knownId : knownBatchIds) {
+                if (knownId.equalsIgnoreCase(batchId.trim())) {
+                    found = true;
+                    break;
+                }
+            }
+            
+            if (!found) {
+                showAlert(Alert.AlertType.WARNING, "Batch ID Not Found", 
+                    "The batch ID '" + batchId + "' was not found in our system.");
+                
+                // Add failure entry to verification history
+                String failureEntry = java.time.LocalDateTime.now().format(
+                        java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) + 
+                        ": " + batchId + " - ❌ NOT FOUND";
+                
+                Platform.runLater(() -> {
+                    verificationHistory.add(0, failureEntry);
+                });
+                return;
+            }
         }
 
         // TODO: In production, query actual blockchain/ledger service for batch info
