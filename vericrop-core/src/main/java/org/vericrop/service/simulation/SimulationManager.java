@@ -243,11 +243,25 @@ public class SimulationManager {
                             state.currentLocation = "In transit - midpoint";
                         } else if (state.progress < 100) {
                             state.currentLocation = "Approaching destination";
-                        } else {
+                        } else if (state.progress >= 100) {
                             state.currentLocation = "Delivered";
                             // Auto-stop when complete
-                            stopSimulation();
-                            notifyStopped(batchId, true);
+                            // Stop simulation (will notify listeners with completed=true)
+                            running.set(false); // Stop the monitoring loop
+                            String completedBatchId = state.batchId;
+                            currentSimulation.set(null);
+                            
+                            // Stop in DeliverySimulator
+                            try {
+                                deliverySimulator.stopSimulation(completedBatchId);
+                            } catch (Exception e) {
+                                logger.error("Error stopping delivery simulator", e);
+                            }
+                            
+                            // Notify listeners with completed=true
+                            notifyStopped(completedBatchId, true);
+                            logger.info("Simulation completed for batch: {}", completedBatchId);
+                            break; // Exit monitoring loop
                         }
                         
                         // Notify listeners
