@@ -43,6 +43,10 @@ public class ApplicationContext {
     private final MessageService messageService;
     private final DeliverySimulator deliverySimulator;
     private final AlertService alertService;
+    
+    // Additional services for demo mode
+    private org.vericrop.service.BlockchainService blockchainService;
+    private org.vericrop.service.impl.FileLedgerService fileLedgerService;
 
     /**
      * Private constructor - use getInstance() to get singleton
@@ -73,6 +77,12 @@ public class ApplicationContext {
         this.messageService = new MessageService(true); // Enable persistence
         this.deliverySimulator = new DeliverySimulator(messageService);
         this.alertService = AlertService.getInstance();
+        
+        // Initialize additional services for demo mode
+        this.fileLedgerService = new org.vericrop.service.impl.FileLedgerService();
+        logger.info("FileLedgerService initialized");
+        
+        // BlockchainService will be initialized lazily when blockchain is ready
         
         // Test connections
         testConnections();
@@ -171,6 +181,42 @@ public class ApplicationContext {
     public AlertService getAlertService() {
         return alertService;
     }
+    
+    /**
+     * Get or create BlockchainService.
+     * @param blockchain The blockchain instance to use
+     * @return BlockchainService instance
+     */
+    public org.vericrop.service.BlockchainService getBlockchainService(org.vericrop.blockchain.Blockchain blockchain) {
+        if (blockchainService == null && blockchain != null) {
+            blockchainService = new org.vericrop.service.BlockchainService(blockchain);
+            logger.info("BlockchainService initialized");
+        }
+        return blockchainService;
+    }
+    
+    /**
+     * Get FileLedgerService for shipment recording.
+     * @return FileLedgerService instance
+     */
+    public org.vericrop.service.impl.FileLedgerService getFileLedgerService() {
+        return fileLedgerService;
+    }
+    
+    /**
+     * Create a demo-friendly KafkaServiceManager that won't fail if Kafka is unavailable.
+     * @return KafkaServiceManager or null if creation fails
+     */
+    public org.vericrop.kafka.KafkaServiceManager createKafkaServiceManager() {
+        try {
+            org.vericrop.kafka.KafkaServiceManager manager = new org.vericrop.kafka.KafkaServiceManager();
+            logger.info("KafkaServiceManager created");
+            return manager;
+        } catch (Exception e) {
+            logger.warn("Could not create KafkaServiceManager: {}. Continuing in demo mode without Kafka.", e.getMessage());
+            return null;
+        }
+    }
 
     /**
      * Shutdown all services and release resources
@@ -184,6 +230,14 @@ public class ApplicationContext {
             }
         } catch (Exception e) {
             logger.error("Error shutting down delivery simulator", e);
+        }
+        
+        try {
+            if (blockchainService != null) {
+                blockchainService.shutdown();
+            }
+        } catch (Exception e) {
+            logger.error("Error shutting down blockchain service", e);
         }
         
         try {

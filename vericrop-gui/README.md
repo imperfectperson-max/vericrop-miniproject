@@ -80,6 +80,8 @@ docker exec -it vericrop-postgres psql -U vericrop -d vericrop \
 
 ### 4. Run the Application
 
+#### Normal Mode (with external services)
+
 ```bash
 # From repository root
 ./gradlew :vericrop-gui:run
@@ -89,6 +91,37 @@ The application will:
 1. Initialize ApplicationContext
 2. Connect to Postgres, Kafka, and ML Service
 3. Launch the JavaFX GUI
+
+#### Demo Mode (standalone, no external services required)
+
+For a self-contained demonstration without Postgres, Kafka, or ML Service dependencies:
+
+```bash
+# Set demo mode via environment variable
+export VERICROP_LOAD_DEMO=true
+./gradlew :vericrop-gui:run
+
+# Or using system property
+./gradlew :vericrop-gui:run --args="-Dvericrop.loadDemo=true"
+
+# Or on Windows PowerShell
+$env:VERICROP_LOAD_DEMO="true"
+./gradlew :vericrop-gui:run
+```
+
+**Demo Mode Features:**
+- Uses in-memory blockchain (no external blockchain network needed)
+- Provides mock ML predictions (no FastAPI ML service needed)
+- Uses demo data for analytics, logistics, and consumer screens
+- Delivery simulator works fully in demo mode
+- QR code generation works in demo mode
+- All UI flows functional without external infrastructure
+
+**When to use Demo Mode:**
+- Quick demonstrations without setup overhead
+- Development without external services running
+- Testing UI flows and features in isolation
+- Offline development scenarios
 
 ## 🎯 Key Features
 
