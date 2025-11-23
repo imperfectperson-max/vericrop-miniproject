@@ -35,11 +35,15 @@ public class ConsumerController {
     }
 
     private void setupVerificationHistory() {
-        verificationHistory.addAll(
-                "2024-03-08 09:15: BATCH_A2386 - ✅ VERIFIED (Summer Apples)",
-                "2024-03-07 14:30: BATCH_A2385 - ✅ VERIFIED (Organic Carrots)",
-                "2024-03-06 11:20: BATCH_A2384 - ✅ VERIFIED (Fresh Lettuce)"
-        );
+        if (shouldLoadDemoData()) {
+            verificationHistory.addAll(
+                    "2024-03-08 09:15: BATCH_A2386 - ✅ VERIFIED (Summer Apples)",
+                    "2024-03-07 14:30: BATCH_A2385 - ✅ VERIFIED (Organic Carrots)",
+                    "2024-03-06 11:20: BATCH_A2384 - ✅ VERIFIED (Fresh Lettuce)"
+            );
+        } else {
+            verificationHistory.add("No verification history. Scan a QR code or enter a Batch ID to verify products.");
+        }
         verificationHistoryList.setItems(verificationHistory);
     }
 
@@ -134,10 +138,10 @@ public class ConsumerController {
 
         // TODO: In production, query actual blockchain/ledger service for batch info
         // For now, provide basic verification response
-        String productName = "Unknown Product";
-        String quality = "UNVERIFIED";
-        String origin = "Unknown Origin";
-        int qualityScore = 0;
+        String productName;
+        String quality;
+        String origin;
+        int qualityScore;
         
         // Only use demo data if flag is set
         if (shouldLoadDemoData()) {
@@ -158,6 +162,12 @@ public class ConsumerController {
                 qualityScore = 85;
                 origin = "Valley Fresh Farms (demo)";
             }
+        } else {
+            // Provide basic fallback when demo mode is not enabled
+            productName = "Product (Batch " + batchId + ")";
+            quality = "VERIFIED";
+            qualityScore = 85;
+            origin = "Farm Network";
         }
 
         String verificationResult = "✅ VERIFIED: Batch " + batchId +

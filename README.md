@@ -42,6 +42,39 @@ VeriCrop is a comprehensive mini-project that demonstrates modern supply chain m
 - Demonstrate integration of modern technologies (Java, Python, Kafka, PostgreSQL, Docker)
 - Build trust in agricultural supply chains through transparency
 
+### Demo Mode
+
+VeriCrop GUI can run in a **self-contained demo mode** without requiring external services (PostgreSQL, Kafka, ML Service). This is perfect for:
+- Quick demonstrations
+- Development without infrastructure setup
+- Testing UI flows in isolation
+- Offline scenarios
+
+**To enable demo mode:**
+```bash
+# Using environment variable
+export VERICROP_LOAD_DEMO=true
+./gradlew :vericrop-gui:run
+
+# Using system property
+./gradlew :vericrop-gui:run --args="-Dvericrop.loadDemo=true"
+
+# Windows PowerShell
+$env:VERICROP_LOAD_DEMO="true"
+./gradlew :vericrop-gui:run
+```
+
+**Demo mode features:**
+- In-memory blockchain (no external network)
+- Mock ML predictions
+- Demo data in all screens (Analytics, Logistics, Consumer)
+- Fully functional delivery simulator
+- QR code generation
+- All UI flows operational
+- Full screen display on PC (maximized window)
+
+See [vericrop-gui/README.md](vericrop-gui/README.md) for detailed demo mode documentation.
+
 ## Architecture
 
 VeriCrop follows a microservices architecture with event-driven communication:

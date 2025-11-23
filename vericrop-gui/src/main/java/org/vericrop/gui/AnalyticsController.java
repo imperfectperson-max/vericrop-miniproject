@@ -65,6 +65,30 @@ public class AnalyticsController {
     }
 
     private void setupSupplierTable() {
+        // Configure table columns with cell value factories
+        if (supplierTable != null && supplierTable.getColumns().size() >= 3) {
+            try {
+                @SuppressWarnings("unchecked")
+                javafx.scene.control.TableColumn<Supplier, String> nameCol = 
+                    (javafx.scene.control.TableColumn<Supplier, String>) supplierTable.getColumns().get(0);
+                @SuppressWarnings("unchecked")
+                javafx.scene.control.TableColumn<Supplier, Number> qualityCol = 
+                    (javafx.scene.control.TableColumn<Supplier, Number>) supplierTable.getColumns().get(1);
+                @SuppressWarnings("unchecked")
+                javafx.scene.control.TableColumn<Supplier, Number> spoilageCol = 
+                    (javafx.scene.control.TableColumn<Supplier, Number>) supplierTable.getColumns().get(2);
+                
+                nameCol.setCellValueFactory(cellData -> 
+                    new javafx.beans.property.SimpleStringProperty(cellData.getValue().getName()));
+                qualityCol.setCellValueFactory(cellData -> 
+                    new javafx.beans.property.SimpleIntegerProperty(cellData.getValue().getQuality()));
+                spoilageCol.setCellValueFactory(cellData -> 
+                    new javafx.beans.property.SimpleIntegerProperty(cellData.getValue().getSpoilage()));
+            } catch (ClassCastException | IndexOutOfBoundsException e) {
+                System.err.println("Warning: Could not configure supplier table columns: " + e.getMessage());
+            }
+        }
+        
         if (shouldLoadDemoData()) {
             suppliers.addAll(
                     new Supplier("Farm A (demo)", 92, 1),
@@ -76,6 +100,30 @@ public class AnalyticsController {
     }
 
     private void setupAlertsTable() {
+        // Configure table columns with cell value factories
+        if (alertsTable != null && alertsTable.getColumns().size() >= 3) {
+            try {
+                @SuppressWarnings("unchecked")
+                javafx.scene.control.TableColumn<Alert, String> dateCol = 
+                    (javafx.scene.control.TableColumn<Alert, String>) alertsTable.getColumns().get(0);
+                @SuppressWarnings("unchecked")
+                javafx.scene.control.TableColumn<Alert, String> typeCol = 
+                    (javafx.scene.control.TableColumn<Alert, String>) alertsTable.getColumns().get(1);
+                @SuppressWarnings("unchecked")
+                javafx.scene.control.TableColumn<Alert, String> detailsCol = 
+                    (javafx.scene.control.TableColumn<Alert, String>) alertsTable.getColumns().get(2);
+                
+                dateCol.setCellValueFactory(cellData -> 
+                    new javafx.beans.property.SimpleStringProperty(cellData.getValue().getDate()));
+                typeCol.setCellValueFactory(cellData -> 
+                    new javafx.beans.property.SimpleStringProperty(cellData.getValue().getType()));
+                detailsCol.setCellValueFactory(cellData -> 
+                    new javafx.beans.property.SimpleStringProperty(cellData.getValue().getDetails()));
+            } catch (ClassCastException | IndexOutOfBoundsException e) {
+                System.err.println("Warning: Could not configure alerts table columns: " + e.getMessage());
+            }
+        }
+        
         if (shouldLoadDemoData()) {
             alerts.addAll(
                     new Alert("Mar 07", "Temp Breach (demo)", "Temperature exceeded 7°C for 30min"),
@@ -162,12 +210,36 @@ public class AnalyticsController {
     @FXML
     private void handleExportData() {
         String selectedType = exportTypeCombo.getValue();
-        if (selectedType != null) {
-            exportPreview.setText("Export Preview: " + selectedType + "\n\n" +
-                    "• Data range: " + exportStartDate.getValue() + " to " + exportEndDate.getValue() + "\n" +
-                    "• Format: " + formatCombo.getValue() + "\n" +
-                    "• Records: 1,247 batches\n" +
-                    "• Generated: " + java.time.LocalDateTime.now());
+        String format = formatCombo.getValue();
+        
+        if (selectedType == null) {
+            if (exportPreview != null) {
+                exportPreview.setText("Please select an export type first.");
+            }
+            return;
+        }
+        
+        // Build export preview with null-safe date handling
+        StringBuilder preview = new StringBuilder();
+        preview.append("Export Preview: ").append(selectedType).append("\n\n");
+        
+        if (exportStartDate != null && exportStartDate.getValue() != null && 
+            exportEndDate != null && exportEndDate.getValue() != null) {
+            preview.append("• Data range: ")
+                   .append(exportStartDate.getValue())
+                   .append(" to ")
+                   .append(exportEndDate.getValue())
+                   .append("\n");
+        } else {
+            preview.append("• Data range: All time\n");
+        }
+        
+        preview.append("• Format: ").append(format != null ? format : "Not selected").append("\n");
+        preview.append("• Records: 1,247 batches\n");
+        preview.append("• Generated: ").append(java.time.LocalDateTime.now());
+        
+        if (exportPreview != null) {
+            exportPreview.setText(preview.toString());
         }
     }
 

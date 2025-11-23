@@ -90,7 +90,13 @@ public class LogisticsController {
     }
 
     private void setupMapContainer() {
-        if (mapContainer != null) {
+        // Null-safe map visualization initialization
+        if (mapContainer == null) {
+            System.err.println("Warning: mapContainer is null, skipping map visualization setup");
+            return;
+        }
+        
+        try {
             // Clear any existing content
             mapContainer.getChildren().clear();
 
@@ -118,12 +124,20 @@ public class LogisticsController {
                     "Start simulation from Producer screen to see real-time tracking");
             instruction.setFill(Color.GRAY);
             mapContainer.getChildren().add(instruction);
+        } catch (Exception e) {
+            System.err.println("Error setting up map container: " + e.getMessage());
         }
     }
 
     private void startSyncService() {
-        syncExecutor = Executors.newSingleThreadScheduledExecutor();
-        syncExecutor.scheduleAtFixedRate(this::syncWithDeliverySimulator, 0, 2, TimeUnit.SECONDS);
+        // Safe initialization of sync service
+        try {
+            syncExecutor = Executors.newSingleThreadScheduledExecutor();
+            syncExecutor.scheduleAtFixedRate(this::syncWithDeliverySimulator, 0, 2, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            System.err.println("Warning: Could not start sync service: " + e.getMessage());
+            // Continue without sync service - manual refresh will still work
+        }
     }
 
     private void syncWithDeliverySimulator() {
@@ -136,9 +150,16 @@ public class LogisticsController {
         }
 
         Platform.runLater(() -> {
-            // Clear previous visualizations
-            mapContainer.getChildren().removeIf(node ->
-                    node.getUserData() != null && "shipment".equals(node.getUserData()));
+            // Null-safe map container operations
+            if (mapContainer != null) {
+                try {
+                    // Clear previous visualizations
+                    mapContainer.getChildren().removeIf(node ->
+                            node.getUserData() != null && "shipment".equals(node.getUserData()));
+                } catch (Exception e) {
+                    System.err.println("Error clearing map visualizations: " + e.getMessage());
+                }
+            }
 
             // Update active shipments from simulator
             updateActiveShipmentsFromSimulator();
@@ -325,6 +346,51 @@ public class LogisticsController {
     }
 
     private void setupShipmentsTable() {
+        // Configure table columns programmatically with cell value factories
+        if (shipmentsTable != null && shipmentsTable.getColumns().size() >= 7) {
+            try {
+                @SuppressWarnings("unchecked")
+                javafx.scene.control.TableColumn<Shipment, String> batchIdCol = 
+                    (javafx.scene.control.TableColumn<Shipment, String>) shipmentsTable.getColumns().get(0);
+                @SuppressWarnings("unchecked")
+                javafx.scene.control.TableColumn<Shipment, String> statusCol = 
+                    (javafx.scene.control.TableColumn<Shipment, String>) shipmentsTable.getColumns().get(1);
+                @SuppressWarnings("unchecked")
+                javafx.scene.control.TableColumn<Shipment, String> locationCol = 
+                    (javafx.scene.control.TableColumn<Shipment, String>) shipmentsTable.getColumns().get(2);
+                @SuppressWarnings("unchecked")
+                javafx.scene.control.TableColumn<Shipment, Number> tempCol = 
+                    (javafx.scene.control.TableColumn<Shipment, Number>) shipmentsTable.getColumns().get(3);
+                @SuppressWarnings("unchecked")
+                javafx.scene.control.TableColumn<Shipment, Number> humidityCol = 
+                    (javafx.scene.control.TableColumn<Shipment, Number>) shipmentsTable.getColumns().get(4);
+                @SuppressWarnings("unchecked")
+                javafx.scene.control.TableColumn<Shipment, String> etaCol = 
+                    (javafx.scene.control.TableColumn<Shipment, String>) shipmentsTable.getColumns().get(5);
+                @SuppressWarnings("unchecked")
+                javafx.scene.control.TableColumn<Shipment, String> vehicleCol = 
+                    (javafx.scene.control.TableColumn<Shipment, String>) shipmentsTable.getColumns().get(6);
+                
+                batchIdCol.setCellValueFactory(cellData -> 
+                    new javafx.beans.property.SimpleStringProperty(cellData.getValue().getBatchId()));
+                statusCol.setCellValueFactory(cellData -> 
+                    new javafx.beans.property.SimpleStringProperty(cellData.getValue().getStatus()));
+                locationCol.setCellValueFactory(cellData -> 
+                    new javafx.beans.property.SimpleStringProperty(cellData.getValue().getLocation()));
+                tempCol.setCellValueFactory(cellData -> 
+                    new javafx.beans.property.SimpleDoubleProperty(cellData.getValue().getTemperature()));
+                humidityCol.setCellValueFactory(cellData -> 
+                    new javafx.beans.property.SimpleDoubleProperty(cellData.getValue().getHumidity()));
+                etaCol.setCellValueFactory(cellData -> 
+                    new javafx.beans.property.SimpleStringProperty(cellData.getValue().getEta()));
+                vehicleCol.setCellValueFactory(cellData -> 
+                    new javafx.beans.property.SimpleStringProperty(
+                        cellData.getValue().getVehicle() != null ? cellData.getValue().getVehicle() : "N/A"));
+            } catch (ClassCastException | IndexOutOfBoundsException e) {
+                System.err.println("Warning: Could not configure shipments table columns: " + e.getMessage());
+            }
+        }
+        
         // Load demo data only if flag is set
         if (shouldLoadDemoData()) {
             shipments.addAll(
