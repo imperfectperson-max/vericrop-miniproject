@@ -25,6 +25,9 @@ public class FileLedgerService {
     private static final Logger logger = LoggerFactory.getLogger(FileLedgerService.class);
     private final Path ledgerPath;
     private final ObjectMapper objectMapper;
+    // Lock object for synchronizing writes within the same JVM
+    // File locks work across processes but not across threads in the same JVM
+    private final Object writeLock = new Object();
 
     /**
      * Create ledger service with default ledger directory.
@@ -67,7 +70,8 @@ public class FileLedgerService {
 
     /**
      * Record a shipment in the immutable ledger with atomic file operations.
-     * Uses file locking to prevent concurrent write corruption.
+     * Uses synchronized block for in-JVM thread safety and file locking for cross-process safety.
+     * File locks in Java are per-JVM, so we need both mechanisms for complete concurrency control.
      *
      * @param record The shipment record to store
      * @return The record with ledger ID and hash assigned
@@ -77,44 +81,50 @@ public class FileLedgerService {
             throw new IllegalArgumentException("Shipment record cannot be null");
         }
 
-        try {
-            // Generate unique ledger ID if not present
-            if (record.getLedgerId() == null || record.getLedgerId().isEmpty()) {
-                record.setLedgerId(UUID.randomUUID().toString());
-            }
+        // Synchronize on writeLock to prevent OverlappingFileLockException
+        // File locks in Java are per-JVM, not per-thread, so multiple threads in the same
+        // JVM trying to lock the same file will get OverlappingFileLockException
+        synchronized (writeLock) {
+            try {
+                // Generate unique ledger ID if not present
+                if (record.getLedgerId() == null || record.getLedgerId().isEmpty()) {
+                    record.setLedgerId(UUID.randomUUID().toString());
+                }
 
-            // Get previous record's hash for chain verification
-            String previousHash = getLastRecordHash();
-            
-            // Compute SHA-256 hash of record content including previous hash (chain)
-            String recordHash = computeRecordHash(record, previousHash);
-            record.setLedgerHash(recordHash);
-
-            // Serialize to JSON
-            String jsonLine = objectMapper.writeValueAsString(record) + System.lineSeparator();
-
-            // Use file locking for atomic append operation with try-with-resources
-            try (RandomAccessFile raf = new RandomAccessFile(ledgerPath.toFile(), "rw");
-                 java.nio.channels.FileChannel channel = raf.getChannel();
-                 java.nio.channels.FileLock lock = channel.lock()) {
+                // Get previous record's hash for chain verification
+                String previousHash = getLastRecordHash();
                 
-                // Move to end of file and append
-                raf.seek(raf.length());
-                raf.write(jsonLine.getBytes(StandardCharsets.UTF_8));
-                
-                // Force writes to disk for durability
-                channel.force(true);
+                // Compute SHA-256 hash of record content including previous hash (chain)
+                String recordHash = computeRecordHash(record, previousHash);
+                record.setLedgerHash(recordHash);
+
+                // Serialize to JSON
+                String jsonLine = objectMapper.writeValueAsString(record) + System.lineSeparator();
+
+                // Use file locking for atomic append operation with try-with-resources
+                // This provides cross-process safety (e.g., multiple JVM instances)
+                try (RandomAccessFile raf = new RandomAccessFile(ledgerPath.toFile(), "rw");
+                     java.nio.channels.FileChannel channel = raf.getChannel();
+                     java.nio.channels.FileLock lock = channel.lock()) {
+                    
+                    // Move to end of file and append
+                    raf.seek(raf.length());
+                    raf.write(jsonLine.getBytes(StandardCharsets.UTF_8));
+                    
+                    // Force writes to disk for durability
+                    channel.force(true);
+                }
+
+                logger.info("Recorded shipment {} in ledger with hash {} (chain: {})",
+                        record.getShipmentId(), recordHash.substring(0, 8), 
+                        previousHash != null ? previousHash.substring(0, 8) : "genesis");
+
+                return record;
+
+            } catch (IOException e) {
+                logger.error("Failed to record shipment {}: {}", record.getShipmentId(), e.getMessage());
+                throw new RuntimeException("Failed to record shipment in ledger", e);
             }
-
-            logger.info("Recorded shipment {} in ledger with hash {} (chain: {})",
-                    record.getShipmentId(), recordHash.substring(0, 8), 
-                    previousHash != null ? previousHash.substring(0, 8) : "genesis");
-
-            return record;
-
-        } catch (IOException e) {
-            logger.error("Failed to record shipment {}: {}", record.getShipmentId(), e.getMessage());
-            throw new RuntimeException("Failed to record shipment in ledger", e);
         }
     }
 
