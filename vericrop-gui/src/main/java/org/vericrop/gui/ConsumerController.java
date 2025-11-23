@@ -5,8 +5,13 @@ import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.stage.FileChooser;
+import javafx.stage.Stage;
 import java.util.Set;
 import java.util.HashSet;
+import java.io.File;
+import org.vericrop.gui.util.QRDecoder;
+import com.google.zxing.NotFoundException;
 
 public class ConsumerController {
 
@@ -59,7 +64,46 @@ public class ConsumerController {
 
     @FXML
     private void handleScanQR() {
-        showAlert(Alert.AlertType.INFORMATION, "QR Scanner", "QR scanner would activate here");
+        // Create file chooser for image upload
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Select QR Code Image");
+        fileChooser.getExtensionFilters().addAll(
+            new FileChooser.ExtensionFilter("Image Files", "*.png", "*.jpg", "*.jpeg", "*.gif", "*.bmp"),
+            new FileChooser.ExtensionFilter("All Files", "*.*")
+        );
+        
+        // Get the current stage (window)
+        Stage stage = (Stage) batchIdField.getScene().getWindow();
+        
+        // Show file chooser dialog
+        File selectedFile = fileChooser.showOpenDialog(stage);
+        
+        if (selectedFile != null) {
+            try {
+                // Decode the QR code from the image
+                String qrContent = QRDecoder.decodeQRCode(selectedFile);
+                
+                // Extract batch ID from QR content
+                String batchId = QRDecoder.extractBatchId(qrContent);
+                
+                if (batchId != null && !batchId.trim().isEmpty()) {
+                    // Set the batch ID in the text field
+                    batchIdField.setText(batchId);
+                    
+                    // Automatically verify the batch
+                    verifyBatch(batchId);
+                } else {
+                    showAlert(Alert.AlertType.WARNING, "Invalid QR Code", 
+                        "Could not extract batch ID from the QR code.");
+                }
+            } catch (NotFoundException e) {
+                showAlert(Alert.AlertType.ERROR, "QR Code Not Found", 
+                    "No QR code was found in the selected image. Please select an image containing a valid QR code.");
+            } catch (Exception e) {
+                showAlert(Alert.AlertType.ERROR, "Error Reading QR Code", 
+                    "Failed to read QR code from the image: " + e.getMessage());
+            }
+        }
     }
 
     @FXML
