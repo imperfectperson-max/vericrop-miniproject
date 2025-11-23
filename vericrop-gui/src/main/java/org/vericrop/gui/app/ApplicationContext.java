@@ -11,6 +11,7 @@ import org.vericrop.gui.persistence.PostgresBatchRepository;
 import org.vericrop.gui.services.*;
 import org.vericrop.service.DeliverySimulator;
 import org.vericrop.service.MessageService;
+import org.vericrop.service.simulation.SimulationManager;
 
 import javax.sql.DataSource;
 
@@ -45,6 +46,7 @@ public class ApplicationContext {
     private final MessageService messageService;
     private final DeliverySimulator deliverySimulator;
     private final AlertService alertService;
+    private final SimulationManager simulationManager;
     
     // Additional services for demo mode
     private org.vericrop.service.BlockchainService blockchainService;
@@ -80,6 +82,11 @@ public class ApplicationContext {
         this.messageService = new MessageService(true); // Enable persistence
         this.deliverySimulator = new DeliverySimulator(messageService);
         this.alertService = AlertService.getInstance();
+        
+        // Initialize SimulationManager with DeliverySimulator
+        SimulationManager.initialize(this.deliverySimulator);
+        this.simulationManager = SimulationManager.getInstance();
+        logger.info("SimulationManager initialized");
         
         // Initialize additional services for demo mode
         this.fileLedgerService = new org.vericrop.service.impl.FileLedgerService();
@@ -189,6 +196,10 @@ public class ApplicationContext {
         return alertService;
     }
     
+    public SimulationManager getSimulationManager() {
+        return simulationManager;
+    }
+    
     /**
      * Get or create BlockchainService.
      * @param blockchain The blockchain instance to use
@@ -230,6 +241,14 @@ public class ApplicationContext {
      */
     public void shutdown() {
         logger.info("=== Shutting down Application Context ===");
+        
+        try {
+            if (simulationManager != null) {
+                simulationManager.shutdown();
+            }
+        } catch (Exception e) {
+            logger.error("Error shutting down simulation manager", e);
+        }
         
         try {
             if (deliverySimulator != null) {

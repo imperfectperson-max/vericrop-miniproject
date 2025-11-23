@@ -12,9 +12,11 @@ import java.util.HashSet;
 import java.io.File;
 import java.io.IOException;
 import org.vericrop.gui.util.QRDecoder;
+import org.vericrop.service.simulation.SimulationListener;
+import org.vericrop.service.simulation.SimulationManager;
 import com.google.zxing.NotFoundException;
 
-public class ConsumerController {
+public class ConsumerController implements SimulationListener {
 
     @FXML private TextField batchIdField;
     @FXML private ListView<String> verificationHistoryList;
@@ -29,6 +31,29 @@ public class ConsumerController {
     public void initialize() {
         setupVerificationHistory();
         setupNavigationButtons();
+        registerWithSimulationManager();
+    }
+    
+    /**
+     * Register this controller as a listener with SimulationManager.
+     */
+    private void registerWithSimulationManager() {
+        try {
+            if (SimulationManager.isInitialized()) {
+                SimulationManager manager = SimulationManager.getInstance();
+                manager.registerListener(this);
+                
+                // If simulation is already running, add note to verification history
+                if (manager.isRunning()) {
+                    String batchId = manager.getSimulationId();
+                    Platform.runLater(() -> {
+                        verificationHistory.add(0, "📦 Batch in transit: " + batchId + " - Track in Logistics tab");
+                    });
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Warning: Could not register with SimulationManager: " + e.getMessage());
+        }
     }
 
     private void setupNavigationButtons() {
@@ -291,5 +316,50 @@ public class ConsumerController {
         alert.setHeaderText(null);
         alert.setContentText(message);
         alert.showAndWait();
+    }
+    
+    public void cleanup() {
+        // Unregister from SimulationManager
+        try {
+            if (SimulationManager.isInitialized()) {
+                SimulationManager.getInstance().unregisterListener(this);
+            }
+        } catch (Exception e) {
+            System.err.println("Error unregistering from SimulationManager: " + e.getMessage());
+        }
+    }
+    
+    // ========== SimulationListener Implementation ==========
+    
+    @Override
+    public void onSimulationStarted(String batchId, String farmerId) {
+        Platform.runLater(() -> {
+            verificationHistory.add(0, "🚚 Batch " + batchId + " is now in transit - Track in Logistics tab");
+            System.out.println("ConsumerController: Simulation started - " + batchId);
+        });
+    }
+    
+    @Override
+    public void onProgressUpdate(String batchId, double progress, String currentLocation) {
+        // Consumer doesn't need detailed progress updates
+    }
+    
+    @Override
+    public void onSimulationStopped(String batchId, boolean completed) {
+        Platform.runLater(() -> {
+            String message = completed ? 
+                "✅ Batch " + batchId + " delivered successfully" : 
+                "⏹ Delivery stopped for batch " + batchId;
+            verificationHistory.add(0, message);
+            System.out.println("ConsumerController: " + message);
+        });
+    }
+    
+    @Override
+    public void onSimulationError(String batchId, String error) {
+        Platform.runLater(() -> {
+            verificationHistory.add(0, "❌ Delivery issue for batch " + batchId);
+            System.err.println("ConsumerController: Simulation error - " + error);
+        });
     }
 }

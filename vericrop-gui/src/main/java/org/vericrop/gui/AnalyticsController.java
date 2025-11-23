@@ -8,8 +8,10 @@ import javafx.scene.chart.XYChart;
 import javafx.scene.control.*;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import org.vericrop.service.simulation.SimulationListener;
+import org.vericrop.service.simulation.SimulationManager;
 
-public class AnalyticsController {
+public class AnalyticsController implements SimulationListener {
 
     @FXML private Label totalBatchesLabel;
     @FXML private Label avgQualityLabel;
@@ -41,6 +43,34 @@ public class AnalyticsController {
         setupExportCombo();
         setupCharts();
         setupNavigation();
+        registerWithSimulationManager();
+    }
+    
+    /**
+     * Register this controller as a listener with SimulationManager.
+     */
+    private void registerWithSimulationManager() {
+        try {
+            if (SimulationManager.isInitialized()) {
+                SimulationManager manager = SimulationManager.getInstance();
+                manager.registerListener(this);
+                
+                // If simulation is already running, add to alerts
+                if (manager.isRunning()) {
+                    String batchId = manager.getSimulationId();
+                    Platform.runLater(() -> {
+                        alerts.add(new Alert(
+                            java.time.LocalDateTime.now().format(
+                                java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")),
+                            "INFO",
+                            "Active delivery simulation: " + batchId
+                        ));
+                    });
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Warning: Could not register with SimulationManager: " + e.getMessage());
+        }
     }
 
     private void setupNavigation() {
@@ -330,5 +360,65 @@ public class AnalyticsController {
         public String getDate() { return date; }
         public String getType() { return type; }
         public String getDetails() { return details; }
+    }
+    
+    public void cleanup() {
+        // Unregister from SimulationManager
+        try {
+            if (SimulationManager.isInitialized()) {
+                SimulationManager.getInstance().unregisterListener(this);
+            }
+        } catch (Exception e) {
+            System.err.println("Error unregistering from SimulationManager: " + e.getMessage());
+        }
+    }
+    
+    // ========== SimulationListener Implementation ==========
+    
+    @Override
+    public void onSimulationStarted(String batchId, String farmerId) {
+        Platform.runLater(() -> {
+            alerts.add(0, new Alert(
+                java.time.LocalDateTime.now().format(
+                    java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")),
+                "INFO",
+                "Delivery simulation started for batch: " + batchId
+            ));
+            System.out.println("AnalyticsController: Simulation started - " + batchId);
+        });
+    }
+    
+    @Override
+    public void onProgressUpdate(String batchId, double progress, String currentLocation) {
+        // Analytics doesn't need detailed progress updates
+    }
+    
+    @Override
+    public void onSimulationStopped(String batchId, boolean completed) {
+        Platform.runLater(() -> {
+            String details = completed ? 
+                "Delivery completed for batch: " + batchId : 
+                "Delivery simulation stopped for batch: " + batchId;
+            alerts.add(0, new Alert(
+                java.time.LocalDateTime.now().format(
+                    java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")),
+                completed ? "SUCCESS" : "INFO",
+                details
+            ));
+            System.out.println("AnalyticsController: " + details);
+        });
+    }
+    
+    @Override
+    public void onSimulationError(String batchId, String error) {
+        Platform.runLater(() -> {
+            alerts.add(0, new Alert(
+                java.time.LocalDateTime.now().format(
+                    java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")),
+                "ERROR",
+                "Simulation error for batch " + batchId + ": " + error
+            ));
+            System.err.println("AnalyticsController: Simulation error - " + error);
+        });
     }
 }

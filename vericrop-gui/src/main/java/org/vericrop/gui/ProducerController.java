@@ -36,8 +36,10 @@ import org.vericrop.kafka.events.LogisticsEvent;
 import org.vericrop.kafka.events.BlockchainEvent;
 import org.vericrop.kafka.events.QualityAlertEvent;
 import org.vericrop.gui.util.BlockchainInitializer;
+import org.vericrop.service.simulation.SimulationListener;
+import org.vericrop.service.simulation.SimulationManager;
 
-public class ProducerController {
+public class ProducerController implements SimulationListener {
     private static final int SHIPMENT_UPDATE_INTERVAL_MS = 2000;
 
     private Blockchain blockchain;
@@ -148,6 +150,42 @@ public class ProducerController {
                 rejectionRateLabel.setText("0%");
             }
         });
+        
+        // Register with SimulationManager to receive simulation updates
+        registerWithSimulationManager();
+    }
+    
+    /**
+     * Register this controller as a listener with SimulationManager.
+     * If a simulation is already running, update UI to reflect it.
+     */
+    private void registerWithSimulationManager() {
+        try {
+            if (SimulationManager.isInitialized()) {
+                SimulationManager manager = SimulationManager.getInstance();
+                manager.registerListener(this);
+                
+                // If simulation is already running when we initialize, restore UI state
+                if (manager.isRunning()) {
+                    String batchId = manager.getSimulationId();
+                    double progress = manager.getProgress();
+                    String location = manager.getCurrentLocation();
+                    
+                    Platform.runLater(() -> {
+                        activeSimulationId = batchId;
+                        if (startSimButton != null) startSimButton.setDisable(true);
+                        if (stopSimButton != null) stopSimButton.setDisable(false);
+                        if (simStatusLabel != null) {
+                            simStatusLabel.setText(String.format("✅ Simulation running: %.0f%% - %s", 
+                                progress, location != null ? location : batchId));
+                            simStatusLabel.setStyle("-fx-text-fill: #10B981;");
+                        }
+                    });
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Warning: Could not register with SimulationManager: " + e.getMessage());
+        }
     }
 
     private void setupNavigationButtons() {
@@ -1067,8 +1105,11 @@ public class ProducerController {
                 return;
             }
 
-            // Get delivery simulator from ApplicationContext
-            var deliverySimulator = MainApp.getInstance().getApplicationContext().getDeliverySimulator();
+            // Get farmer ID from field or use default
+            String farmerId = farmerField.getText();
+            if (farmerId == null || farmerId.trim().isEmpty()) {
+                farmerId = "Unknown Farmer";
+            }
 
             // Generate sample route: Farm to Warehouse
             var origin = new org.vericrop.service.DeliverySimulator.GeoCoordinate(
@@ -1078,24 +1119,14 @@ public class ProducerController {
                     42.3736, -71.1097, "Metro Fresh Warehouse"
             );
 
-            // Generate route with 10 waypoints over next 2 hours (avg speed 50 km/h)
-            long startTime = System.currentTimeMillis();
-            var route = deliverySimulator.generateRoute(origin, destination, 10, startTime, 50.0);
-
-            // Start simulation with 10-second update intervals
-            deliverySimulator.startSimulation(selectedBatchId, route, 10000);
-
-            activeSimulationId = selectedBatchId;
+            // Use SimulationManager to start simulation
+            SimulationManager manager = MainApp.getInstance().getApplicationContext().getSimulationManager();
+            manager.startSimulation(selectedBatchId, farmerId, origin, destination, 10, 50.0, 10000);
 
             // Notify logistics controller about the new simulation
             notifyLogisticsAboutSimulation(selectedBatchId);
 
-            // Update UI
-            startSimButton.setDisable(true);
-            stopSimButton.setDisable(false);
-            simStatusLabel.setText("✅ Simulation running for: " + selectedBatchId);
-            simStatusLabel.setStyle("-fx-text-fill: #10B981;");
-
+            // UI updates will be handled by SimulationListener callbacks
             // Create alert
             var alertService = MainApp.getInstance().getApplicationContext().getAlertService();
             alertService.info("Simulation Started",
@@ -1105,8 +1136,12 @@ public class ProducerController {
             System.out.println("✅ Simulation started for: " + selectedBatchId);
 
         } catch (Exception e) {
-            simStatusLabel.setText("❌ Error: " + e.getMessage());
-            simStatusLabel.setStyle("-fx-text-fill: #DC2626;");
+            Platform.runLater(() -> {
+                if (simStatusLabel != null) {
+                    simStatusLabel.setText("❌ Error: " + e.getMessage());
+                    simStatusLabel.setStyle("-fx-text-fill: #DC2626;");
+                }
+            });
             e.printStackTrace();
         }
     }
@@ -1293,33 +1328,38 @@ public class ProducerController {
     @FXML
     private void handleStopSimulation() {
         try {
-            if (activeSimulationId == null) {
-                simStatusLabel.setText("⚠ No active simulation");
+            // Use SimulationManager to stop simulation
+            SimulationManager manager = MainApp.getInstance().getApplicationContext().getSimulationManager();
+            
+            if (!manager.isRunning()) {
+                Platform.runLater(() -> {
+                    if (simStatusLabel != null) {
+                        simStatusLabel.setText("⚠ No active simulation");
+                        simStatusLabel.setStyle("-fx-text-fill: #DC2626;");
+                    }
+                });
                 return;
             }
 
-            // Stop simulation
-            var deliverySimulator = MainApp.getInstance().getApplicationContext().getDeliverySimulator();
-            deliverySimulator.stopSimulation(activeSimulationId);
-
-            // Update UI
-            startSimButton.setDisable(false);
-            stopSimButton.setDisable(true);
-            simStatusLabel.setText("⏹ Simulation stopped");
-            simStatusLabel.setStyle("-fx-text-fill: #6B7280;");
+            String stoppingBatchId = manager.getSimulationId();
+            manager.stopSimulation();
 
             // Create alert
             var alertService = MainApp.getInstance().getApplicationContext().getAlertService();
             alertService.info("Simulation Stopped",
-                    "Delivery simulation for " + activeSimulationId + " has been stopped",
+                    "Delivery simulation for " + stoppingBatchId + " has been stopped",
                     "simulator");
 
-            System.out.println("⏹ Simulation stopped for: " + activeSimulationId);
-            activeSimulationId = null;
+            System.out.println("⏹ Simulation stopped for: " + stoppingBatchId);
+            // UI updates will be handled by SimulationListener callbacks
 
         } catch (Exception e) {
-            simStatusLabel.setText("❌ Error: " + e.getMessage());
-            simStatusLabel.setStyle("-fx-text-fill: #DC2626;");
+            Platform.runLater(() -> {
+                if (simStatusLabel != null) {
+                    simStatusLabel.setText("❌ Error: " + e.getMessage());
+                    simStatusLabel.setStyle("-fx-text-fill: #DC2626;");
+                }
+            });
             e.printStackTrace();
         }
     }
@@ -1798,6 +1838,15 @@ public class ProducerController {
     }
 
     public void cleanup() {
+        // Unregister from SimulationManager
+        try {
+            if (SimulationManager.isInitialized()) {
+                SimulationManager.getInstance().unregisterListener(this);
+            }
+        } catch (Exception e) {
+            System.err.println("Error unregistering from SimulationManager: " + e.getMessage());
+        }
+        
         if (blockchainService != null) {
             blockchainService.shutdown();
         }
@@ -1820,5 +1869,71 @@ public class ProducerController {
             qualityAlertProducer.close();
         }
         System.out.println("🔴 All services cleaned up");
+    }
+    
+    // ========== SimulationListener Implementation ==========
+    
+    @Override
+    public void onSimulationStarted(String batchId, String farmerId) {
+        Platform.runLater(() -> {
+            activeSimulationId = batchId;
+            if (startSimButton != null) {
+                startSimButton.setDisable(true);
+            }
+            if (stopSimButton != null) {
+                stopSimButton.setDisable(false);
+            }
+            if (simStatusLabel != null) {
+                simStatusLabel.setText("✅ Simulation started for: " + batchId);
+                simStatusLabel.setStyle("-fx-text-fill: #10B981;");
+            }
+            System.out.println("🎬 Simulation started notification received: " + batchId);
+        });
+    }
+    
+    @Override
+    public void onProgressUpdate(String batchId, double progress, String currentLocation) {
+        Platform.runLater(() -> {
+            if (simStatusLabel != null && batchId.equals(activeSimulationId)) {
+                simStatusLabel.setText(String.format("✅ Simulation: %.0f%% - %s", progress, currentLocation));
+                simStatusLabel.setStyle("-fx-text-fill: #10B981;");
+            }
+        });
+    }
+    
+    @Override
+    public void onSimulationStopped(String batchId, boolean completed) {
+        Platform.runLater(() -> {
+            if (startSimButton != null) {
+                startSimButton.setDisable(false);
+            }
+            if (stopSimButton != null) {
+                stopSimButton.setDisable(true);
+            }
+            if (simStatusLabel != null) {
+                String message = completed ? "✅ Simulation completed" : "⏹ Simulation stopped";
+                simStatusLabel.setText(message);
+                simStatusLabel.setStyle("-fx-text-fill: #6B7280;");
+            }
+            activeSimulationId = null;
+            System.out.println("🛑 Simulation stopped notification received: " + batchId);
+        });
+    }
+    
+    @Override
+    public void onSimulationError(String batchId, String error) {
+        Platform.runLater(() -> {
+            if (simStatusLabel != null) {
+                simStatusLabel.setText("❌ Error: " + error);
+                simStatusLabel.setStyle("-fx-text-fill: #DC2626;");
+            }
+            if (startSimButton != null) {
+                startSimButton.setDisable(false);
+            }
+            if (stopSimButton != null) {
+                stopSimButton.setDisable(true);
+            }
+            System.err.println("❌ Simulation error: " + error);
+        });
     }
 }

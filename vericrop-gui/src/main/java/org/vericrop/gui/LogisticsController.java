@@ -12,6 +12,8 @@ import javafx.scene.shape.Circle;
 import javafx.scene.shape.Line;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Text;
+import org.vericrop.service.simulation.SimulationListener;
+import org.vericrop.service.simulation.SimulationManager;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -19,7 +21,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-public class LogisticsController {
+public class LogisticsController implements SimulationListener {
 
     @FXML private TableView<Shipment> shipmentsTable;
     @FXML private ListView<String> alertsList;
@@ -68,6 +70,33 @@ public class LogisticsController {
             this.deliverySimulator = MainApp.getInstance().getApplicationContext().getDeliverySimulator();
         } catch (Exception e) {
             System.err.println("Delivery simulator not available: " + e.getMessage());
+        }
+        
+        // Register with SimulationManager to track running simulations
+        registerWithSimulationManager();
+    }
+    
+    /**
+     * Register this controller as a listener with SimulationManager.
+     * If a simulation is already running, update the map to show it.
+     */
+    private void registerWithSimulationManager() {
+        try {
+            if (SimulationManager.isInitialized()) {
+                SimulationManager manager = SimulationManager.getInstance();
+                manager.registerListener(this);
+                
+                // If simulation is already running when we initialize, show it on map
+                if (manager.isRunning()) {
+                    String batchId = manager.getSimulationId();
+                    Platform.runLater(() -> {
+                        alerts.add(0, "📍 Active simulation detected: " + batchId);
+                        System.out.println("LogisticsController: Detected running simulation: " + batchId);
+                    });
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Warning: Could not register with SimulationManager: " + e.getMessage());
         }
     }
 
@@ -602,9 +631,55 @@ public class LogisticsController {
     }
 
     public void cleanup() {
+        // Unregister from SimulationManager
+        try {
+            if (SimulationManager.isInitialized()) {
+                SimulationManager.getInstance().unregisterListener(this);
+            }
+        } catch (Exception e) {
+            System.err.println("Error unregistering from SimulationManager: " + e.getMessage());
+        }
+        
         if (syncExecutor != null && !syncExecutor.isShutdown()) {
             syncExecutor.shutdownNow();
         }
+    }
+    
+    // ========== SimulationListener Implementation ==========
+    
+    @Override
+    public void onSimulationStarted(String batchId, String farmerId) {
+        Platform.runLater(() -> {
+            alerts.add(0, "🚚 Delivery simulation started for: " + batchId);
+            System.out.println("LogisticsController: Simulation started - " + batchId);
+        });
+    }
+    
+    @Override
+    public void onProgressUpdate(String batchId, double progress, String currentLocation) {
+        Platform.runLater(() -> {
+            // Update could be shown in the map or alerts list
+            System.out.println("LogisticsController: Progress update - " + batchId + " at " + progress + "%");
+        });
+    }
+    
+    @Override
+    public void onSimulationStopped(String batchId, boolean completed) {
+        Platform.runLater(() -> {
+            String message = completed ? 
+                "✅ Delivery completed for: " + batchId : 
+                "⏹ Delivery simulation stopped for: " + batchId;
+            alerts.add(0, message);
+            System.out.println("LogisticsController: " + message);
+        });
+    }
+    
+    @Override
+    public void onSimulationError(String batchId, String error) {
+        Platform.runLater(() -> {
+            alerts.add(0, "❌ Simulation error for " + batchId + ": " + error);
+            System.err.println("LogisticsController: Simulation error - " + error);
+        });
     }
 
     // Helper class for map visualization
