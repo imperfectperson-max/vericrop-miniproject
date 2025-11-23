@@ -71,8 +71,9 @@ public class PostgresBatchRepository {
      */
     public BatchRecord create(BatchRecord batch) throws SQLException {
         String sql = "INSERT INTO batches (batch_id, name, farmer, product_type, quantity, " +
-                "quality_score, quality_label, data_hash, timestamp, status, created_at, updated_at) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::timestamp, ?, ?, ?) " +
+                "quality_score, quality_label, data_hash, timestamp, status, " +
+                "image_path, qr_code_path, prime_rate, rejection_rate, created_at, updated_at) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::timestamp, ?, ?, ?, ?, ?, ?, ?) " +
                 "RETURNING id, created_at, updated_at";
         
         try (Connection conn = dataSource.getConnection();
@@ -95,10 +96,24 @@ public class PostgresBatchRepository {
             stmt.setString(9, batch.getTimestamp() != null ? batch.getTimestamp() : 
                     LocalDateTime.now().toString());
             stmt.setString(10, batch.getStatus() != null ? batch.getStatus() : "created");
+            stmt.setString(11, batch.getImagePath());
+            stmt.setString(12, batch.getQrCodePath());
+            
+            if (batch.getPrimeRate() != null) {
+                stmt.setDouble(13, batch.getPrimeRate());
+            } else {
+                stmt.setNull(13, Types.DECIMAL);
+            }
+            
+            if (batch.getRejectionRate() != null) {
+                stmt.setDouble(14, batch.getRejectionRate());
+            } else {
+                stmt.setNull(14, Types.DECIMAL);
+            }
             
             Timestamp now = Timestamp.valueOf(LocalDateTime.now());
-            stmt.setTimestamp(11, now);
-            stmt.setTimestamp(12, now);
+            stmt.setTimestamp(15, now);
+            stmt.setTimestamp(16, now);
             
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
@@ -223,7 +238,8 @@ public class PostgresBatchRepository {
      */
     public BatchRecord update(BatchRecord batch) throws SQLException {
         String sql = "UPDATE batches SET name = ?, farmer = ?, product_type = ?, quantity = ?, " +
-                "quality_score = ?, quality_label = ?, data_hash = ?, status = ?, updated_at = ? " +
+                "quality_score = ?, quality_label = ?, data_hash = ?, status = ?, " +
+                "image_path = ?, qr_code_path = ?, prime_rate = ?, rejection_rate = ?, updated_at = ? " +
                 "WHERE batch_id = ? " +
                 "RETURNING id, created_at, updated_at";
         
@@ -244,8 +260,23 @@ public class PostgresBatchRepository {
             stmt.setString(6, batch.getQualityLabel());
             stmt.setString(7, batch.getDataHash());
             stmt.setString(8, batch.getStatus());
-            stmt.setTimestamp(9, Timestamp.valueOf(LocalDateTime.now()));
-            stmt.setString(10, batch.getBatchId());
+            stmt.setString(9, batch.getImagePath());
+            stmt.setString(10, batch.getQrCodePath());
+            
+            if (batch.getPrimeRate() != null) {
+                stmt.setDouble(11, batch.getPrimeRate());
+            } else {
+                stmt.setNull(11, Types.DECIMAL);
+            }
+            
+            if (batch.getRejectionRate() != null) {
+                stmt.setDouble(12, batch.getRejectionRate());
+            } else {
+                stmt.setNull(12, Types.DECIMAL);
+            }
+            
+            stmt.setTimestamp(13, Timestamp.valueOf(LocalDateTime.now()));
+            stmt.setString(14, batch.getBatchId());
             
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
@@ -333,6 +364,18 @@ public class PostgresBatchRepository {
         batch.setDataHash(rs.getString("data_hash"));
         batch.setTimestamp(rs.getString("timestamp"));
         batch.setStatus(rs.getString("status"));
+        batch.setImagePath(rs.getString("image_path"));
+        batch.setQrCodePath(rs.getString("qr_code_path"));
+        
+        double primeRate = rs.getDouble("prime_rate");
+        if (!rs.wasNull()) {
+            batch.setPrimeRate(primeRate);
+        }
+        
+        double rejectionRate = rs.getDouble("rejection_rate");
+        if (!rs.wasNull()) {
+            batch.setRejectionRate(rejectionRate);
+        }
         
         Timestamp createdAt = rs.getTimestamp("created_at");
         if (createdAt != null) {
