@@ -100,6 +100,9 @@ public class ProducerController {
     private Map<String, Object> currentPrediction;
     private String currentBatchId;
     private String activeSimulationId;
+    
+    // Map to store batch info: batch display name -> batch details (for selection dialog)
+    private Map<String, Map<String, Object>> batchInfoMap = new HashMap<>();
 
     public void initialize() {
         backgroundExecutor = Executors.newFixedThreadPool(4);
@@ -868,14 +871,21 @@ public class ProducerController {
 
                 if (recentBatchesList != null && recentBatches != null) {
                     ObservableList<String> batches = FXCollections.observableArrayList();
+                    batchInfoMap.clear(); // Clear previous batch info
+                    
                     for (Map<String, Object> batch : recentBatches) {
+                        String batchId = safeGetString(batch, "batch_id");
                         String batchName = safeGetString(batch, "name");
                         String qualityScore = safeGetString(batch, "quality_score");
                         String primeRateStr = safeGetString(batch, "prime_rate");
                         String rejectionRateStr = safeGetString(batch, "rejection_rate");
 
-                        batches.add(batchName + " | Quality: " + qualityScore +
-                                " | Prime: " + primeRateStr + " | Reject: " + rejectionRateStr);
+                        String displayText = batchName + " | Quality: " + qualityScore +
+                                " | Prime: " + primeRateStr + " | Reject: " + rejectionRateStr;
+                        batches.add(displayText);
+                        
+                        // Store batch info for later retrieval by display text
+                        batchInfoMap.put(displayText, batch);
                     }
                     recentBatchesList.setItems(batches);
                     recentBatchesList.getStyleClass().add("modern-list");
@@ -1757,15 +1767,26 @@ public class ProducerController {
         
         Optional<String> result = dialog.showAndWait();
         if (result.isPresent()) {
-            // Extract batch ID from the formatted string (format: "BatchName | Quality: X% | Prime: Y% | Reject: Z%")
+            // Extract batch ID from the stored batch info map
             String selectedItem = result.get();
-            // Try to extract batch ID - for now, return the currentBatchId or create a temporary one
-            // In a real implementation, we'd parse the batch name or store batch IDs separately
-            if (currentBatchId != null && !currentBatchId.isEmpty()) {
-                return currentBatchId;
-            } else {
-                return "BATCH-" + System.currentTimeMillis();
+            Map<String, Object> batchInfo = batchInfoMap.get(selectedItem);
+            
+            if (batchInfo != null) {
+                String batchId = safeGetString(batchInfo, "batch_id");
+                if (batchId != null && !batchId.equals("Unknown") && !batchId.equals("UNKNOWN")) {
+                    return batchId;
+                }
             }
+            
+            // Fallback: use current batch ID if available
+            if (currentBatchId != null && !currentBatchId.isEmpty()) {
+                System.err.println("Warning: Could not extract batch ID from selection, using currentBatchId");
+                return currentBatchId;
+            }
+            
+            // Last resort: generate a new batch ID
+            System.err.println("Warning: Could not determine batch ID, generating new one");
+            return "BATCH-" + System.currentTimeMillis();
         }
         
         return null;

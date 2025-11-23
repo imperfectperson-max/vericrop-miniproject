@@ -165,7 +165,34 @@ async def create_batch(batch_data: dict = None):
 # Load batches on startup
 @app.on_event("startup")
 async def startup_event():
-    """Initialize the model and load data on startup"""
+    """
+    Initialize the model and load data on startup.
+    
+    Model Loading Priority:
+    1. ONNX model (model/vericrop_quality_model.onnx) - PREFERRED for production
+       - Cross-platform compatibility
+       - Optimized inference performance
+       - No PyTorch dependency required
+    
+    2. PyTorch TorchScript model (model/vericrop_quality_model_scripted.pt) - FALLBACK
+       - Used when ONNX not available
+       - Requires PyTorch installed
+       - Good for development
+    
+    3. Demo Mode - LAST RESORT (only if VERICROP_LOAD_DEMO=true)
+       - Returns deterministic demo predictions
+       - Allows testing without model files
+       - Not allowed in PROD mode unless explicitly enabled
+    
+    Environment Variables:
+    - VERICROP_MODE: "dev" (default) or "prod"
+      - In PROD mode, service fails startup if no model found
+      - In DEV mode, allows running without model if VERICROP_LOAD_DEMO=true
+    
+    - VERICROP_LOAD_DEMO: "true" or "false" (default)
+      - When true, enables demo predictions when model not available
+      - Can be used in PROD mode if needed for testing
+    """
     global session, label_map, model_loaded
 
     # Load existing batches first
@@ -433,6 +460,7 @@ async def get_farm_dashboard():
                 quality_display = "85.0%"
 
             recent_batches_data.append({
+                "batch_id": batch.get('batch_id', 'UNKNOWN'),  # Include batch_id for UI selection
                 "name": batch.get('name', f"Batch_{len(recent_batches_data)}"),
                 "quality_score": quality_display,
                 "timestamp": batch.get('timestamp', datetime.now().isoformat()),
