@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.vericrop.service.models.Scenario;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -113,7 +114,7 @@ public class SimulationOrchestratorTest {
         DeliverySimulator.GeoCoordinate destination = 
             new DeliverySimulator.GeoCoordinate(41.0, -73.0, "Destination");
         
-        List<Scenario> scenarios = Arrays.asList();
+        List<Scenario> scenarios = Collections.emptyList();
         
         assertThrows(IllegalArgumentException.class, () -> {
             orchestrator.startConcurrentScenarios(

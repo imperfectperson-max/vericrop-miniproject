@@ -17,6 +17,7 @@ public class SimulationOrchestrator {
     private static final Logger logger = LoggerFactory.getLogger(SimulationOrchestrator.class);
     private static final int ORCHESTRATOR_THREAD_POOL_SIZE = 20;
     private static final long STATUS_UPDATE_INTERVAL_MS = 5000; // 5 seconds
+    private static final int BATCH_ID_UUID_LENGTH = 8;
     
     private final DeliverySimulator deliverySimulator;
     private final AlertService alertService;
@@ -284,7 +285,7 @@ public class SimulationOrchestrator {
         return String.format("BATCH_%s_%s_%s", 
                            farmerId != null ? farmerId : "UNKNOWN",
                            scenario.name(),
-                           UUID.randomUUID().toString().substring(0, 8));
+                           UUID.randomUUID().toString().substring(0, BATCH_ID_UUID_LENGTH));
     }
     
     /**

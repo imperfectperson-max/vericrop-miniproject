@@ -18,6 +18,7 @@ import org.vericrop.dto.Message;
 import jakarta.annotation.PreDestroy;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -279,9 +280,9 @@ public class DeliveryController {
                     Map<String, Object> errorResponse = new HashMap<>();
                     errorResponse.put("success", false);
                     errorResponse.put("error", "Invalid scenario: " + scenarioName);
-                    errorResponse.put("valid_scenarios", List.of("NORMAL", "HOT_TRANSPORT", 
-                                                                  "COLD_STORAGE", "HUMID_ROUTE", 
-                                                                  "EXTREME_DELAY"));
+                    errorResponse.put("valid_scenarios", Arrays.stream(Scenario.values())
+                                                               .map(Scenario::name)
+                                                               .collect(java.util.stream.Collectors.toList()));
                     return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
                 }
             }
