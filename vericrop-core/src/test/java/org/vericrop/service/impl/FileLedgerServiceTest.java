@@ -11,6 +11,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -283,10 +287,10 @@ class FileLedgerServiceTest {
         int threadCount = 5;
         Thread[] threads = new Thread[threadCount];
         // Use CountDownLatch to ensure all threads start at the same time for better concurrency testing
-        java.util.concurrent.CountDownLatch startLatch = new java.util.concurrent.CountDownLatch(1);
-        java.util.concurrent.CountDownLatch doneLatch = new java.util.concurrent.CountDownLatch(threadCount);
-        java.util.concurrent.atomic.AtomicInteger successCount = new java.util.concurrent.atomic.AtomicInteger(0);
-        java.util.concurrent.ConcurrentHashMap<Integer, String> errors = new java.util.concurrent.ConcurrentHashMap<>();
+        CountDownLatch startLatch = new CountDownLatch(1);
+        CountDownLatch doneLatch = new CountDownLatch(threadCount);
+        AtomicInteger successCount = new AtomicInteger(0);
+        ConcurrentHashMap<Integer, String> errors = new ConcurrentHashMap<>();
         
         // When - Spawn threads to write concurrently
         for (int i = 0; i < threadCount; i++) {
@@ -320,7 +324,7 @@ class FileLedgerServiceTest {
         startLatch.countDown();
         
         // Wait for all threads to complete with timeout
-        boolean completed = doneLatch.await(10, java.util.concurrent.TimeUnit.SECONDS);
+        boolean completed = doneLatch.await(10, TimeUnit.SECONDS);
         assertTrue(completed, "All threads should complete within timeout");
         
         // Print any errors for debugging

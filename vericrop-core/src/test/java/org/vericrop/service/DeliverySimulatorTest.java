@@ -202,18 +202,21 @@ public class DeliverySimulatorTest {
         // 2. Have advanced to waypoint 1 or beyond if they progressed
         // Note: If simulation completed, it will be removed and status will show totalWaypoints=0
         // So we check: either still registered (totalWaypoints > 0) OR was running earlier (which we verified above)
-        boolean simAValid = (statusA.getTotalWaypoints() > 0 && (statusA.isRunning() || statusA.getCurrentWaypoint() > 0));
-        boolean simBValid = (statusB.getTotalWaypoints() > 0 && (statusB.isRunning() || statusB.getCurrentWaypoint() > 0));
-        
-        assertTrue(simAValid, 
-            String.format("Simulation A should still be active or have made progress (running=%s, waypoint=%d/%d)", 
-                statusA.isRunning(), statusA.getCurrentWaypoint(), statusA.getTotalWaypoints()));
-        assertTrue(simBValid,
-            String.format("Simulation B should still be active or have made progress (running=%s, waypoint=%d/%d)", 
-                statusB.isRunning(), statusB.getCurrentWaypoint(), statusB.getTotalWaypoints()));
+        assertSimulationActiveOrProgressed("A", statusA);
+        assertSimulationActiveOrProgressed("B", statusB);
         
         // Stop both (safe even if already completed)
         simulator.stopSimulation("SHIP_A");
         simulator.stopSimulation("SHIP_B");
+    }
+    
+    /**
+     * Helper method to assert that a simulation is either still active or has made progress.
+     */
+    private void assertSimulationActiveOrProgressed(String simulationName, SimulationStatus status) {
+        boolean isValid = (status.getTotalWaypoints() > 0 && (status.isRunning() || status.getCurrentWaypoint() > 0));
+        assertTrue(isValid, 
+            String.format("Simulation %s should still be active or have made progress (running=%s, waypoint=%d/%d)", 
+                simulationName, status.isRunning(), status.getCurrentWaypoint(), status.getTotalWaypoints()));
     }
 }
