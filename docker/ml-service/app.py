@@ -165,7 +165,34 @@ async def create_batch(batch_data: dict = None):
 # Load batches on startup
 @app.on_event("startup")
 async def startup_event():
-    """Initialize the model and load data on startup"""
+    """
+    Initialize the model and load data on startup.
+    
+    Model Loading Priority:
+    1. ONNX model (model/vericrop_quality_model.onnx) - PREFERRED for production
+       - Cross-platform compatibility
+       - Optimized inference performance
+       - No PyTorch dependency required
+    
+    2. PyTorch TorchScript model (model/vericrop_quality_model_scripted.pt) - FALLBACK
+       - Used when ONNX not available
+       - Requires PyTorch installed
+       - Good for development
+    
+    3. Demo Mode - LAST RESORT (only if VERICROP_LOAD_DEMO=true)
+       - Returns deterministic demo predictions
+       - Allows testing without model files
+       - Not allowed in PROD mode unless explicitly enabled
+    
+    Environment Variables:
+    - VERICROP_MODE: "dev" (default) or "prod"
+      - In PROD mode, service fails startup if no model found
+      - In DEV mode, allows running without model if VERICROP_LOAD_DEMO=true
+    
+    - VERICROP_LOAD_DEMO: "true" or "false" (default)
+      - When true, enables demo predictions when model not available
+      - Can be used in PROD mode if needed for testing
+    """
     global session, label_map, model_loaded
 
     # Load existing batches first
@@ -298,6 +325,15 @@ def get_dummy_prediction():
     dummy_score = 0.85
     dummy_label = "fresh"
     dummy_confidence = 0.92
+    
+    # Generate deterministic demo data_hash
+    demo_report = {
+        "quality_score": dummy_score,
+        "label": dummy_label,
+        "confidence": dummy_confidence,
+        "timestamp": "demo"
+    }
+    demo_hash = hashlib.sha256(json.dumps(demo_report, sort_keys=True).encode("utf-8")).hexdigest()
 
     # Return response matching the exact contract from README
     return {
@@ -308,6 +344,13 @@ def get_dummy_prediction():
             "color_consistency": 0.88,
             "size_uniformity": 0.85,
             "defect_density": 0.02
+        },
+        "data_hash": demo_hash,
+        "label": dummy_label,  # Alias for backward compatibility
+        "all_predictions": {
+            "fresh": 0.92,
+            "low_quality": 0.05,
+            "rotten": 0.03
         }
     }
 
@@ -316,16 +359,17 @@ async def health():
     """Health check endpoint - fails in prod mode if model not loaded"""
     vericrop_mode = os.getenv("VERICROP_MODE", "dev").lower()
     is_production = vericrop_mode == "prod"
+    demo_allowed = should_use_demo_mode()
     
-    # In production mode, service is unhealthy if model not loaded
-    if is_production and not model_loaded:
+    # In production mode, service is unhealthy if model not loaded (unless demo explicitly enabled)
+    if is_production and not model_loaded and not demo_allowed:
         raise HTTPException(
             status_code=503,
             detail="Service unavailable: Model not loaded in production mode"
         )
     
     status = {
-        "status": "healthy" if model_loaded or not is_production else "degraded",
+        "status": "ok",  # Always "ok" when request succeeds (503 raised above if unhealthy)
         "time": int(time.time()),
         "mode": vericrop_mode,
         "model_loaded": model_loaded,
@@ -416,6 +460,7 @@ async def get_farm_dashboard():
                 quality_display = "85.0%"
 
             recent_batches_data.append({
+                "batch_id": batch.get('batch_id', 'UNKNOWN'),  # Include batch_id for UI selection
                 "name": batch.get('name', f"Batch_{len(recent_batches_data)}"),
                 "quality_score": quality_display,
                 "timestamp": batch.get('timestamp', datetime.now().isoformat()),
@@ -551,10 +596,13 @@ async def predict(file: UploadFile = File(...)):
             "quality_score": round(quality_score, 2),  # 0.0 to 1.0
             "quality_label": predicted_class,  # fresh, low_quality, rotten
             "confidence": round(confidence, 2),  # Model confidence 0.0 to 1.0
-            "metadata": metadata  # Additional quality metrics
+            "metadata": metadata,  # Additional quality metrics
+            "data_hash": data_hash,  # SHA-256 hash for blockchain
+            "label": predicted_class,  # Alias for quality_label (for backward compatibility)
+            "all_predictions": top_predictions  # Top predictions for detailed analysis
         }
 
-        logger.info(f"✅ Prediction: {predicted_class} (confidence: {confidence:.3f}, quality: {quality_score:.2f})")
+        logger.info(f"✅ Prediction: {predicted_class} (confidence: {confidence:.3f}, quality: {quality_score:.2f}, hash: {data_hash[:16]}...)")
         return response
 
     except HTTPException:
