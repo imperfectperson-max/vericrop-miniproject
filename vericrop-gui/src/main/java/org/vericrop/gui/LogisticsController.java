@@ -496,6 +496,14 @@ public class LogisticsController {
     }
 
     @FXML
+    private void handleShowContacts() {
+        MainApp mainApp = MainApp.getInstance();
+        if (mainApp != null) {
+            mainApp.showContactsScreen();
+        }
+    }
+
+    @FXML
     private void handleLogout() {
         MainApp mainApp = MainApp.getInstance();
         if (mainApp != null) {
