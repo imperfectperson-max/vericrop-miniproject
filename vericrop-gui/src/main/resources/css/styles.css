@@ -640,3 +640,37 @@
     -fx-vgap: 15;
     -fx-padding: 20;
 }
+
+.map-container {
+    -fx-padding: 10;
+    -fx-background-color: white;
+    -fx-background-radius: 10;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 10, 0, 0, 2);
+}
+
+.shipment-marker {
+    -fx-stroke: #000000;
+    -fx-stroke-width: 1;
+}
+
+.shipment-marker-in-transit {
+    -fx-fill: #3B82F6;
+}
+
+.shipment-marker-midway {
+    -fx-fill: #F59E0B;
+}
+
+.shipment-marker-delivered {
+    -fx-fill: #10B981;
+}
+
+.shipment-marker-stopped {
+    -fx-fill: #6B7280;
+}
+
+.route-line {
+    -fx-stroke: #3B82F6;
+    -fx-stroke-width: 2;
+    -fx-stroke-dash-array: 5 5;
+}

@@ -39,7 +39,7 @@ import org.vericrop.gui.util.BlockchainInitializer;
 
 public class ProducerController {
     private static final int SHIPMENT_UPDATE_INTERVAL_MS = 2000;
-    
+
     private Blockchain blockchain;
     private BlockchainService blockchainService;
     private ObjectMapper mapper;
@@ -88,7 +88,7 @@ public class ProducerController {
     @FXML private Button analyticsButton;
     @FXML private Button logisticsButton;
     @FXML private Button consumerButton;
-    
+
     // QR and Simulator controls
     @FXML private Button generateQRButton;
     @FXML private Label qrStatusLabel;
@@ -281,7 +281,7 @@ public class ProducerController {
         String productType = productTypeField.getText().isEmpty() ? "Unknown Product" : productTypeField.getText().trim();
         int quantity = parseQuantity();
         String dataHash = safeGetString(currentPrediction, "data_hash");
-        
+
         // Generate and store batch ID for QR/Simulator use
         String batchId = "BATCH_" + System.currentTimeMillis();
         this.currentBatchId = batchId;
@@ -304,6 +304,120 @@ public class ProducerController {
 
         return batchData;
     }
+
+    /**
+     * Calculate quality metrics based on classification and quality score
+     * using the specified algorithm:
+     *
+     * 1. Fresh: prime% = 80 + quality% * 20, remainder distributed
+     * 2. Low Quality: low_quality% = 80 + quality% * 20, remainder distributed
+     * 3. Rotten: rejection% = 80 + quality% * 20, remainder distributed
+     */
+    private Map<String, Double> calculateQualityMetrics(String classification, double qualityScore) {
+        Map<String, Double> metrics = new HashMap<>();
+
+        // Convert quality score to percentage (0-100)
+        double qualityPercent = qualityScore * 100.0;
+
+        switch (classification.toUpperCase()) {
+            case "FRESH":
+                // prime% = 80 + quality% * 20
+                double primeRate = 80 + (qualityPercent * 0.2);
+                primeRate = Math.min(primeRate, 100.0); // Cap at 100%
+                double freshRemainder = 100.0 - primeRate;
+
+                metrics.put("prime_rate", primeRate / 100.0);
+                metrics.put("low_quality_rate", (freshRemainder * 0.8) / 100.0);
+                metrics.put("rejection_rate", (freshRemainder * 0.2) / 100.0);
+                break;
+
+            case "LOW_QUALITY":
+                // low_quality% = 80 + quality% * 20
+                double lowQualityRate = 80 + (qualityPercent * 0.2);
+                lowQualityRate = Math.min(lowQualityRate, 100.0);
+                double lowQualityRemainder = 100.0 - lowQualityRate;
+
+                metrics.put("low_quality_rate", lowQualityRate / 100.0);
+                metrics.put("prime_rate", (lowQualityRemainder * 0.8) / 100.0);
+                metrics.put("rejection_rate", (lowQualityRemainder * 0.2) / 100.0);
+                break;
+
+            case "ROTTEN":
+                // rejection% = 80 + quality% * 20
+                double rejectionRate = 80 + (qualityPercent * 0.2);
+                rejectionRate = Math.min(rejectionRate, 100.0);
+                double rottenRemainder = 100.0 - rejectionRate;
+
+                metrics.put("rejection_rate", rejectionRate / 100.0);
+                metrics.put("low_quality_rate", (rottenRemainder * 0.8) / 100.0);
+                metrics.put("prime_rate", (rottenRemainder * 0.2) / 100.0);
+                break;
+
+            default:
+                // Fallback for unknown classifications
+                metrics.put("prime_rate", qualityScore);
+                metrics.put("low_quality_rate", (1.0 - qualityScore) * 0.7);
+                metrics.put("rejection_rate", (1.0 - qualityScore) * 0.3);
+        }
+
+        // Normalize to ensure exact 100% total
+        return normalizeMetrics(metrics);
+    }
+
+    /**
+     * Normalize metrics to ensure they sum to 1.0 (100%)
+     */
+    private Map<String, Double> normalizeMetrics(Map<String, Double> metrics) {
+        double total = metrics.values().stream().mapToDouble(Double::doubleValue).sum();
+
+        if (total > 0 && Math.abs(total - 1.0) > 0.001) {
+            double factor = 1.0 / total;
+            metrics.replaceAll((k, v) -> v * factor);
+        }
+
+        return metrics;
+    }
+
+    /**
+     * Apply the quality metrics algorithm to batch data
+     */
+    private Map<String, Object> applyQualityMetricsAlgorithm(Map<String, Object> batchData, Map<String, Object> backendResult) {
+        try {
+            // Get classification and quality score from prediction
+            Map<String, Object> qualityData = (Map<String, Object>) batchData.get("quality_data");
+            String classification = safeGetString(qualityData, "label");
+            double qualityScore = safeGetDouble(qualityData, "quality_score");
+
+            // Calculate metrics using the algorithm
+            Map<String, Double> calculatedMetrics = calculateQualityMetrics(classification, qualityScore);
+
+            // Store the calculated metrics in the result
+            backendResult.put("calculated_prime_rate", calculatedMetrics.get("prime_rate"));
+            backendResult.put("calculated_low_quality_rate", calculatedMetrics.get("low_quality_rate"));
+            backendResult.put("calculated_rejection_rate", calculatedMetrics.get("rejection_rate"));
+
+            // Also update the main result fields for consistency
+            backendResult.put("prime_rate", calculatedMetrics.get("prime_rate"));
+            backendResult.put("rejection_rate", calculatedMetrics.get("rejection_rate"));
+
+            System.out.println("📊 Applied quality metrics algorithm:");
+            System.out.println("   Classification: " + classification);
+            System.out.println("   Quality Score: " + (qualityScore * 100) + "%");
+            System.out.println("   Prime Rate: " + (calculatedMetrics.get("prime_rate") * 100) + "%");
+            System.out.println("   Low Quality Rate: " + (calculatedMetrics.get("low_quality_rate") * 100) + "%");
+            System.out.println("   Rejection Rate: " + (calculatedMetrics.get("rejection_rate") * 100) + "%");
+
+        } catch (Exception e) {
+            System.err.println("❌ Error applying quality metrics algorithm: " + e.getMessage());
+            // Fallback to original values
+            backendResult.put("calculated_prime_rate", backendResult.get("prime_rate"));
+            backendResult.put("calculated_low_quality_rate", 0.0);
+            backendResult.put("calculated_rejection_rate", backendResult.get("rejection_rate"));
+        }
+
+        return backendResult;
+    }
+
     private Map<String, Object> ensureRequiredFields(Map<String, Object> result) {
         // Ensure all required fields exist with fallback values
         if (!result.containsKey("quality_score")) {
@@ -335,12 +449,15 @@ public class ProducerController {
                     if (responseBody == null) {
                         throw new IOException("Response body is null");
                     }
-                    
+
                     String responseBodyString = responseBody.string();
-                    
+
                     if (response.isSuccessful()) {
                         Map<String, Object> result = mapper.readValue(responseBodyString, Map.class);
                         result.put("batch_data", batchData);
+
+                        // Apply your quality metrics algorithm
+                        result = applyQualityMetricsAlgorithm(batchData, result);
 
                         // Ensure all required fields exist (modifies result in place)
                         ensureRequiredFields(result);
@@ -427,6 +544,9 @@ public class ProducerController {
         txData.put("backend_quality_score", backendResult.get("backend_quality_score"));
         txData.put("backend_prime_rate", backendResult.get("backend_prime_rate"));
         txData.put("backend_rejection_rate", backendResult.get("backend_rejection_rate"));
+        txData.put("calculated_prime_rate", backendResult.get("calculated_prime_rate"));
+        txData.put("calculated_low_quality_rate", backendResult.get("calculated_low_quality_rate"));
+        txData.put("calculated_rejection_rate", backendResult.get("calculated_rejection_rate"));
         txData.put("timestamp", new Date().toString());
 
         try {
@@ -641,6 +761,53 @@ public class ProducerController {
         }).start();
     }
 
+    /**
+     * Calculate cumulative rates from all batches using the new algorithm metrics
+     */
+    private double[] calculateCumulativeRates(List<Map<String, Object>> recentBatches) {
+        if (recentBatches == null || recentBatches.isEmpty()) {
+            return new double[] {0.0, 0.0, 0.0}; // prime, low_quality, rejection
+        }
+
+        double totalPrime = 0.0;
+        double totalLowQuality = 0.0;
+        double totalRejection = 0.0;
+        int count = 0;
+
+        for (Map<String, Object> batch : recentBatches) {
+            try {
+                // Try to get calculated metrics first
+                Object primeObj = batch.get("calculated_prime_rate");
+                Object lowQualityObj = batch.get("calculated_low_quality_rate");
+                Object rejectionObj = batch.get("calculated_rejection_rate");
+
+                // Fallback to original fields if calculated ones don't exist
+                if (primeObj == null) primeObj = batch.get("prime_rate");
+                if (rejectionObj == null) rejectionObj = batch.get("rejection_rate");
+                if (lowQualityObj == null) lowQualityObj = 0.0;
+
+                if (primeObj instanceof Number && rejectionObj instanceof Number && lowQualityObj instanceof Number) {
+                    totalPrime += ((Number) primeObj).doubleValue();
+                    totalLowQuality += ((Number) lowQualityObj).doubleValue();
+                    totalRejection += ((Number) rejectionObj).doubleValue();
+                    count++;
+                }
+            } catch (Exception e) {
+                System.err.println("Error processing batch for cumulative rates: " + e.getMessage());
+            }
+        }
+
+        if (count == 0) {
+            return new double[] {0.0, 0.0, 0.0};
+        }
+
+        return new double[] {
+                (totalPrime / count) * 100.0,      // Prime rate as percentage
+                (totalLowQuality / count) * 100.0, // Low quality rate as percentage
+                (totalRejection / count) * 100.0   // Rejection rate as percentage
+        };
+    }
+
     @SuppressWarnings("unchecked")
     private void updateDashboardUI(Map<String, Object> dashboardData) {
         if (dashboardData == null) return;
@@ -652,23 +819,18 @@ public class ProducerController {
                 Map<String, Object> distribution = (Map<String, Object>) dashboardData.get("quality_distribution");
                 List<Map<String, Object>> recentBatches = (List<Map<String, Object>>) dashboardData.get("recent_batches");
 
-                // Use counts to calculate rates consistently
-                if (counts != null) {
-                    int primeCount = safeGetInt(counts, "prime_count");
-                    int rejectedCount = safeGetInt(counts, "rejected_count");
-                    
-                    // Calculate rates using the canonical formula
-                    double[] rates = calculateRates(primeCount, rejectedCount);
-                    double primeRate = rates[0];
-                    double rejectionRate = rates[1];
-                    
-                    // Update UI with calculated rates
-                    if (primePercentageLabel != null) {
-                        primePercentageLabel.setText(String.format("%.1f%%", primeRate));
-                    }
-                    if (rejectionRateLabel != null) {
-                        rejectionRateLabel.setText(String.format("%.1f%%", rejectionRate));
-                    }
+                // Calculate cumulative rates using the new algorithm
+                double[] cumulativeRates = calculateCumulativeRates(recentBatches);
+                double primeRate = cumulativeRates[0];
+                double lowQualityRate = cumulativeRates[1];
+                double rejectionRate = cumulativeRates[2];
+
+                // Update UI with calculated rates
+                if (primePercentageLabel != null) {
+                    primePercentageLabel.setText(String.format("%.1f%%", primeRate));
+                }
+                if (rejectionRateLabel != null) {
+                    rejectionRateLabel.setText(String.format("%.1f%%", rejectionRate));
                 }
 
                 if (kpis != null) {
@@ -683,34 +845,17 @@ public class ProducerController {
                     }
                 }
 
-                // Update pie chart with labeled segments
-                if (qualityDistributionChart != null && distribution != null) {
-                    double primeCount = safeGetDouble(distribution, "prime");
-                    double standardCount = safeGetDouble(distribution, "standard");
-                    double subStandardCount = safeGetDouble(distribution, "sub_standard");
-                    double total = primeCount + standardCount + subStandardCount;
-                    
-                    // Create pie chart data with labels showing category and percentage
+                // Update pie chart with all three categories
+                if (qualityDistributionChart != null) {
                     ObservableList<PieChart.Data> pieChartData = FXCollections.observableArrayList();
-                    
-                    if (total > 0) {
-                        double primePercent = (primeCount / total) * 100.0;
-                        double standardPercent = (standardCount / total) * 100.0;
-                        double subStandardPercent = (subStandardCount / total) * 100.0;
-                        
-                        pieChartData.add(new PieChart.Data(
-                            String.format("Prime — %.1f%%", primePercent), primeCount));
-                        pieChartData.add(new PieChart.Data(
-                            String.format("Standard — %.1f%%", standardPercent), standardCount));
-                        pieChartData.add(new PieChart.Data(
-                            String.format("Sub-standard — %.1f%%", subStandardPercent), subStandardCount));
-                    } else {
-                        // Zero case: show labels with 0.0%
-                        pieChartData.add(new PieChart.Data("Prime — 0.0%", 0));
-                        pieChartData.add(new PieChart.Data("Standard — 0.0%", 0));
-                        pieChartData.add(new PieChart.Data("Sub-standard — 0.0%", 0));
-                    }
-                    
+
+                    pieChartData.add(new PieChart.Data(
+                            String.format("Prime — %.1f%%", primeRate), primeRate));
+                    pieChartData.add(new PieChart.Data(
+                            String.format("Standard — %.1f%%", lowQualityRate), lowQualityRate));
+                    pieChartData.add(new PieChart.Data(
+                            String.format("Rejected — %.1f%%", rejectionRate), rejectionRate));
+
                     qualityDistributionChart.setData(pieChartData);
                     qualityDistributionChart.setLegendVisible(true);
                     qualityDistributionChart.setStyle("-fx-font-size: 10px;");
@@ -721,11 +866,11 @@ public class ProducerController {
                     for (Map<String, Object> batch : recentBatches) {
                         String batchName = safeGetString(batch, "name");
                         String qualityScore = safeGetString(batch, "quality_score");
-                        String primeRate = safeGetString(batch, "prime_rate");
-                        String rejectionRate = safeGetString(batch, "rejection_rate");
+                        String primeRateStr = safeGetString(batch, "prime_rate");
+                        String rejectionRateStr = safeGetString(batch, "rejection_rate");
 
                         batches.add(batchName + " | Quality: " + qualityScore +
-                                " | Prime: " + primeRate + " | Reject: " + rejectionRate);
+                                " | Prime: " + primeRateStr + " | Reject: " + rejectionRateStr);
                     }
                     recentBatchesList.setItems(batches);
                     recentBatchesList.getStyleClass().add("modern-list");
@@ -869,7 +1014,91 @@ public class ProducerController {
             }
         }
     }
+    private void notifyLogisticsAboutSimulation(String batchId) {
+        try {
+            // This would typically use an event bus or message service
+            // For now, we'll rely on the shared DeliverySimulator instance
+            System.out.println("📡 Notifying logistics about simulation: " + batchId);
 
+            // The LogisticsController will automatically detect the new simulation
+            // through its sync service that polls the DeliverySimulator
+
+            // Send a Kafka event for logistics tracking
+            if (logisticsProducer != null) {
+                LogisticsEvent logisticsEvent = new LogisticsEvent(
+                        batchId,
+                        "SIMULATION_STARTED",
+                        4.2,
+                        65.0,
+                        "Farm Location"
+                );
+                logisticsEvent.setRoute("Farm → Processing Center");
+                logisticsProducer.sendLogisticsEvent(logisticsEvent);
+            }
+        } catch (Exception e) {
+            System.err.println("Failed to notify logistics: " + e.getMessage());
+        }
+    }
+
+    // Update the handleStartSimulation method to call the notification
+    @FXML
+    private void handleStartSimulation() {
+        try {
+            // Get batch info
+            String batchName = batchNameField.getText();
+            if (batchName == null || batchName.trim().isEmpty()) {
+                simStatusLabel.setText("⚠ Please create a batch first");
+                simStatusLabel.setStyle("-fx-text-fill: #DC2626;");
+                return;
+            }
+
+            if (currentBatchId == null || currentBatchId.isEmpty()) {
+                currentBatchId = "BATCH-" + System.currentTimeMillis();
+            }
+
+            // Get delivery simulator from ApplicationContext
+            var deliverySimulator = MainApp.getInstance().getApplicationContext().getDeliverySimulator();
+
+            // Generate sample route: Farm to Warehouse
+            var origin = new org.vericrop.service.DeliverySimulator.GeoCoordinate(
+                    42.3601, -71.0589, "Sunny Valley Farm"
+            );
+            var destination = new org.vericrop.service.DeliverySimulator.GeoCoordinate(
+                    42.3736, -71.1097, "Metro Fresh Warehouse"
+            );
+
+            // Generate route with 10 waypoints over next 2 hours (avg speed 50 km/h)
+            long startTime = System.currentTimeMillis();
+            var route = deliverySimulator.generateRoute(origin, destination, 10, startTime, 50.0);
+
+            // Start simulation with 10-second update intervals
+            deliverySimulator.startSimulation(currentBatchId, route, 10000);
+
+            activeSimulationId = currentBatchId;
+
+            // Notify logistics controller about the new simulation
+            notifyLogisticsAboutSimulation(currentBatchId);
+
+            // Update UI
+            startSimButton.setDisable(true);
+            stopSimButton.setDisable(false);
+            simStatusLabel.setText("✅ Simulation running for: " + currentBatchId);
+            simStatusLabel.setStyle("-fx-text-fill: #10B981;");
+
+            // Create alert
+            var alertService = MainApp.getInstance().getApplicationContext().getAlertService();
+            alertService.info("Simulation Started",
+                    "Delivery simulation for " + currentBatchId + " is now running",
+                    "simulator");
+
+            System.out.println("✅ Simulation started for: " + currentBatchId);
+
+        } catch (Exception e) {
+            simStatusLabel.setText("❌ Error: " + e.getMessage());
+            simStatusLabel.setStyle("-fx-text-fill: #DC2626;");
+            e.printStackTrace();
+        }
+    }
     private void analyzeImageWithAI(File imageFile) {
         Platform.runLater(() -> {
             progressIndicator.setVisible(true);
@@ -895,9 +1124,9 @@ public class ProducerController {
                     if (body == null) {
                         throw new IOException("Response body is null");
                     }
-                    
+
                     String responseBodyString = body.string();
-                    
+
                     if (response.isSuccessful()) {
                         currentPrediction = mapper.readValue(responseBodyString, Map.class);
 
@@ -943,6 +1172,7 @@ public class ProducerController {
 
                 qualityLabel.setText(String.format("Quality: %.1f%%", qualityScore * 100));
                 confidenceLabel.setText("Category: " + label.toUpperCase());
+                confidenceLabel.setStyle("-fx-font-weight: bold;");
 
                 if (dataHash != null && dataHash.length() >= 16) {
                     hashLabel.setText("Hash: " + dataHash.substring(0, 16) + "...");
@@ -979,24 +1209,24 @@ public class ProducerController {
     private void handleShowConsumer() {
         MainApp.getInstance().showConsumerScreen();
     }
-    
+
     @FXML
     private void handleShowMessages() {
         MainApp.getInstance().showInboxScreen();
     }
-    
+
     @FXML
     private void handleShowSimulator() {
         // Show simulator dialog
         showSimulatorDialog();
     }
-    
+
     @FXML
     private void handleLogout() {
         // Clear session and return to login
         MainApp.getInstance().switchToScreen("login.fxml");
     }
-    
+
     private void showSimulatorDialog() {
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
         alert.setTitle("Delivery Simulator");
@@ -1004,7 +1234,7 @@ public class ProducerController {
         alert.setContentText("Use the Start/Stop buttons in the left panel to control the simulator.");
         alert.showAndWait();
     }
-    
+
     // QR Code Generation
     @FXML
     private void handleGenerateQR() {
@@ -1012,98 +1242,43 @@ public class ProducerController {
             // Get current batch info
             String batchName = batchNameField.getText();
             String farmer = farmerField.getText();
-            
+
             if (batchName == null || batchName.trim().isEmpty()) {
                 qrStatusLabel.setText("⚠ Please create a batch first");
                 qrStatusLabel.setStyle("-fx-text-fill: #DC2626;");
                 return;
             }
-            
+
             // Generate batch ID if not exists
             if (currentBatchId == null || currentBatchId.isEmpty()) {
                 currentBatchId = "BATCH-" + System.currentTimeMillis();
             }
-            
+
             String farmerId = (farmer != null && !farmer.isEmpty()) ? farmer : "unknown";
-            
+
             // Generate QR code using QRGenerator utility
             var qrPath = org.vericrop.gui.util.QRGenerator.generateProductQR(currentBatchId, farmerId);
-            
+
             qrStatusLabel.setText("✅ QR code generated: " + qrPath.getFileName());
             qrStatusLabel.setStyle("-fx-text-fill: #10B981;");
-            
+
             // Broadcast QR generation event via AlertService
             var alertService = MainApp.getInstance().getApplicationContext().getAlertService();
-            alertService.info("QR Code Generated", 
-                "QR code for batch " + currentBatchId + " saved to " + qrPath.toAbsolutePath(), 
-                "producer");
-            
+            alertService.info("QR Code Generated",
+                    "QR code for batch " + currentBatchId + " saved to " + qrPath.toAbsolutePath(),
+                    "producer");
+
             System.out.println("✅ QR Code generated: " + qrPath.toAbsolutePath());
-            
+
         } catch (Exception e) {
             qrStatusLabel.setText("❌ Error: " + e.getMessage());
             qrStatusLabel.setStyle("-fx-text-fill: #DC2626;");
             e.printStackTrace();
         }
     }
-    
-    // Delivery Simulator Controls
-    @FXML
-    private void handleStartSimulation() {
-        try {
-            // Get batch info
-            String batchName = batchNameField.getText();
-            if (batchName == null || batchName.trim().isEmpty()) {
-                simStatusLabel.setText("⚠ Please create a batch first");
-                simStatusLabel.setStyle("-fx-text-fill: #DC2626;");
-                return;
-            }
-            
-            if (currentBatchId == null || currentBatchId.isEmpty()) {
-                currentBatchId = "BATCH-" + System.currentTimeMillis();
-            }
-            
-            // Get delivery simulator from ApplicationContext
-            var deliverySimulator = MainApp.getInstance().getApplicationContext().getDeliverySimulator();
-            
-            // Generate sample route: Farm to Warehouse
-            var origin = new org.vericrop.service.DeliverySimulator.GeoCoordinate(
-                42.3601, -71.0589, "Sunny Valley Farm"
-            );
-            var destination = new org.vericrop.service.DeliverySimulator.GeoCoordinate(
-                42.3736, -71.1097, "Metro Fresh Warehouse"
-            );
-            
-            // Generate route with 10 waypoints over next 2 hours (avg speed 50 km/h)
-            long startTime = System.currentTimeMillis();
-            var route = deliverySimulator.generateRoute(origin, destination, 10, startTime, 50.0);
-            
-            // Start simulation with 10-second update intervals
-            deliverySimulator.startSimulation(currentBatchId, route, 10000);
-            
-            activeSimulationId = currentBatchId;
-            
-            // Update UI
-            startSimButton.setDisable(true);
-            stopSimButton.setDisable(false);
-            simStatusLabel.setText("✅ Simulation running for: " + currentBatchId);
-            simStatusLabel.setStyle("-fx-text-fill: #10B981;");
-            
-            // Create alert
-            var alertService = MainApp.getInstance().getApplicationContext().getAlertService();
-            alertService.info("Simulation Started", 
-                "Delivery simulation for " + currentBatchId + " is now running", 
-                "simulator");
-            
-            System.out.println("✅ Simulation started for: " + currentBatchId);
-            
-        } catch (Exception e) {
-            simStatusLabel.setText("❌ Error: " + e.getMessage());
-            simStatusLabel.setStyle("-fx-text-fill: #DC2626;");
-            e.printStackTrace();
-        }
-    }
-    
+
+
+
     @FXML
     private void handleStopSimulation() {
         try {
@@ -1111,26 +1286,26 @@ public class ProducerController {
                 simStatusLabel.setText("⚠ No active simulation");
                 return;
             }
-            
+
             // Stop simulation
             var deliverySimulator = MainApp.getInstance().getApplicationContext().getDeliverySimulator();
             deliverySimulator.stopSimulation(activeSimulationId);
-            
+
             // Update UI
             startSimButton.setDisable(false);
             stopSimButton.setDisable(true);
             simStatusLabel.setText("⏹ Simulation stopped");
             simStatusLabel.setStyle("-fx-text-fill: #6B7280;");
-            
+
             // Create alert
             var alertService = MainApp.getInstance().getApplicationContext().getAlertService();
-            alertService.info("Simulation Stopped", 
-                "Delivery simulation for " + activeSimulationId + " has been stopped", 
-                "simulator");
-            
+            alertService.info("Simulation Stopped",
+                    "Delivery simulation for " + activeSimulationId + " has been stopped",
+                    "simulator");
+
             System.out.println("⏹ Simulation stopped for: " + activeSimulationId);
             activeSimulationId = null;
-            
+
         } catch (Exception e) {
             simStatusLabel.setText("❌ Error: " + e.getMessage());
             simStatusLabel.setStyle("-fx-text-fill: #DC2626;");
@@ -1220,9 +1395,9 @@ public class ProducerController {
 
             // Use ScheduledExecutorService to send events periodically instead of busy-wait
             final java.util.concurrent.atomic.AtomicInteger eventIndex = new java.util.concurrent.atomic.AtomicInteger(0);
-            final java.util.concurrent.atomic.AtomicReference<java.util.concurrent.ScheduledFuture<?>> scheduledTaskRef = 
-                new java.util.concurrent.atomic.AtomicReference<>();
-            
+            final java.util.concurrent.atomic.AtomicReference<java.util.concurrent.ScheduledFuture<?>> scheduledTaskRef =
+                    new java.util.concurrent.atomic.AtomicReference<>();
+
             java.util.concurrent.ScheduledFuture<?> task = scheduledExecutor.scheduleAtFixedRate(() -> {
                 try {
                     int i = eventIndex.getAndIncrement();
@@ -1238,7 +1413,7 @@ public class ProducerController {
                         });
                         return;
                     }
-                    
+
                     LogisticsEvent event = events.get(i);
                     logisticsProducer.sendLogisticsEvent(event);
                     System.out.println("📦 Sent shipment update: " + event.getStatus() + " at " + event.getLocation());
@@ -1255,7 +1430,7 @@ public class ProducerController {
                     Platform.runLater(() -> showError("Shipment simulation error: " + e.getMessage()));
                 }
             }, 0, SHIPMENT_UPDATE_INTERVAL_MS, TimeUnit.MILLISECONDS);
-            
+
             scheduledTaskRef.set(task);
 
         } catch (Exception e) {
@@ -1319,7 +1494,7 @@ public class ProducerController {
 
     /**
      * Update the live blockchain view display.
-     * 
+     *
      * Displays blocks in newest-first order to show recent activity at the top.
      * This method is called after new blocks are added to ensure real-time updates.
      * Runs on UI thread via Platform.runLater to ensure thread-safety.
@@ -1510,30 +1685,30 @@ public class ProducerController {
 
     /**
      * Calculate prime rate and rejection rate using consistent formulas.
-     * 
+     *
      * Canonical formulas:
      * - prime_rate = prime_count / total_count
      * - rejection_rate = rejected_count / total_count
      * - total_count = prime_count + rejected_count
-     * 
+     *
      * Edge case: when total_count == 0, rates are defined as 0.0 (not NaN/inf).
-     * 
+     *
      * @param primeCount number of prime quality samples
      * @param rejectedCount number of rejected samples
      * @return array with [primeRate, rejectionRate] as percentages (0.0 to 100.0)
      */
     private double[] calculateRates(int primeCount, int rejectedCount) {
         int totalCount = primeCount + rejectedCount;
-        
+
         // Handle zero-count edge case: rates are 0.0
         if (totalCount == 0) {
             return new double[] {0.0, 0.0};
         }
-        
+
         // Calculate rates as percentages (0.0 to 100.0)
         double primeRate = (primeCount * 100.0) / totalCount;
         double rejectionRate = (rejectedCount * 100.0) / totalCount;
-        
+
         return new double[] {primeRate, rejectionRate};
     }
 

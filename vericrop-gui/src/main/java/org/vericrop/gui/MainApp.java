@@ -37,7 +37,7 @@ public class MainApp extends Application {
             primaryStage.setTitle("VeriCrop - Supply Chain Management");
 
             try {
-                URL iconUrl = getClass().getResource("./images/vericrop-icon.png");
+                URL iconUrl = getClass().getResource("/images/vericrop-icon.png");
                 if (iconUrl != null) {
                     Image icon = new Image(iconUrl.toString());
                     primaryStage.getIcons().add(icon);

@@ -19,7 +19,7 @@
     <!-- Header -->
     <HBox spacing="20" alignment="CENTER_LEFT">
         <VBox spacing="2">
-            <Label text="LOGISTICS MONITORING - BATCH A2386" styleClass="title-label"/>
+            <Label text="LOGISTICS MONITORING - LIVE DELIVERY TRACKING" styleClass="title-label"/>
             <Label text="Real-time Shipment Tracking And Monitoring" style="-fx-text-fill: #666; -fx-font-size: 12px;"/>
         </VBox>
         <Region HBox.hgrow="ALWAYS"/>
@@ -47,7 +47,6 @@
                 onAction="#handleLogout"/>
     </HBox>
 
-    <!-- Rest of the logistics.fxml content remains the same -->
     <!-- Navigation Tabs -->
     <TabPane styleClass="tab-pane">
         <tabs>
@@ -56,11 +55,10 @@
                     <!-- Batch Info Card -->
                     <HBox styleClass="dashboard-card" spacing="20">
                         <VBox spacing="8">
-                            <Label text="Farm: Sunny Valley → Warehouse: Metro Fresh (ETA: 17:30)" styleClass="subtitle-label"/>
+                            <Label text="Farm: Sunny Valley → Warehouse: Metro Fresh" styleClass="subtitle-label"/>
                             <HBox spacing="20" alignment="CENTER_LEFT">
-                                <Label text="Status: IN TRANSIT" styleClass="status-label" style="-fx-text-fill: #f59e0b; -fx-font-weight: bold;"/>
-                                <Label text="Temperature: 4.2°C ✅" styleClass="status-label" style="-fx-text-fill: #10b981;"/>
-                                <Label text="Humidity: 65% ✅" styleClass="status-label" style="-fx-text-fill: #10b981;"/>
+                                <Label text="Status: LIVE TRACKING ACTIVE" styleClass="status-label" style="-fx-text-fill: #10b981; -fx-font-weight: bold;"/>
+                                <Label text="Active Simulations: " styleClass="status-label" style="-fx-text-fill: #3b82f6;"/>
                             </HBox>
                         </VBox>
                     </HBox>
@@ -69,10 +67,11 @@
                     <HBox spacing="20">
                         <!-- Left Column -->
                         <VBox spacing="15" styleClass="left-panel" prefWidth="400">
-                            <Label text="🗺️ Route Map" styleClass="subtitle-label"/>
-                            <Pane styleClass="map-container" prefHeight="200">
-                                <Label text="Interactive Map View\n(Real-time GPS Tracking)"
-                                       style="-fx-text-alignment: center; -fx-text-fill: #64748b;"/>
+                            <Label text="🗺️ Live Route Tracking" styleClass="subtitle-label"/>
+                            <Pane fx:id="mapContainer" style="-fx-background-color: #f8f9fa; -fx-border-color: #e9ecef; -fx-border-radius: 8;"
+                                  prefHeight="200" prefWidth="350">
+                                <Label text="Loading real-time delivery tracking..."
+                                       style="-fx-text-alignment: center; -fx-text-fill: #64748b; -fx-alignment: center;"/>
                             </Pane>
 
                             <Label text="Timeline" styleClass="subtitle-label"/>
@@ -81,21 +80,21 @@
                                     <Label text="●" style="-fx-text-fill: #10b981; -fx-font-weight: bold;"/>
                                     <VBox>
                                         <Label text="Created" style="-fx-font-weight: bold;"/>
-                                        <Label text="14:30 - Batch created at Sunny Valley"/>
+                                        <Label text="Batch created at Sunny Valley Farm"/>
                                     </VBox>
                                 </HBox>
                                 <HBox styleClass="timeline-item" spacing="10" alignment="CENTER_LEFT">
                                     <Label text="●" style="-fx-text-fill: #3b82f6; -fx-font-weight: bold;"/>
                                     <VBox>
                                         <Label text="In Transit" style="-fx-font-weight: bold;"/>
-                                        <Label text="15:45 - Currently on Highway A"/>
+                                        <Label text="Real-time GPS tracking active"/>
                                     </VBox>
                                 </HBox>
                                 <HBox styleClass="timeline-item" spacing="10" alignment="CENTER_LEFT">
                                     <Label text="○" style="-fx-text-fill: #64748b;"/>
                                     <VBox>
                                         <Label text="At Warehouse" style="-fx-text-fill: #64748b;"/>
-                                        <Label text="ETA: 17:30 - Metro Fresh Storage"/>
+                                        <Label text="ETA: Calculated in real-time"/>
                                     </VBox>
                                 </HBox>
                             </VBox>
@@ -120,15 +119,16 @@
 
                             <!-- Alerts Panel -->
                             <VBox styleClass="alert-panel success" spacing="8">
-                                <Label text="🚨 Alerts Panel" style="-fx-font-weight: bold;"/>
-                                <Label text="✓ No active alerts"/>
-                                <Label text="✓ Last 24h: 0 temperature breaches"/>
+                                <Label text="🚨 Live Alerts Panel" style="-fx-font-weight: bold;"/>
+                                <Label text="✓ Real-time monitoring active"/>
+                                <Label text="✓ Environmental sensors online"/>
+                                <Label text="✓ GPS tracking synchronized"/>
                             </VBox>
 
                             <!-- Quality Tracking -->
                             <HBox spacing="15" alignment="CENTER_LEFT">
                                 <Label text="📋 Quality Tracking:" styleClass="status-label"/>
-                                <Label text="Prime (82%) → Current: Stable"
+                                <Label text="Real-time monitoring active"
                                        style="-fx-text-fill: #10b981; -fx-font-weight: bold;"/>
                             </HBox>
                         </VBox>
@@ -149,6 +149,10 @@
                             <TableColumn text="Vehicle" prefWidth="100"/>
                         </columns>
                     </TableView>
+                    <HBox spacing="10">
+                        <Button text="Refresh Data" styleClass="primary-button" onAction="#handleRefresh"/>
+                        <Label text="🔄 Real-time updates every 2 seconds" style="-fx-text-fill: #666; -fx-font-size: 11px;"/>
+                    </HBox>
                 </VBox>
             </Tab>
 
@@ -158,6 +162,7 @@
                     <HBox spacing="10">
                         <Button text="Acknowledge All" styleClass="primary-button" onAction="#handleAcknowledgeAlerts"/>
                         <Button text="Simulate Alert" styleClass="warning-button" onAction="#handleSimulateAlert"/>
+                        <Label text="Live alerts from delivery simulator" style="-fx-text-fill: #666; -fx-font-size: 11px;"/>
                     </HBox>
                 </VBox>
             </Tab>

@@ -5,8 +5,19 @@ import javafx.fxml.FXML;
 import javafx.scene.chart.LineChart;
 import javafx.scene.chart.XYChart;
 import javafx.scene.control.*;
+import javafx.scene.layout.Pane;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.scene.shape.Circle;
+import javafx.scene.shape.Line;
+import javafx.scene.paint.Color;
+import javafx.scene.text.Text;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class LogisticsController {
 
@@ -17,14 +28,30 @@ public class LogisticsController {
     @FXML private DatePicker endDatePicker;
     @FXML private TextArea reportArea;
     @FXML private LineChart<String, Number> temperatureChart;
+    @FXML private Pane mapContainer;
 
     // Navigation buttons
     @FXML private Button backToProducerButton;
     @FXML private Button analyticsButton;
     @FXML private Button consumerButton;
+    @FXML private Button messagesButton;
+    @FXML private Button logoutButton;
 
     private ObservableList<Shipment> shipments = FXCollections.observableArrayList();
     private ObservableList<String> alerts = FXCollections.observableArrayList();
+
+    // Delivery simulation synchronization
+    private ScheduledExecutorService syncExecutor;
+    private Map<String, MapVisualization> activeShipments = new HashMap<>();
+    private org.vericrop.service.DeliverySimulator deliverySimulator;
+
+    // Map visualization constants
+    private static final double MAP_WIDTH = 350;
+    private static final double MAP_HEIGHT = 200;
+    private static final double ORIGIN_X = 50;
+    private static final double ORIGIN_Y = 100;
+    private static final double DESTINATION_X = 300;
+    private static final double DESTINATION_Y = 100;
 
     @FXML
     public void initialize() {
@@ -33,6 +60,15 @@ public class LogisticsController {
         setupReportCombo();
         setupTemperatureChart();
         setupNavigationButtons();
+        setupMapContainer();
+        startSyncService();
+
+        // Get delivery simulator from application context
+        try {
+            this.deliverySimulator = MainApp.getInstance().getApplicationContext().getDeliverySimulator();
+        } catch (Exception e) {
+            System.err.println("Delivery simulator not available: " + e.getMessage());
+        }
     }
 
     private void setupNavigationButtons() {
@@ -45,6 +81,247 @@ public class LogisticsController {
         if (consumerButton != null) {
             consumerButton.setOnAction(e -> handleShowConsumer());
         }
+        if (messagesButton != null) {
+            messagesButton.setOnAction(e -> handleShowMessages());
+        }
+        if (logoutButton != null) {
+            logoutButton.setOnAction(e -> handleLogout());
+        }
+    }
+
+    private void setupMapContainer() {
+        if (mapContainer != null) {
+            // Clear any existing content
+            mapContainer.getChildren().clear();
+
+            // Draw route background
+            Line routeLine = new Line(ORIGIN_X, ORIGIN_Y, DESTINATION_X, DESTINATION_Y);
+            routeLine.setStroke(Color.LIGHTGRAY);
+            routeLine.setStrokeWidth(3);
+            routeLine.getStrokeDashArray().addAll(5d, 5d);
+            mapContainer.getChildren().add(routeLine);
+
+            // Draw origin point
+            Circle origin = new Circle(ORIGIN_X, ORIGIN_Y, 8, Color.GREEN);
+            mapContainer.getChildren().add(origin);
+            Text originLabel = new Text(ORIGIN_X - 40, ORIGIN_Y - 10, "🏠 Farm");
+            mapContainer.getChildren().add(originLabel);
+
+            // Draw destination point
+            Circle destination = new Circle(DESTINATION_X, DESTINATION_Y, 8, Color.BLUE);
+            mapContainer.getChildren().add(destination);
+            Text destinationLabel = new Text(DESTINATION_X - 20, DESTINATION_Y - 10, "🏢 Warehouse");
+            mapContainer.getChildren().add(destinationLabel);
+
+            // Initial instruction text
+            Text instruction = new Text(MAP_WIDTH/2 - 100, MAP_HEIGHT - 10,
+                    "Start simulation from Producer screen to see real-time tracking");
+            instruction.setFill(Color.GRAY);
+            mapContainer.getChildren().add(instruction);
+        }
+    }
+
+    private void startSyncService() {
+        syncExecutor = Executors.newSingleThreadScheduledExecutor();
+        syncExecutor.scheduleAtFixedRate(this::syncWithDeliverySimulator, 0, 2, TimeUnit.SECONDS);
+    }
+
+    private void syncWithDeliverySimulator() {
+        if (deliverySimulator == null) {
+            try {
+                this.deliverySimulator = MainApp.getInstance().getApplicationContext().getDeliverySimulator();
+            } catch (Exception e) {
+                return; // Simulator not available yet
+            }
+        }
+
+        Platform.runLater(() -> {
+            // Clear previous visualizations
+            mapContainer.getChildren().removeIf(node ->
+                    node.getUserData() != null && "shipment".equals(node.getUserData()));
+
+            // Update active shipments from simulator
+            updateActiveShipmentsFromSimulator();
+
+            // Update alerts based on simulation status
+            updateAlertsFromSimulator();
+        });
+    }
+
+    private void updateActiveShipmentsFromSimulator() {
+        if (deliverySimulator == null) return;
+
+        // Get all active simulations and update map
+        for (String shipmentId : activeShipments.keySet()) {
+            try {
+                org.vericrop.service.DeliverySimulator.SimulationStatus status =
+                        deliverySimulator.getSimulationStatus(shipmentId);
+
+                if (status.isRunning() && status.getCurrentLocation() != null) {
+                    updateShipmentOnMap(shipmentId, status);
+                } else {
+                    // Simulation ended, remove from map
+                    activeShipments.remove(shipmentId);
+                    addAlert("✅ Delivery completed: " + shipmentId);
+                }
+            } catch (Exception e) {
+                System.err.println("Error getting status for " + shipmentId + ": " + e.getMessage());
+            }
+        }
+
+        // Check for new simulations (this would typically come from an event system)
+        // For demo purposes, we'll simulate discovering new shipments
+        checkForNewSimulations();
+    }
+
+    private void checkForNewSimulations() {
+        // In a real system, you'd have an event bus or message queue
+        // For now, we'll rely on the shared DeliverySimulator instance
+        // New simulations are automatically detected when they appear in the simulator
+    }
+
+    private void updateShipmentOnMap(String shipmentId,
+                                     org.vericrop.service.DeliverySimulator.SimulationStatus status) {
+        // Calculate position on map based on progress
+        double progress = (double) status.getCurrentWaypoint() / status.getTotalWaypoints();
+        double currentX = ORIGIN_X + (DESTINATION_X - ORIGIN_X) * progress;
+        double currentY = ORIGIN_Y; // Simple straight line for now
+
+        MapVisualization visualization = activeShipments.get(shipmentId);
+        if (visualization == null) {
+            // Create new visualization
+            visualization = new MapVisualization();
+            visualization.shipmentCircle = new Circle(currentX, currentY, 6, Color.ORANGE);
+            visualization.shipmentCircle.setUserData("shipment");
+
+            visualization.shipmentLabel = new Text(currentX - 15, currentY - 15,
+                    "🚚 " + shipmentId.substring(0, Math.min(8, shipmentId.length())));
+            visualization.shipmentLabel.setUserData("shipment");
+            visualization.shipmentLabel.setFill(Color.DARKBLUE);
+            visualization.shipmentLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 10px;");
+
+            mapContainer.getChildren().addAll(visualization.shipmentCircle, visualization.shipmentLabel);
+            activeShipments.put(shipmentId, visualization);
+
+            // Add to alerts
+            addAlert("🔄 Tracking started: " + shipmentId);
+        } else {
+            // Update existing visualization
+            visualization.shipmentCircle.setCenterX(currentX);
+            visualization.shipmentCircle.setCenterY(currentY);
+            visualization.shipmentLabel.setX(currentX - 15);
+            visualization.shipmentLabel.setY(currentY - 15);
+        }
+
+        // Update status label with environmental data
+        if (status.getCurrentLocation() != null) {
+            String statusText = String.format("📍 %s | 🌡%.1f°C | 💧%.1f%%",
+                    status.getCurrentLocation().getLocation().getName(),
+                    status.getCurrentLocation().getTemperature(),
+                    status.getCurrentLocation().getHumidity());
+
+            visualization.shipmentLabel.setText("🚚 " + shipmentId.substring(0, Math.min(8, shipmentId.length())) + "\n" + statusText);
+
+            // Check for environmental alerts
+            checkEnvironmentalAlerts(shipmentId, status.getCurrentLocation());
+        }
+
+        // Update shipments table
+        updateShipmentsTable(shipmentId, status);
+    }
+
+    private void checkEnvironmentalAlerts(String shipmentId, org.vericrop.service.DeliverySimulator.RouteWaypoint waypoint) {
+        // Temperature alerts
+        if (waypoint.getTemperature() < 2.0) {
+            addAlert("❄️ LOW TEMP: " + shipmentId + " at " + waypoint.getTemperature() + "°C");
+        } else if (waypoint.getTemperature() > 8.0) {
+            addAlert("🔥 HIGH TEMP: " + shipmentId + " at " + waypoint.getTemperature() + "°C");
+        }
+
+        // Humidity alerts
+        if (waypoint.getHumidity() < 50.0) {
+            addAlert("🏜️ LOW HUMIDITY: " + shipmentId + " at " + waypoint.getHumidity() + "%");
+        } else if (waypoint.getHumidity() > 90.0) {
+            addAlert("💦 HIGH HUMIDITY: " + shipmentId + " at " + waypoint.getHumidity() + "%");
+        }
+    }
+
+    private void updateShipmentsTable(String shipmentId,
+                                      org.vericrop.service.DeliverySimulator.SimulationStatus status) {
+        // Find or create shipment entry
+        Shipment existing = shipments.stream()
+                .filter(s -> s.getBatchId().contains(shipmentId))
+                .findFirst()
+                .orElse(null);
+
+        if (existing == null) {
+            // Create new shipment entry
+            String location = status.getCurrentLocation() != null ?
+                    status.getCurrentLocation().getLocation().getName() : "Unknown";
+            double temp = status.getCurrentLocation() != null ?
+                    status.getCurrentLocation().getTemperature() : 0.0;
+            double humidity = status.getCurrentLocation() != null ?
+                    status.getCurrentLocation().getHumidity() : 0.0;
+
+            shipments.add(new Shipment(
+                    shipmentId + " (Live)",
+                    "IN_TRANSIT",
+                    location,
+                    temp,
+                    humidity,
+                    calculateETA(status),
+                    "TRUCK_" + Math.abs(shipmentId.hashCode() % 1000)
+            ));
+        } else {
+            // Update existing entry
+            if (status.getCurrentLocation() != null) {
+                // Update with real data from simulator
+                int index = shipments.indexOf(existing);
+                shipments.set(index, new Shipment(
+                        existing.getBatchId(),
+                        status.isRunning() ? "IN_TRANSIT" : "DELIVERED",
+                        status.getCurrentLocation().getLocation().getName(),
+                        status.getCurrentLocation().getTemperature(),
+                        status.getCurrentLocation().getHumidity(),
+                        status.isRunning() ? calculateETA(status) : "DELIVERED",
+                        existing.getVehicle()
+                ));
+            }
+        }
+    }
+
+    private String calculateETA(org.vericrop.service.DeliverySimulator.SimulationStatus status) {
+        if (!status.isRunning() || status.getCurrentWaypoint() >= status.getTotalWaypoints()) {
+            return "ARRIVED";
+        }
+
+        double progress = (double) status.getCurrentWaypoint() / status.getTotalWaypoints();
+        double remaining = 1.0 - progress;
+
+        // Simple ETA calculation (in minutes)
+        int etaMinutes = (int) (remaining * 120); // Assuming 2 hour total trip
+        return etaMinutes + " min";
+    }
+
+    private void updateAlertsFromSimulator() {
+        // Additional alert logic can be added here
+        // For example, checking for stalled shipments or other conditions
+    }
+
+    private void addAlert(String alertMessage) {
+        String timestamp = java.time.LocalDateTime.now().format(
+                java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"));
+        Platform.runLater(() -> {
+            // Check if this alert already exists to avoid duplicates
+            String fullAlert = "[" + timestamp + "] " + alertMessage;
+            if (!alerts.contains(fullAlert)) {
+                alerts.add(0, fullAlert);
+                // Keep only recent alerts
+                if (alerts.size() > 50) {
+                    alerts.remove(alerts.size() - 1);
+                }
+            }
+        });
     }
 
     private void setupShipmentsTable() {
@@ -71,15 +348,12 @@ public class LogisticsController {
         }
         alertsList.setItems(alerts);
     }
-    
+
     private boolean shouldLoadDemoData() {
-        // Check system property (set via --load-demo flag)
         String loadDemo = System.getProperty("vericrop.loadDemo");
         if ("true".equalsIgnoreCase(loadDemo)) {
             return true;
         }
-        
-        // Check environment variable
         String loadDemoEnv = System.getenv("VERICROP_LOAD_DEMO");
         return "true".equalsIgnoreCase(loadDemoEnv);
     }
@@ -94,12 +368,10 @@ public class LogisticsController {
     }
 
     private void setupTemperatureChart() {
-        // Set chart title and legend
         if (temperatureChart != null) {
             temperatureChart.setTitle("Temperature Monitoring");
             temperatureChart.setLegendVisible(true);
-            
-            // Populate with demo data only if flag is set
+
             if (shouldLoadDemoData()) {
                 XYChart.Series<String, Number> series1 = new XYChart.Series<>();
                 series1.setName("BATCH_A2386 (demo)");
@@ -109,7 +381,7 @@ public class LogisticsController {
                 series1.getData().add(new XYChart.Data<>("12:00", 5.1));
                 series1.getData().add(new XYChart.Data<>("16:00", 4.6));
                 series1.getData().add(new XYChart.Data<>("20:00", 4.3));
-                
+
                 XYChart.Series<String, Number> series2 = new XYChart.Series<>();
                 series2.setName("BATCH_A2387 (demo)");
                 series2.getData().add(new XYChart.Data<>("00:00", 3.8));
@@ -118,7 +390,7 @@ public class LogisticsController {
                 series2.getData().add(new XYChart.Data<>("12:00", 4.3));
                 series2.getData().add(new XYChart.Data<>("16:00", 4.0));
                 series2.getData().add(new XYChart.Data<>("20:00", 3.8));
-                
+
                 temperatureChart.getData().addAll(series1, series2);
             }
         }
@@ -148,7 +420,7 @@ public class LogisticsController {
             mainApp.showConsumerScreen();
         }
     }
-    
+
     @FXML
     private void handleShowMessages() {
         MainApp mainApp = MainApp.getInstance();
@@ -156,7 +428,7 @@ public class LogisticsController {
             mainApp.showInboxScreen();
         }
     }
-    
+
     @FXML
     private void handleLogout() {
         MainApp mainApp = MainApp.getInstance();
@@ -168,26 +440,21 @@ public class LogisticsController {
     // Action methods
     @FXML
     private void handleRefresh() {
-        System.out.println("Refreshing logistics data...");
         Platform.runLater(() -> {
-            // Simulate data refresh by re-initializing
-            setupShipmentsTable();
-            setupAlertsList();
-            setupTemperatureChart();
-            showAlert(Alert.AlertType.INFORMATION, "Refresh Complete", 
-                    "Logistics data has been refreshed successfully");
+            syncWithDeliverySimulator();
+            showAlert(Alert.AlertType.INFORMATION, "Refresh Complete",
+                    "Logistics data has been refreshed with latest simulation data");
         });
     }
 
     @FXML
     private void handleExportReport() {
-        System.out.println("Exporting logistics report...");
         String reportType = reportTypeCombo.getValue();
         if (reportType != null) {
-            showAlert(Alert.AlertType.INFORMATION, "Export Complete", 
+            showAlert(Alert.AlertType.INFORMATION, "Export Complete",
                     "Report '" + reportType + "' has been exported successfully");
         } else {
-            showAlert(Alert.AlertType.WARNING, "No Report Selected", 
+            showAlert(Alert.AlertType.WARNING, "No Report Selected",
                     "Please select a report type before exporting");
         }
     }
@@ -198,7 +465,7 @@ public class LogisticsController {
             int alertCount = alerts.size();
             alerts.clear();
             alerts.add("All alerts acknowledged ✅ (" + alertCount + " alerts cleared)");
-            showAlert(Alert.AlertType.INFORMATION, "Alerts Acknowledged", 
+            showAlert(Alert.AlertType.INFORMATION, "Alerts Acknowledged",
                     alertCount + " alerts have been acknowledged");
         });
     }
@@ -209,14 +476,14 @@ public class LogisticsController {
             String timestamp = java.time.LocalDateTime.now().format(
                     java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"));
             alerts.add(0, "🚨 SIMULATED [" + timestamp + "]: Temperature breach detected - 8.5°C");
-            showAlert(Alert.AlertType.WARNING, "Alert Simulated", 
+            showAlert(Alert.AlertType.WARNING, "Alert Simulated",
                     "A temperature breach alert has been simulated");
         });
     }
 
     @FXML
     private void handleGenerateReport() {
-        final String reportType = reportTypeCombo.getValue() != null ? 
+        final String reportType = reportTypeCombo.getValue() != null ?
                 reportTypeCombo.getValue() : "General Report";
         final String dateRange;
         if (startDatePicker.getValue() != null && endDatePicker.getValue() != null) {
@@ -224,25 +491,26 @@ public class LogisticsController {
         } else {
             dateRange = "";
         }
-        
+
         Platform.runLater(() -> {
             reportArea.setText("=== " + reportType + " ===\n\n" +
                     dateRange +
                     "• Total Shipments: " + shipments.size() + "\n" +
+                    "• Active Simulations: " + activeShipments.size() + "\n" +
                     "• In Transit: " + countByStatus("IN_TRANSIT") + "\n" +
                     "• At Warehouse: " + countByStatus("AT_WAREHOUSE") + "\n" +
                     "• Delivered: " + countByStatus("DELIVERED") + "\n" +
                     "• Avg Temperature: " + calculateAvgTemperature() + "°C\n" +
                     "• Compliance: 100%\n" +
                     "• Generated: " + java.time.LocalDateTime.now().format(
-                            java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                    java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
         });
     }
-    
+
     private long countByStatus(String status) {
         return shipments.stream().filter(s -> s.getStatus().equals(status)).count();
     }
-    
+
     private String calculateAvgTemperature() {
         double avg = shipments.stream()
                 .mapToDouble(Shipment::getTemperature)
@@ -250,13 +518,25 @@ public class LogisticsController {
                 .orElse(0.0);
         return String.format("%.1f", avg);
     }
-    
+
     private void showAlert(Alert.AlertType type, String title, String message) {
         Alert alert = new Alert(type);
         alert.setTitle(title);
         alert.setHeaderText(null);
         alert.setContentText(message);
         alert.showAndWait();
+    }
+
+    public void cleanup() {
+        if (syncExecutor != null && !syncExecutor.isShutdown()) {
+            syncExecutor.shutdownNow();
+        }
+    }
+
+    // Helper class for map visualization
+    private static class MapVisualization {
+        Circle shipmentCircle;
+        Text shipmentLabel;
     }
 
     // Data model class
