@@ -1005,6 +1005,19 @@ Migrations run automatically on application startup. No manual setup required!
 - **Message Preview**: See first 100 characters in message list
 - **Auto-mark Read**: Inbox messages marked read when viewed
 
+### Contacts and Messaging Features (NEW)
+
+- **Participant Discovery**: Automatic discovery of other connected GUI instances
+- **Contact List**: View all active participants with online/offline status indicators
+- **Real-Time Status**: Online status updates with 5-minute activity threshold
+- **Contact-Based Messaging**: Send messages directly to contacts from contacts view
+- **Message History**: View complete conversation history with each contact
+- **Auto-Refresh**: Contacts list automatically refreshes every 5 seconds
+- **Role-Based Display**: See participant roles (FARMER, SUPPLIER, CONSUMER, ADMIN)
+- **Connection Tracking**: Store and retrieve connection information for future features
+
+📖 **[Contacts and Messaging Guide](vericrop-gui/CONTACTS_AND_MESSAGING.md)** - Complete guide for contacts and messaging system
+
 ### Documentation
 
 For detailed setup instructions, user guides, and troubleshooting:
