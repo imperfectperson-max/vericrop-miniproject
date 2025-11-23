@@ -267,3 +267,175 @@ The simulator is defensive and continues operation even if optional components f
 - Message service unavailable: Logs error, continues
 
 This ensures simulation robustness in production environments.
+
+## SimulationOrchestrator for Concurrent Scenarios
+
+The `SimulationOrchestrator` service enables running multiple delivery simulations with different scenarios concurrently. This allows you to compare different environmental conditions (hot transport, humid routes, delays, etc.) for the same delivery route.
+
+### Basic Usage
+
+```java
+MessageService messageService = new MessageService(false);
+AlertService alertService = new AlertService();
+DeliverySimulator simulator = new DeliverySimulator(messageService, alertService);
+SimulationOrchestrator orchestrator = new SimulationOrchestrator(simulator, alertService, messageService);
+
+// Define route
+DeliverySimulator.GeoCoordinate origin = 
+    new DeliverySimulator.GeoCoordinate(42.3601, -71.0589, "Farm");
+DeliverySimulator.GeoCoordinate destination = 
+    new DeliverySimulator.GeoCoordinate(42.3736, -71.1097, "Warehouse");
+
+// Start multiple scenarios concurrently
+List<Scenario> scenarios = Arrays.asList(
+    Scenario.NORMAL,
+    Scenario.HOT_TRANSPORT,
+    Scenario.HUMID_ROUTE
+);
+
+Map<Scenario, String> batchIds = orchestrator.startConcurrentScenarios(
+    origin, destination, 10, 60.0, "FARMER_A", scenarios, 5000L);
+
+// Get active orchestrations
+List<Map<String, Object>> activeOrchestrations = orchestrator.getActiveOrchestrations();
+
+// Stop all simulations
+orchestrator.stopAll();
+
+// Cleanup
+orchestrator.shutdown();
+```
+
+### REST API Endpoint: POST /api/v1/delivery/start-multi-scenarios
+
+Start multiple delivery simulations with different scenarios concurrently. Returns HTTP 202 (Accepted) with batch IDs for each scenario.
+
+**Request Body:**
+
+```json
+{
+  "origin": {
+    "latitude": 42.3601,
+    "longitude": -71.0589,
+    "name": "Farm"
+  },
+  "destination": {
+    "latitude": 42.3736,
+    "longitude": -71.1097,
+    "name": "Warehouse"
+  },
+  "scenarios": ["NORMAL", "HOT_TRANSPORT", "HUMID_ROUTE"],
+  "farmer_id": "FARMER_A",
+  "num_waypoints": 10,
+  "avg_speed_kmh": 60.0,
+  "update_interval_ms": 5000
+}
+```
+
+**Response (HTTP 202):**
+
+```json
+{
+  "success": true,
+  "scenario_batch_ids": {
+    "NORMAL": "BATCH_FARMER_A_NORMAL_a1b2c3d4",
+    "HOT_TRANSPORT": "BATCH_FARMER_A_HOT_TRANSPORT_e5f6g7h8",
+    "HUMID_ROUTE": "BATCH_FARMER_A_HUMID_ROUTE_i9j0k1l2"
+  },
+  "farmer_id": "FARMER_A",
+  "scenario_count": 3,
+  "origin": "Farm (42.3601, -71.0589)",
+  "destination": "Warehouse (42.3736, -71.1097)",
+  "message": "Multi-scenario simulations started"
+}
+```
+
+**Example cURL Command:**
+
+```bash
+curl -X POST http://localhost:8080/api/v1/delivery/start-multi-scenarios \
+  -H "Content-Type: application/json" \
+  -d '{
+    "origin": {"latitude": 42.3601, "longitude": -71.0589, "name": "Farm"},
+    "destination": {"latitude": 42.3736, "longitude": -71.1097, "name": "Warehouse"},
+    "scenarios": ["NORMAL", "HOT_TRANSPORT", "HUMID_ROUTE"],
+    "farmer_id": "FARMER_A",
+    "num_waypoints": 10,
+    "avg_speed_kmh": 60.0,
+    "update_interval_ms": 5000
+  }'
+```
+
+### Orchestration Events
+
+The `SimulationOrchestrator` publishes events to `MessageService` at key orchestration milestones:
+
+- **ORCHESTRATION_STARTED**: All scenario simulations are being started
+- **ORCHESTRATION_ALL_STARTED**: All scenarios started successfully
+- **ORCHESTRATION_PARTIALLY_STARTED**: Some scenarios failed to start
+- **ORCHESTRATION_STATUS**: Periodic status update (every 5 seconds)
+- **ORCHESTRATION_COMPLETED**: All scenarios completed
+- **ORCHESTRATION_STOPPED**: Orchestration manually stopped
+
+These events are published with `senderRole: "orchestrator"` and `senderId: "simulation_orchestrator"`, and include the orchestration ID in the `shipmentId` field.
+
+### Monitoring Active Orchestrations
+
+```java
+List<Map<String, Object>> orchestrations = orchestrator.getActiveOrchestrations();
+
+for (Map<String, Object> orch : orchestrations) {
+    String orchId = (String) orch.get("orchestration_id");
+    boolean running = (Boolean) orch.get("running");
+    int scenarioCount = (Integer) orch.get("scenario_count");
+    
+    @SuppressWarnings("unchecked")
+    Map<String, Map<String, Object>> scenarios = 
+        (Map<String, Map<String, Object>>) orch.get("scenarios");
+    
+    for (Map.Entry<String, Map<String, Object>> entry : scenarios.entrySet()) {
+        String scenario = entry.getKey();
+        Map<String, Object> status = entry.getValue();
+        boolean scenarioRunning = (Boolean) status.get("running");
+        int currentWaypoint = (Integer) status.get("current_waypoint");
+        int totalWaypoints = (Integer) status.get("total_waypoints");
+        
+        System.out.printf("Scenario %s: %d/%d waypoints (%s)%n",
+                         scenario, currentWaypoint, totalWaypoints,
+                         scenarioRunning ? "running" : "complete");
+    }
+}
+```
+
+### Integration with GUI Controllers
+
+The orchestrator integrates seamlessly with existing GUI controllers (LogisticsController, AnalyticsController, ProducerController). These controllers can observe simulation updates via:
+
+1. **MessageService polling**: Controllers poll `MessageService.getMessagesByShipment(batchId)` to get updates
+2. **AlertService listeners**: Controllers register listeners with `AlertService.addListener(...)` to receive real-time alerts
+3. **Simulation status polling**: Controllers call `DeliverySimulator.getSimulationStatus(batchId)` to check progress
+
+All simulations started by the orchestrator use the same `MessageService` and `AlertService` instances, ensuring coordinated event delivery.
+
+### Thread Safety and Concurrency
+
+- Uses a fixed thread pool (size: 20) for parallel simulation execution
+- All orchestrations are tracked in a thread-safe `ConcurrentHashMap`
+- Status monitoring runs in a separate scheduled thread pool
+- Safe to call from multiple threads concurrently
+
+### Kafka Integration
+
+Since the orchestrator uses `MessageService` to publish events, all orchestration events automatically propagate to Kafka if the kafka-service is configured and wired to the same `MessageService` instance. This enables:
+
+- Real-time event streaming to Kafka topics
+- Integration with downstream analytics pipelines
+- Event-driven workflows triggered by orchestration milestones
+
+### Best Practices
+
+1. **Scenario Selection**: Choose scenarios that represent realistic variations in your delivery conditions
+2. **Update Interval**: Use longer intervals (10-30 seconds) for production to reduce message volume
+3. **Resource Management**: The orchestrator limits concurrent simulations to 20 by default. Adjust `ORCHESTRATOR_THREAD_POOL_SIZE` if needed
+4. **Cleanup**: Always call `orchestrator.shutdown()` when done to release resources
+5. **Error Handling**: Monitor orchestration events for `ORCHESTRATION_PARTIALLY_STARTED` to detect failures
