@@ -9,6 +9,8 @@ import java.util.Map;
  * Used for contact discovery and messaging between different GUI instances.
  */
 public class Participant {
+    /** Threshold in minutes for considering a participant online */
+    public static final int ONLINE_THRESHOLD_MINUTES = 5;
     private Long id;
     private Long userId;
     private String instanceId;
@@ -145,13 +147,13 @@ public class Participant {
     }
     
     /**
-     * Check if the participant has been seen recently (within last 5 minutes)
+     * Check if the participant has been seen recently (within threshold)
      */
     public boolean isOnline() {
         if (lastSeen == null) {
             return false;
         }
-        return lastSeen.isAfter(LocalDateTime.now().minusMinutes(5)) && isActive();
+        return lastSeen.isAfter(LocalDateTime.now().minusMinutes(ONLINE_THRESHOLD_MINUTES)) && isActive();
     }
     
     /**

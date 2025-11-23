@@ -38,6 +38,8 @@ import java.util.TimerTask;
 public class ContactsViewController {
     private static final Logger logger = LoggerFactory.getLogger(ContactsViewController.class);
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("MMM dd, yyyy HH:mm");
+    
+    /** Auto-refresh interval in milliseconds. TODO: Make configurable via application settings */
     private static final int REFRESH_INTERVAL_MS = 5000; // 5 seconds
     
     @FXML private ListView<Participant> contactsListView;

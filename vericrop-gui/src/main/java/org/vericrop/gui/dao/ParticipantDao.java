@@ -217,12 +217,13 @@ public class ParticipantDao {
     }
     
     /**
-     * Mark inactive participants (last seen > 5 minutes ago) as disconnected
+     * Mark inactive participants (last seen beyond threshold) as disconnected
      * @return Number of participants marked as disconnected
      */
     public int markInactiveParticipants() {
         String sql = "UPDATE participants SET status = 'disconnected' " +
-                     "WHERE status = 'active' AND last_seen < (CURRENT_TIMESTAMP - INTERVAL '5 minutes')";
+                     "WHERE status = 'active' AND last_seen < (CURRENT_TIMESTAMP - INTERVAL '" + 
+                     org.vericrop.gui.models.Participant.ONLINE_THRESHOLD_MINUTES + " minutes')";
         
         try (Connection conn = dataSource.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {

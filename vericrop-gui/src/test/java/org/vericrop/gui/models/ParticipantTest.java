@@ -71,22 +71,19 @@ public class ParticipantTest {
     
     @Test
     public void testUpdateLastSeen() {
-        LocalDateTime beforeUpdate = participant.getLastSeen();
+        // Set an old timestamp
+        LocalDateTime oldTimestamp = LocalDateTime.now().minusHours(1);
+        participant.setLastSeen(oldTimestamp);
         
-        // Wait a tiny bit to ensure time difference
-        try {
-            Thread.sleep(10);
-        } catch (InterruptedException e) {
-            // Ignore
-        }
-        
+        // Update to current time
         participant.updateLastSeen();
         LocalDateTime afterUpdate = participant.getLastSeen();
         
         assertNotNull(afterUpdate);
-        if (beforeUpdate != null) {
-            assertTrue(afterUpdate.isAfter(beforeUpdate), "Updated last seen should be more recent");
-        }
+        assertTrue(afterUpdate.isAfter(oldTimestamp), "Updated last seen should be more recent");
+        // Verify it's within the last second (reasonable for a just-updated timestamp)
+        assertTrue(afterUpdate.isAfter(LocalDateTime.now().minusSeconds(1)), 
+                  "Updated timestamp should be very recent");
     }
     
     @Test

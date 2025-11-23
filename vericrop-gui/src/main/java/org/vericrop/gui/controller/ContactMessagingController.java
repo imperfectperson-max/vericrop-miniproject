@@ -86,8 +86,10 @@ public class ContactMessagingController {
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
             }
             
-            // TODO: If the contact has connection info, deliver the message in real-time
-            // For now, messages are stored in database and retrieved via polling
+            // Note: Real-time message delivery could be implemented using the contact's
+            // connection info. For now, messages are stored in database and retrieved via
+            // polling or can be pushed through WebSocket in future enhancement.
+            // See CONTACTS_AND_MESSAGING.md for planned WebSocket integration.
             
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
