@@ -48,7 +48,6 @@ import org.vericrop.service.models.Alert;
  */
 @FunctionalInterface
 public interface KafkaAlertPublisher {
-    Logger logger = LoggerFactory.getLogger(KafkaAlertPublisher.class);
     
     /**
      * Publish an alert to Kafka.
@@ -60,6 +59,7 @@ public interface KafkaAlertPublisher {
      * Create a no-op publisher that logs warnings.
      */
     static KafkaAlertPublisher noOp() {
+        Logger logger = LoggerFactory.getLogger(KafkaAlertPublisher.class);
         return (alert) -> {
             logger.warn("Kafka not configured, alert not published: {}", alert);
         };

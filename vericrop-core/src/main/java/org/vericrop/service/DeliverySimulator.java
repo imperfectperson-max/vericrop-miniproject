@@ -664,8 +664,9 @@ public class DeliverySimulator {
     /**
      * Legacy compatibility - GeoCoordinate as inner class.
      * This is a direct copy of the model class for backwards compatibility.
+     * @deprecated Since 2.0. Use {@link org.vericrop.service.models.GeoCoordinate} instead.
      */
-    @Deprecated
+    @Deprecated(since = "2.0")
     public static class GeoCoordinate {
         private final double latitude;
         private final double longitude;
@@ -697,8 +698,9 @@ public class DeliverySimulator {
     
     /**
      * Legacy compatibility - RouteWaypoint as inner class.
+     * @deprecated Since 2.0. Use {@link org.vericrop.service.models.RouteWaypoint} instead.
      */
-    @Deprecated
+    @Deprecated(since = "2.0")
     public static class RouteWaypoint {
         private final GeoCoordinate location;
         private final long timestamp;
@@ -735,8 +737,9 @@ public class DeliverySimulator {
     
     /**
      * Legacy compatibility - SimulationStatus as inner class.
+     * @deprecated Since 2.0. Use {@link org.vericrop.service.models.SimulationStatus} instead.
      */
-    @Deprecated
+    @Deprecated(since = "2.0")
     public static class SimulationStatus {
         private final String shipmentId;
         private final boolean running;
