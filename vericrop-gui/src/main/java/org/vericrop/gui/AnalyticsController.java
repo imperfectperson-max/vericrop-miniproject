@@ -67,19 +67,26 @@ public class AnalyticsController {
     private void setupSupplierTable() {
         // Configure table columns with cell value factories
         if (supplierTable != null && supplierTable.getColumns().size() >= 3) {
-            javafx.scene.control.TableColumn<Supplier, String> nameCol = 
-                (javafx.scene.control.TableColumn<Supplier, String>) supplierTable.getColumns().get(0);
-            javafx.scene.control.TableColumn<Supplier, Number> qualityCol = 
-                (javafx.scene.control.TableColumn<Supplier, Number>) supplierTable.getColumns().get(1);
-            javafx.scene.control.TableColumn<Supplier, Number> spoilageCol = 
-                (javafx.scene.control.TableColumn<Supplier, Number>) supplierTable.getColumns().get(2);
-            
-            nameCol.setCellValueFactory(cellData -> 
-                new javafx.beans.property.SimpleStringProperty(cellData.getValue().getName()));
-            qualityCol.setCellValueFactory(cellData -> 
-                new javafx.beans.property.SimpleIntegerProperty(cellData.getValue().getQuality()));
-            spoilageCol.setCellValueFactory(cellData -> 
-                new javafx.beans.property.SimpleIntegerProperty(cellData.getValue().getSpoilage()));
+            try {
+                @SuppressWarnings("unchecked")
+                javafx.scene.control.TableColumn<Supplier, String> nameCol = 
+                    (javafx.scene.control.TableColumn<Supplier, String>) supplierTable.getColumns().get(0);
+                @SuppressWarnings("unchecked")
+                javafx.scene.control.TableColumn<Supplier, Number> qualityCol = 
+                    (javafx.scene.control.TableColumn<Supplier, Number>) supplierTable.getColumns().get(1);
+                @SuppressWarnings("unchecked")
+                javafx.scene.control.TableColumn<Supplier, Number> spoilageCol = 
+                    (javafx.scene.control.TableColumn<Supplier, Number>) supplierTable.getColumns().get(2);
+                
+                nameCol.setCellValueFactory(cellData -> 
+                    new javafx.beans.property.SimpleStringProperty(cellData.getValue().getName()));
+                qualityCol.setCellValueFactory(cellData -> 
+                    new javafx.beans.property.SimpleIntegerProperty(cellData.getValue().getQuality()));
+                spoilageCol.setCellValueFactory(cellData -> 
+                    new javafx.beans.property.SimpleIntegerProperty(cellData.getValue().getSpoilage()));
+            } catch (ClassCastException | IndexOutOfBoundsException e) {
+                System.err.println("Warning: Could not configure supplier table columns: " + e.getMessage());
+            }
         }
         
         if (shouldLoadDemoData()) {
@@ -95,19 +102,26 @@ public class AnalyticsController {
     private void setupAlertsTable() {
         // Configure table columns with cell value factories
         if (alertsTable != null && alertsTable.getColumns().size() >= 3) {
-            javafx.scene.control.TableColumn<Alert, String> dateCol = 
-                (javafx.scene.control.TableColumn<Alert, String>) alertsTable.getColumns().get(0);
-            javafx.scene.control.TableColumn<Alert, String> typeCol = 
-                (javafx.scene.control.TableColumn<Alert, String>) alertsTable.getColumns().get(1);
-            javafx.scene.control.TableColumn<Alert, String> detailsCol = 
-                (javafx.scene.control.TableColumn<Alert, String>) alertsTable.getColumns().get(2);
-            
-            dateCol.setCellValueFactory(cellData -> 
-                new javafx.beans.property.SimpleStringProperty(cellData.getValue().getDate()));
-            typeCol.setCellValueFactory(cellData -> 
-                new javafx.beans.property.SimpleStringProperty(cellData.getValue().getType()));
-            detailsCol.setCellValueFactory(cellData -> 
-                new javafx.beans.property.SimpleStringProperty(cellData.getValue().getDetails()));
+            try {
+                @SuppressWarnings("unchecked")
+                javafx.scene.control.TableColumn<Alert, String> dateCol = 
+                    (javafx.scene.control.TableColumn<Alert, String>) alertsTable.getColumns().get(0);
+                @SuppressWarnings("unchecked")
+                javafx.scene.control.TableColumn<Alert, String> typeCol = 
+                    (javafx.scene.control.TableColumn<Alert, String>) alertsTable.getColumns().get(1);
+                @SuppressWarnings("unchecked")
+                javafx.scene.control.TableColumn<Alert, String> detailsCol = 
+                    (javafx.scene.control.TableColumn<Alert, String>) alertsTable.getColumns().get(2);
+                
+                dateCol.setCellValueFactory(cellData -> 
+                    new javafx.beans.property.SimpleStringProperty(cellData.getValue().getDate()));
+                typeCol.setCellValueFactory(cellData -> 
+                    new javafx.beans.property.SimpleStringProperty(cellData.getValue().getType()));
+                detailsCol.setCellValueFactory(cellData -> 
+                    new javafx.beans.property.SimpleStringProperty(cellData.getValue().getDetails()));
+            } catch (ClassCastException | IndexOutOfBoundsException e) {
+                System.err.println("Warning: Could not configure alerts table columns: " + e.getMessage());
+            }
         }
         
         if (shouldLoadDemoData()) {
