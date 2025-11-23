@@ -100,12 +100,16 @@ JavaFX desktop application with Spring Boot integration. Provides four interacti
 **New Features:**
 - 🔳 **QR Code Generation**: Scannable RGB PNG QR codes for product traceability
 - 🚀 **Delivery Simulator**: Real-time simulation with GPS tracking and environmental monitoring
-- 📊 **Report Generator**: CSV/JSON reports with journey data, quality metrics, analytics
+- 📊 **Report Generator**: CSV/JSON/PDF reports with journey data, quality metrics, analytics
 - 🔔 **Alert System**: Real-time alerts with severity levels and acknowledgement tracking
 - 🚪 **Logout Buttons**: Consistent logout functionality across all user screens
 - 💬 **Messages Navigation**: Easy access to messaging system from all dashboards
+- 📦 **Batch Metrics**: Automatic computation of prime%, rejection% based on quality classification
+- 🔄 **Quality Decay Tracking**: Real-time quality degradation during storage and transit
+- 📈 **Aggregated Reports**: Supply chain summaries with average quality, prime%, rejection%
+- 🎯 **Quality Disclosure**: Automated quality disclosure to buyers for price negotiation
 
-**Tech Stack**: Java 17, JavaFX, Spring Boot, HikariCP, BCrypt, Flyway, Kafka Client, ZXing (QR codes)
+**Tech Stack**: Java 17, JavaFX, Spring Boot, HikariCP, BCrypt, Flyway, Kafka Client, ZXing (QR codes), iText (PDF generation)
 
 **Details**: See [vericrop-gui/README.md](vericrop-gui/README.md) and [docs/GUI-setup.md](docs/GUI-setup.md)
 
@@ -139,6 +143,13 @@ Kafka messaging service for event-driven communication:
 - `quality-alerts`: Quality threshold alerts
 - `logistics-events`: Shipment tracking events
 - `blockchain-events`: Blockchain transactions
+- `batch-created-events`: Batch creation notifications (NEW)
+- `order-events`: Order placement and processing events (NEW)
+
+**New Features**:
+- 🎯 **Order Processing**: OrderEventConsumer handles orders with quality disclosure
+- 💰 **Dynamic Pricing**: Price adjustments based on quality metrics (prime/rejection rates)
+- 📦 **Batch Tracking**: BatchCreatedEvent for real-time batch notifications
 
 ### ml-service
 
@@ -164,8 +175,18 @@ Apache Airflow workflow orchestration:
   - Calls REST API for quality evaluation
   - Verifies ledger records
   - Generates pipeline summary
+- `delivery_simulation_dag.py`: Batch delivery simulation (NEW)
+  - Simulates environmental conditions during transit
+  - Applies quality decay based on temperature/humidity
+  - Publishes delivery events to Kafka
+  - Generates delivery reports with quality metrics
 
 **Tech Stack**: Apache Airflow 2.7.1, Kafka Python Client
+
+**New Features**:
+- 🌡️ **Environmental Monitoring**: Temperature and humidity tracking at waypoints
+- 📉 **Quality Decay Simulation**: Real-time quality degradation during transit
+- 📊 **Delivery Reports**: Comprehensive reports with quality metrics and violations
 
 ### docker
 
@@ -782,6 +803,21 @@ The VeriCrop GUI generates various output files during operation:
 - **Format**: JSON
 - **Content**: Immutable blockchain records for batches
 - **Usage**: Audit trail, verification
+
+### Logistics and Supply Chain Directory (NEW)
+- **Location**: `logistics-and-supply-chain/`
+- **Purpose**: Centralized export location for all supply chain reports and data
+- **Structure**:
+  - `reports/`: CSV and PDF reports (journey, quality, shipment)
+  - `summaries/`: Aggregated metrics and KPI summaries
+  - `batches/`: Individual batch data exports with complete metadata
+  - `supply-chain-events/`: Timeline logs of all supply chain events
+- **Formats**: CSV (machine-readable), PDF (human-readable), JSON (structured data)
+- **Features**:
+  - Aggregated metrics: average quality%, prime%, rejection%
+  - Timeline logs with timestamps for full traceability
+  - Batch summaries with quality metrics, QR codes, and image paths
+  - Supply chain event logs (creation, transit, delivery)
 
 **Note**: All generated directories are excluded from version control via `.gitignore`.
 

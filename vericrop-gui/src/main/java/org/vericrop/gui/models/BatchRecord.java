@@ -51,6 +51,12 @@ public class BatchRecord {
     
     @JsonProperty("rejection_rate")
     private Double rejectionRate;
+    
+    @JsonProperty("image_path")
+    private String imagePath;
+    
+    @JsonProperty("qr_code_path")
+    private String qrCodePath;
 
     // Database-specific fields (not sent to ML service)
     private Long id;
@@ -257,6 +263,22 @@ public class BatchRecord {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public String getImagePath() {
+        return imagePath;
+    }
+
+    public void setImagePath(String imagePath) {
+        this.imagePath = imagePath;
+    }
+
+    public String getQrCodePath() {
+        return qrCodePath;
+    }
+
+    public void setQrCodePath(String qrCodePath) {
+        this.qrCodePath = qrCodePath;
     }
 
     @Override
