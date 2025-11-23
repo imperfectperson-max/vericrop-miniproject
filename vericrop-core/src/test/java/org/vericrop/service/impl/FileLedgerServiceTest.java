@@ -3,6 +3,7 @@ package org.vericrop.service.impl;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.vericrop.dto.ShipmentRecord;
 
 import java.io.IOException;
@@ -10,6 +11,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -19,26 +24,30 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class FileLedgerServiceTest {
     
+    @TempDir
+    Path tempDir;
+    
     private FileLedgerService service;
     private String testLedgerDir;
     
     @BeforeEach
     void setUp() {
-        // Use unique directory for each test
-        testLedgerDir = "test-ledger-" + System.currentTimeMillis();
+        // Use JUnit 5 @TempDir for platform-independent temporary directory
+        testLedgerDir = tempDir.resolve("test-ledger").toString();
         service = new FileLedgerService(testLedgerDir);
     }
     
     @AfterEach
     void tearDown() throws IOException {
-        // Clean up test ledger directory
+        // Clean up is handled automatically by @TempDir
+        // But we explicitly clean up the ledger file for good measure
         Path ledgerPath = service.getLedgerPath();
         if (Files.exists(ledgerPath)) {
-            Files.delete(ledgerPath);
-        }
-        Path ledgerDir = Paths.get(testLedgerDir);
-        if (Files.exists(ledgerDir)) {
-            Files.delete(ledgerDir);
+            try {
+                Files.delete(ledgerPath);
+            } catch (IOException e) {
+                // Ignore - @TempDir will clean up anyway
+            }
         }
     }
     
@@ -275,37 +284,60 @@ class FileLedgerServiceTest {
     @Test
     void testConcurrentWritesWithFileLocking() throws Exception {
         // Given - Multiple threads trying to write simultaneously
-        int threadCount = 5; // Reduced for test stability
+        int threadCount = 5;
         Thread[] threads = new Thread[threadCount];
+        // Use CountDownLatch to ensure all threads start at the same time for better concurrency testing
+        CountDownLatch startLatch = new CountDownLatch(1);
+        CountDownLatch doneLatch = new CountDownLatch(threadCount);
+        AtomicInteger successCount = new AtomicInteger(0);
+        ConcurrentHashMap<Integer, String> errors = new ConcurrentHashMap<>();
         
         // When - Spawn threads to write concurrently
         for (int i = 0; i < threadCount; i++) {
             final int threadId = i;
             threads[i] = new Thread(() -> {
                 try {
-                    // Add small delay to help with synchronization
-                    Thread.sleep(threadId * 10);
+                    // Wait for all threads to be ready before starting
+                    startLatch.await();
+                    
                     ShipmentRecord record = createTestShipment(
                         "SHIP_CONCURRENT_" + threadId,
                         "BATCH_CONCURRENT_" + threadId
                     );
                     service.recordShipment(record);
+                    successCount.incrementAndGet();
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
+                    errors.put(threadId, "Interrupted: " + e.getMessage());
+                } catch (Exception e) {
+                    // Capture the full exception for debugging
+                    errors.put(threadId, e.getClass().getName() + ": " + e.getMessage());
+                    e.printStackTrace();
+                } finally {
+                    doneLatch.countDown();
                 }
             });
             threads[i].start();
         }
         
-        // Wait for all threads to complete
-        for (Thread thread : threads) {
-            thread.join();
+        // Release all threads at once for maximum concurrency
+        startLatch.countDown();
+        
+        // Wait for all threads to complete with timeout
+        boolean completed = doneLatch.await(10, TimeUnit.SECONDS);
+        assertTrue(completed, "All threads should complete within timeout");
+        
+        // Print any errors for debugging
+        if (!errors.isEmpty()) {
+            System.err.println("Errors encountered during concurrent writes:");
+            errors.forEach((id, error) -> System.err.println("  Thread " + id + ": " + error));
         }
         
         // Then - All records should be written successfully
         List<ShipmentRecord> allRecords = service.getAllShipments();
         assertEquals(threadCount, allRecords.size(), 
-            "All concurrent writes should succeed with file locking");
+            String.format("All concurrent writes should succeed with file locking. Success count: %d, Records: %d, Errors: %s", 
+                successCount.get(), allRecords.size(), errors.toString()));
         
         // Verify chain integrity - this is the critical test
         // If file locking works properly, the chain should remain valid

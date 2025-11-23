@@ -165,28 +165,58 @@ public class DeliverySimulatorTest {
         GeoCoordinate origin1 = new GeoCoordinate(40.0, -74.0, "Start1");
         GeoCoordinate dest1 = new GeoCoordinate(41.0, -73.0, "End1");
         List<RouteWaypoint> route1 = simulator.generateRoute(
-            origin1, dest1, 3, System.currentTimeMillis(), 60.0);
+            origin1, dest1, 5, System.currentTimeMillis(), 60.0);  // Increased waypoints for longer simulation
         
         GeoCoordinate origin2 = new GeoCoordinate(42.0, -75.0, "Start2");
         GeoCoordinate dest2 = new GeoCoordinate(43.0, -74.0, "End2");
         List<RouteWaypoint> route2 = simulator.generateRoute(
-            origin2, dest2, 3, System.currentTimeMillis(), 60.0);
+            origin2, dest2, 5, System.currentTimeMillis(), 60.0);  // Increased waypoints for longer simulation
         
-        // Start two simulations
-        simulator.startSimulation("SHIP_A", route1, 100);
-        simulator.startSimulation("SHIP_B", route2, 100);
+        // Start two simulations with longer intervals to ensure they're running during test
+        simulator.startSimulation("SHIP_A", route1, 200);
+        simulator.startSimulation("SHIP_B", route2, 200);
         
-        Thread.sleep(200);
+        // Wait briefly for simulations to start
+        // Initial delay is updateInterval/10 = 20ms
+        Thread.sleep(50);
         
-        // Both should be running
+        // Verify both simulations have started (should have non-zero total waypoints)
         SimulationStatus statusA = simulator.getSimulationStatus("SHIP_A");
         SimulationStatus statusB = simulator.getSimulationStatus("SHIP_B");
         
-        assertTrue(statusA.isRunning() || statusA.getCurrentWaypoint() > 0);
-        assertTrue(statusB.isRunning() || statusB.getCurrentWaypoint() > 0);
+        assertTrue(statusA.getTotalWaypoints() > 0, "Simulation A should be registered");
+        assertTrue(statusB.getTotalWaypoints() > 0, "Simulation B should be registered");
+        assertTrue(statusA.isRunning(), "Simulation A should be running");
+        assertTrue(statusB.isRunning(), "Simulation B should be running");
         
-        // Stop both
+        // Wait for some progress to be made
+        // With 200ms intervals and 5 waypoints, first waypoint at ~20ms, second at ~220ms
+        Thread.sleep(250);
+        
+        // Check that simulations are still running or have made progress
+        statusA = simulator.getSimulationStatus("SHIP_A");
+        statusB = simulator.getSimulationStatus("SHIP_B");
+        
+        // At this point, simulations should either:
+        // 1. Still be running (most likely with longer intervals)
+        // 2. Have advanced to waypoint 1 or beyond if they progressed
+        // Note: If simulation completed, it will be removed and status will show totalWaypoints=0
+        // So we check: either still registered (totalWaypoints > 0) OR was running earlier (which we verified above)
+        assertSimulationActiveOrProgressed("A", statusA);
+        assertSimulationActiveOrProgressed("B", statusB);
+        
+        // Stop both (safe even if already completed)
         simulator.stopSimulation("SHIP_A");
         simulator.stopSimulation("SHIP_B");
+    }
+    
+    /**
+     * Helper method to assert that a simulation is either still active or has made progress.
+     */
+    private void assertSimulationActiveOrProgressed(String simulationName, SimulationStatus status) {
+        boolean isValid = (status.getTotalWaypoints() > 0 && (status.isRunning() || status.getCurrentWaypoint() > 0));
+        assertTrue(isValid, 
+            String.format("Simulation %s should still be active or have made progress (running=%s, waypoint=%d/%d)", 
+                simulationName, status.isRunning(), status.getCurrentWaypoint(), status.getTotalWaypoints()));
     }
 }
