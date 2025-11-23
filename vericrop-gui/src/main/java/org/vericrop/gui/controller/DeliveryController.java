@@ -10,6 +10,10 @@ import org.vericrop.service.DeliverySimulator.GeoCoordinate;
 import org.vericrop.service.DeliverySimulator.RouteWaypoint;
 import org.vericrop.service.DeliverySimulator.SimulationStatus;
 import org.vericrop.service.MessageService;
+import org.vericrop.service.AlertService;
+import org.vericrop.service.SimulationOrchestrator;
+import org.vericrop.service.models.Scenario;
+import org.vericrop.dto.Message;
 
 import jakarta.annotation.PreDestroy;
 import java.time.Instant;
@@ -29,11 +33,15 @@ public class DeliveryController {
     
     private final DeliverySimulator deliverySimulator;
     private final MessageService messageService;
+    private final AlertService alertService;
+    private final SimulationOrchestrator simulationOrchestrator;
     
     public DeliveryController() {
         this.messageService = new MessageService(true);
-        this.deliverySimulator = new DeliverySimulator(messageService);
-        logger.info("DeliveryController initialized");
+        this.alertService = new AlertService();
+        this.deliverySimulator = new DeliverySimulator(messageService, alertService);
+        this.simulationOrchestrator = new SimulationOrchestrator(deliverySimulator, alertService, messageService);
+        logger.info("DeliveryController initialized with SimulationOrchestrator");
     }
     
     /**
@@ -228,10 +236,115 @@ public class DeliveryController {
     }
     
     /**
+     * POST /api/v1/delivery/start-multi-scenarios
+     * Start multiple delivery simulations with different scenarios concurrently.
+     */
+    @PostMapping("/start-multi-scenarios")
+    public ResponseEntity<Map<String, Object>> startMultiScenarios(@RequestBody Map<String, Object> request) {
+        try {
+            // Parse origin
+            @SuppressWarnings("unchecked")
+            Map<String, Object> originData = (Map<String, Object>) request.get("origin");
+            GeoCoordinate origin = new GeoCoordinate(
+                ((Number) originData.get("latitude")).doubleValue(),
+                ((Number) originData.get("longitude")).doubleValue(),
+                (String) originData.get("name")
+            );
+            
+            // Parse destination
+            @SuppressWarnings("unchecked")
+            Map<String, Object> destinationData = (Map<String, Object>) request.get("destination");
+            GeoCoordinate destination = new GeoCoordinate(
+                ((Number) destinationData.get("latitude")).doubleValue(),
+                ((Number) destinationData.get("longitude")).doubleValue(),
+                (String) destinationData.get("name")
+            );
+            
+            // Parse scenarios
+            @SuppressWarnings("unchecked")
+            List<String> scenarioNames = (List<String>) request.get("scenarios");
+            if (scenarioNames == null || scenarioNames.isEmpty()) {
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("success", false);
+                errorResponse.put("error", "At least one scenario is required");
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+            }
+            
+            // Validate and convert scenario names
+            List<Scenario> scenarios = new ArrayList<>();
+            for (String scenarioName : scenarioNames) {
+                try {
+                    scenarios.add(Scenario.valueOf(scenarioName));
+                } catch (IllegalArgumentException e) {
+                    Map<String, Object> errorResponse = new HashMap<>();
+                    errorResponse.put("success", false);
+                    errorResponse.put("error", "Invalid scenario: " + scenarioName);
+                    errorResponse.put("valid_scenarios", List.of("NORMAL", "HOT_TRANSPORT", 
+                                                                  "COLD_STORAGE", "HUMID_ROUTE", 
+                                                                  "EXTREME_DELAY"));
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+                }
+            }
+            
+            // Parse optional parameters
+            String farmerId = (String) request.getOrDefault("farmer_id", "UNKNOWN");
+            int numWaypoints = request.containsKey("num_waypoints") ? 
+                              ((Number) request.get("num_waypoints")).intValue() : 10;
+            double avgSpeed = request.containsKey("avg_speed_kmh") ?
+                            ((Number) request.get("avg_speed_kmh")).doubleValue() : 60.0;
+            long updateInterval = request.containsKey("update_interval_ms") ?
+                                ((Number) request.get("update_interval_ms")).longValue() : 5000L;
+            
+            // Start concurrent scenarios
+            Map<Scenario, String> scenarioBatchIds = simulationOrchestrator.startConcurrentScenarios(
+                origin, destination, numWaypoints, avgSpeed, farmerId, scenarios, updateInterval);
+            
+            // Publish immediate orchestration event
+            Message orchestrationMessage = new Message(
+                "delivery_controller",
+                "delivery_api",
+                "all",
+                null,
+                "MULTI_SCENARIO_STARTED",
+                String.format("Started %d concurrent scenarios for farmer %s from %s to %s",
+                            scenarios.size(), farmerId, origin.getName(), destination.getName())
+            );
+            messageService.sendMessage(orchestrationMessage);
+            
+            // Build response with batch IDs
+            Map<String, String> batchIdMap = new HashMap<>();
+            for (Map.Entry<Scenario, String> entry : scenarioBatchIds.entrySet()) {
+                batchIdMap.put(entry.getKey().name(), entry.getValue());
+            }
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("scenario_batch_ids", batchIdMap);
+            response.put("farmer_id", farmerId);
+            response.put("scenario_count", scenarios.size());
+            response.put("origin", origin.toString());
+            response.put("destination", destination.toString());
+            response.put("message", "Multi-scenario simulations started");
+            
+            logger.info("Started {} concurrent scenarios for farmer: {}", scenarios.size(), farmerId);
+            
+            return ResponseEntity.status(HttpStatus.ACCEPTED).body(response);
+            
+        } catch (Exception e) {
+            logger.error("Failed to start multi-scenario simulations", e);
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("error", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+    
+    /**
      * Cleanup when controller is destroyed.
      */
     @PreDestroy
     public void cleanup() {
+        simulationOrchestrator.shutdown();
         deliverySimulator.shutdown();
         logger.info("DeliveryController cleaned up");
     }
