@@ -49,6 +49,9 @@ public class MainApp extends Application {
                 logger.warn("Could not load icon: {}", e.getMessage());
             }
             
+            // Configure window to be maximized (full screen) on startup
+            primaryStage.setMaximized(true);
+            
             // Add shutdown hook
             primaryStage.setOnCloseRequest(event -> {
                 logger.info("Application closing...");
@@ -106,7 +109,7 @@ public class MainApp extends Application {
             FXMLLoader loader = new FXMLLoader(fxmlUrl);
             Parent root = loader.load();
 
-            Scene scene = new Scene(root, 1400, 900);
+            Scene scene = new Scene(root);
 
             try {
                 URL cssUrl = getClass().getResource("/css/styles.css");
@@ -125,6 +128,10 @@ public class MainApp extends Application {
             primaryStage.setScene(scene);
             primaryStage.setMinWidth(1200);
             primaryStage.setMinHeight(800);
+            
+            // Set window to full screen on PC
+            primaryStage.setMaximized(true);
+            
             primaryStage.show();
 
         } catch (Exception e) {

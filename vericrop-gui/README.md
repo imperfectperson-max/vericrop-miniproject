@@ -90,7 +90,7 @@ docker exec -it vericrop-postgres psql -U vericrop -d vericrop \
 The application will:
 1. Initialize ApplicationContext
 2. Connect to Postgres, Kafka, and ML Service
-3. Launch the JavaFX GUI
+3. Launch the JavaFX GUI in maximized (full screen) mode
 
 #### Demo Mode (standalone, no external services required)
 
@@ -116,6 +116,7 @@ $env:VERICROP_LOAD_DEMO="true"
 - Delivery simulator works fully in demo mode
 - QR code generation works in demo mode
 - All UI flows functional without external infrastructure
+- Full screen display on PC for better user experience
 
 **When to use Demo Mode:**
 - Quick demonstrations without setup overhead

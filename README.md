@@ -71,6 +71,7 @@ $env:VERICROP_LOAD_DEMO="true"
 - Fully functional delivery simulator
 - QR code generation
 - All UI flows operational
+- Full screen display on PC (maximized window)
 
 See [vericrop-gui/README.md](vericrop-gui/README.md) for detailed demo mode documentation.
 
