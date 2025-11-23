@@ -37,6 +37,9 @@
             <Button fx:id="messagesButton" text="💬 Messages"
                     style="-fx-background-color: #8B5CF6; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8; -fx-padding: 8 12;"
                     onAction="#handleShowMessages"/>
+            <Button fx:id="contactsButton" text="👥 Contacts"
+                    style="-fx-background-color: #3B82F6; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8; -fx-padding: 8 12;"
+                    onAction="#handleShowContacts"/>
         </HBox>
 
         <Label text="System Health: ✅ Optimal" styleClass="status-label" style="-fx-text-fill: #10b981; -fx-font-weight: bold;"/>

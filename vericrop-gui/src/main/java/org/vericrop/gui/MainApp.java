@@ -161,6 +161,10 @@ public class MainApp extends Application {
         switchToScreen("inbox.fxml");
     }
 
+    public void showContactsScreen() {
+        switchToScreen("contacts.fxml");
+    }
+
     public static MainApp getInstance() {
         return instance;
     }

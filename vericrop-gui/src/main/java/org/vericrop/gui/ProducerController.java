@@ -1227,6 +1227,11 @@ public class ProducerController {
     }
 
     @FXML
+    private void handleShowContacts() {
+        MainApp.getInstance().showContactsScreen();
+    }
+
+    @FXML
     private void handleShowSimulator() {
         // Show simulator dialog
         showSimulatorDialog();
