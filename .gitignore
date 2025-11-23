@@ -88,6 +88,16 @@ uploads/
 generated_qr/
 generated_reports/
 
+# Logistics and supply chain exports (keep structure but not generated files)
+logistics-and-supply-chain/reports/*
+!logistics-and-supply-chain/reports/.gitkeep
+logistics-and-supply-chain/summaries/*
+!logistics-and-supply-chain/summaries/.gitkeep
+logistics-and-supply-chain/batches/*
+!logistics-and-supply-chain/batches/.gitkeep
+logistics-and-supply-chain/supply-chain-events/*
+!logistics-and-supply-chain/supply-chain-events/.gitkeep
+
 # Blockchain files (generated at runtime)
 blockchain.json
 vericrop_chain.json
