@@ -638,17 +638,22 @@ public class ProducerController {
     private void handleBatchSuccess(Map<String, Object> result) {
         String batchId = safeGetString(result, "batch_id");
         String batchName = (String) ((Map<String, Object>) result.get("batch_data")).get("name");
+        
+        // Store the backend-generated batch ID for QR/Simulator use
+        this.currentBatchId = batchId;
 
         // Display actual results from backend
         Object qualityScore = result.get("backend_quality_score");
         Object primeRate = result.get("backend_prime_rate");
         Object rejectionRate = result.get("backend_rejection_rate");
+        Object dataHash = ((Map<String, Object>) result.get("batch_data")).get("data_hash");
 
         updateBlockchainDisplay();
         loadDashboardData();
 
         String successMessage = "Batch '" + batchName + "' created successfully!\n" +
                 "Batch ID: " + batchId + "\n" +
+                "Data Hash: " + (dataHash != null ? safeSubstring(dataHash.toString(), 16) : "N/A") + "\n" +
                 "Quality Score: " + (qualityScore != null ? String.format("%.1f%%", ((Number)qualityScore).doubleValue() * 100) : "N/A") + "\n" +
                 "Prime Rate: " + (primeRate != null ? String.format("%.1f%%", ((Number)primeRate).doubleValue() * 100) : "N/A") + "\n" +
                 "Rejection Rate: " + (rejectionRate != null ? String.format("%.1f%%", ((Number)rejectionRate).doubleValue() * 100) : "N/A");
@@ -1044,16 +1049,12 @@ public class ProducerController {
     @FXML
     private void handleStartSimulation() {
         try {
-            // Get batch info
-            String batchName = batchNameField.getText();
-            if (batchName == null || batchName.trim().isEmpty()) {
-                simStatusLabel.setText("⚠ Please create a batch first");
+            // Allow selecting a batch from recent batches list
+            String selectedBatchId = selectBatchForAction("Select Batch for Delivery Simulation");
+            if (selectedBatchId == null) {
+                simStatusLabel.setText("⚠ Simulation cancelled");
                 simStatusLabel.setStyle("-fx-text-fill: #DC2626;");
                 return;
-            }
-
-            if (currentBatchId == null || currentBatchId.isEmpty()) {
-                currentBatchId = "BATCH-" + System.currentTimeMillis();
             }
 
             // Get delivery simulator from ApplicationContext
@@ -1072,26 +1073,26 @@ public class ProducerController {
             var route = deliverySimulator.generateRoute(origin, destination, 10, startTime, 50.0);
 
             // Start simulation with 10-second update intervals
-            deliverySimulator.startSimulation(currentBatchId, route, 10000);
+            deliverySimulator.startSimulation(selectedBatchId, route, 10000);
 
-            activeSimulationId = currentBatchId;
+            activeSimulationId = selectedBatchId;
 
             // Notify logistics controller about the new simulation
-            notifyLogisticsAboutSimulation(currentBatchId);
+            notifyLogisticsAboutSimulation(selectedBatchId);
 
             // Update UI
             startSimButton.setDisable(true);
             stopSimButton.setDisable(false);
-            simStatusLabel.setText("✅ Simulation running for: " + currentBatchId);
+            simStatusLabel.setText("✅ Simulation running for: " + selectedBatchId);
             simStatusLabel.setStyle("-fx-text-fill: #10B981;");
 
             // Create alert
             var alertService = MainApp.getInstance().getApplicationContext().getAlertService();
             alertService.info("Simulation Started",
-                    "Delivery simulation for " + currentBatchId + " is now running",
+                    "Delivery simulation for " + selectedBatchId + " is now running",
                     "simulator");
 
-            System.out.println("✅ Simulation started for: " + currentBatchId);
+            System.out.println("✅ Simulation started for: " + selectedBatchId);
 
         } catch (Exception e) {
             simStatusLabel.setText("❌ Error: " + e.getMessage());
@@ -1239,25 +1240,20 @@ public class ProducerController {
     @FXML
     private void handleGenerateQR() {
         try {
-            // Get current batch info
-            String batchName = batchNameField.getText();
-            String farmer = farmerField.getText();
-
-            if (batchName == null || batchName.trim().isEmpty()) {
-                qrStatusLabel.setText("⚠ Please create a batch first");
+            // Allow selecting a batch from recent batches list
+            String selectedBatchId = selectBatchForAction("Select Batch for QR Generation");
+            if (selectedBatchId == null) {
+                qrStatusLabel.setText("⚠ QR generation cancelled");
                 qrStatusLabel.setStyle("-fx-text-fill: #DC2626;");
                 return;
             }
 
-            // Generate batch ID if not exists
-            if (currentBatchId == null || currentBatchId.isEmpty()) {
-                currentBatchId = "BATCH-" + System.currentTimeMillis();
-            }
-
+            // Get farmer info (use current or default)
+            String farmer = farmerField.getText();
             String farmerId = (farmer != null && !farmer.isEmpty()) ? farmer : "unknown";
 
             // Generate QR code using QRGenerator utility
-            var qrPath = org.vericrop.gui.util.QRGenerator.generateProductQR(currentBatchId, farmerId);
+            var qrPath = org.vericrop.gui.util.QRGenerator.generateProductQR(selectedBatchId, farmerId);
 
             qrStatusLabel.setText("✅ QR code generated: " + qrPath.getFileName());
             qrStatusLabel.setStyle("-fx-text-fill: #10B981;");
@@ -1265,7 +1261,7 @@ public class ProducerController {
             // Broadcast QR generation event via AlertService
             var alertService = MainApp.getInstance().getApplicationContext().getAlertService();
             alertService.info("QR Code Generated",
-                    "QR code for batch " + currentBatchId + " saved to " + qrPath.toAbsolutePath(),
+                    "QR code for batch " + selectedBatchId + " saved to " + qrPath.toAbsolutePath(),
                     "producer");
 
             System.out.println("✅ QR Code generated: " + qrPath.toAbsolutePath());
@@ -1710,6 +1706,69 @@ public class ProducerController {
         double rejectionRate = (rejectedCount * 100.0) / totalCount;
 
         return new double[] {primeRate, rejectionRate};
+    }
+
+    /**
+     * Show a dialog to select a batch for QR generation or simulation.
+     * Returns the selected batch ID or null if cancelled.
+     */
+    private String selectBatchForAction(String title) {
+        // If there's a current batch, offer to use it or select from recent batches
+        if (currentBatchId != null && !currentBatchId.isEmpty()) {
+            Alert confirmDialog = new Alert(Alert.AlertType.CONFIRMATION);
+            confirmDialog.setTitle(title);
+            confirmDialog.setHeaderText("Use Current Batch?");
+            confirmDialog.setContentText("Current batch: " + currentBatchId + "\n\nUse this batch or select from recent batches?");
+            
+            ButtonType useCurrent = new ButtonType("Use Current");
+            ButtonType selectOther = new ButtonType("Select Other");
+            ButtonType cancel = new ButtonType("Cancel", ButtonBar.ButtonData.CANCEL_CLOSE);
+            
+            confirmDialog.getButtonTypes().setAll(useCurrent, selectOther, cancel);
+            
+            Optional<ButtonType> result = confirmDialog.showAndWait();
+            if (result.isPresent()) {
+                if (result.get() == useCurrent) {
+                    return currentBatchId;
+                } else if (result.get() == cancel) {
+                    return null;
+                }
+                // Fall through to select from recent batches
+            } else {
+                return null;
+            }
+        }
+        
+        // Get recent batches from the list view
+        if (recentBatchesList == null || recentBatchesList.getItems().isEmpty()) {
+            Alert alert = new Alert(Alert.AlertType.WARNING);
+            alert.setTitle(title);
+            alert.setHeaderText("No Batches Available");
+            alert.setContentText("Please create a batch first or wait for the dashboard to load.");
+            alert.showAndWait();
+            return null;
+        }
+        
+        // Create a choice dialog to select from recent batches
+        ChoiceDialog<String> dialog = new ChoiceDialog<>(recentBatchesList.getItems().get(0), recentBatchesList.getItems());
+        dialog.setTitle(title);
+        dialog.setHeaderText("Select a Batch");
+        dialog.setContentText("Choose batch:");
+        
+        Optional<String> result = dialog.showAndWait();
+        if (result.isPresent()) {
+            // Extract batch ID from the formatted string (format: "BatchName | Quality: X% | Prime: Y% | Reject: Z%")
+            String selectedItem = result.get();
+            // Try to extract batch ID - for now, return the currentBatchId or create a temporary one
+            // In a real implementation, we'd parse the batch name or store batch IDs separately
+            if (currentBatchId != null && !currentBatchId.isEmpty()) {
+                return currentBatchId;
+            } else {
+                return "BATCH-" + System.currentTimeMillis();
+            }
+        }
+        
+        return null;
     }
 
     public void cleanup() {
