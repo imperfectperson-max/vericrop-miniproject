@@ -38,5 +38,7 @@ public class SupplierMetrics {
     public int getSpoiledShipments() { return spoiledShipments; }
     public double getAverageQualityDecay() { return averageQualityDecay; }
     public double getAverageDeliveryTime() { return averageDeliveryTime; }
+    
+    @JsonProperty("successRate")
     public double getSuccessRate() { return successRate; }
 }

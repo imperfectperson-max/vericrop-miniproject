@@ -15,13 +15,13 @@ public class SimulationStatus {
     private final double spoilageProbability;
     
     public SimulationStatus(
-            @JsonProperty("batchId") String batchId,
-            @JsonProperty("running") boolean running,
-            @JsonProperty("currentWaypoint") int currentWaypoint,
-            @JsonProperty("totalWaypoints") int totalWaypoints,
-            @JsonProperty("currentLocation") RouteWaypoint currentLocation,
-            @JsonProperty("currentQualityScore") double currentQualityScore,
-            @JsonProperty("spoilageProbability") double spoilageProbability) {
+            String batchId,
+            boolean running,
+            int currentWaypoint,
+            int totalWaypoints,
+            RouteWaypoint currentLocation,
+            double currentQualityScore,
+            double spoilageProbability) {
         this.batchId = batchId;
         this.running = running;
         this.currentWaypoint = currentWaypoint;
@@ -37,15 +37,25 @@ public class SimulationStatus {
         this(batchId, running, currentWaypoint, totalWaypoints, currentLocation, 100.0, 0.0);
     }
     
+    @JsonProperty("batchId")
     public String getBatchId() { return batchId; }
     
     @JsonProperty("isRunning")
     public boolean isRunning() { return running; }
     
+    @JsonProperty("currentWaypoint")
     public int getCurrentWaypoint() { return currentWaypoint; }
+    
+    @JsonProperty("totalWaypoints")
     public int getTotalWaypoints() { return totalWaypoints; }
+    
+    @JsonProperty("currentLocation")
     public RouteWaypoint getCurrentLocation() { return currentLocation; }
+    
+    @JsonProperty("currentQualityScore")
     public double getCurrentQualityScore() { return currentQualityScore; }
+    
+    @JsonProperty("spoilageProbability")
     public double getSpoilageProbability() { return spoilageProbability; }
     
     // Legacy compatibility

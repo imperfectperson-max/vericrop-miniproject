@@ -37,6 +37,7 @@ public class DeliverySimulator {
     // Quality decay parameters
     private static final double QUALITY_DECAY_PER_HOUR = 0.5;
     private static final double SPOILAGE_THRESHOLD = 50.0;
+    private static final double QUALITY_ALERT_THRESHOLD = 70.0;
     
     private final MessageService messageService;
     private final AlertService alertService;
@@ -120,8 +121,21 @@ public class DeliverySimulator {
         this.activeSimulations = new ConcurrentHashMap<>();
         this.supplierMetrics = new ConcurrentHashMap<>();
         
+        // Initialize random with optional seed for deterministic testing
         String seedProp = System.getProperty("vericrop.sim.seed");
-        this.random = seedProp != null ? new Random(Long.parseLong(seedProp)) : new Random();
+        Random initRandom;
+        if (seedProp != null) {
+            try {
+                initRandom = new Random(Long.parseLong(seedProp));
+                logger.info("Using deterministic random seed: {}", seedProp);
+            } catch (NumberFormatException e) {
+                logger.warn("Invalid seed value '{}', using random seed instead", seedProp);
+                initRandom = new Random();
+            }
+        } else {
+            initRandom = new Random();
+        }
+        this.random = initRandom;
         
         this.objectMapper = new ObjectMapper();
         this.objectMapper.enable(SerializationFeature.INDENT_OUTPUT);
@@ -391,10 +405,10 @@ public class DeliverySimulator {
         }
         
         // Quality degradation alert
-        if (state.currentQualityScore < 70.0) {
+        if (state.currentQualityScore < QUALITY_ALERT_THRESHOLD) {
             createAlert(state, Alert.AlertType.QUALITY_DEGRADATION, Alert.Severity.HIGH,
                        String.format("Quality degraded to %.1f%%", state.currentQualityScore),
-                       state.currentQualityScore, 70.0, waypoint.getLocation().toString());
+                       state.currentQualityScore, QUALITY_ALERT_THRESHOLD, waypoint.getLocation().toString());
         }
     }
     
@@ -503,12 +517,19 @@ public class DeliverySimulator {
         org.vericrop.service.models.GeoCoordinate destination = state.route.isEmpty() ? null : 
                                    state.route.get(state.route.size() - 1).getLocation();
         
-        double avgTemp = state.route.stream()
-                             .mapToDouble(org.vericrop.service.models.RouteWaypoint::getTemperature)
-                             .average().orElse(0.0);
-        double avgHumidity = state.route.stream()
-                                 .mapToDouble(org.vericrop.service.models.RouteWaypoint::getHumidity)
-                                 .average().orElse(0.0);
+        // Calculate averages in a single pass
+        double avgTemp = 0.0;
+        double avgHumidity = 0.0;
+        if (!state.route.isEmpty()) {
+            double sumTemp = 0.0;
+            double sumHumidity = 0.0;
+            for (org.vericrop.service.models.RouteWaypoint wp : state.route) {
+                sumTemp += wp.getTemperature();
+                sumHumidity += wp.getHumidity();
+            }
+            avgTemp = sumTemp / state.route.size();
+            avgHumidity = sumHumidity / state.route.size();
+        }
         
         double totalDistance = origin != null && destination != null 
                              ? calculateDistance(origin, destination) : 0.0;
