@@ -221,7 +221,7 @@ public class BatchService {
         
         double qualityScore = batch.getQualityScore();
         double qualityPercent = qualityScore * 100.0;
-        String classification = batch.getQualityLabel().toUpperCase();
+        String classification = org.vericrop.gui.util.QualityLabelUtil.normalize(batch.getQualityLabel());
         
         double primeRate, rejectionRate;
         
@@ -233,13 +233,12 @@ public class BatchService {
                 break;
                 
             case "LOW_QUALITY":
-            case "LOW QUALITY":
                 double lowQualityRate = Math.min(80 + (qualityPercent * 0.2), 100.0);
                 double lowQualityRemainder = 100.0 - lowQualityRate;
                 primeRate = (lowQualityRemainder * 0.8) / 100.0;
                 rejectionRate = (lowQualityRemainder * 0.2) / 100.0;
                 break;
-                
+            
             case "ROTTEN":
                 rejectionRate = Math.min(80 + (qualityPercent * 0.2), 100.0) / 100.0;
                 double rottenRemainder = 100.0 - (rejectionRate * 100.0);

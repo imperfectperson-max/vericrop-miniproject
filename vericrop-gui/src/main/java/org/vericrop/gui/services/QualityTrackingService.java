@@ -182,7 +182,7 @@ public class QualityTrackingService {
         
         double qualityScore = batch.getQualityScore();
         double qualityPercent = qualityScore * 100.0;
-        String classification = batch.getQualityLabel().toUpperCase();
+        String classification = org.vericrop.gui.util.QualityLabelUtil.normalize(batch.getQualityLabel());
         
         double primeRate, rejectionRate;
         
@@ -194,7 +194,6 @@ public class QualityTrackingService {
                 break;
                 
             case "LOW_QUALITY":
-            case "LOW QUALITY":
                 double lowQualityRate = Math.min(80 + (qualityPercent * 0.2), 100.0);
                 double lowQualityRemainder = 100.0 - lowQualityRate;
                 primeRate = (lowQualityRemainder * 0.8) / 100.0;

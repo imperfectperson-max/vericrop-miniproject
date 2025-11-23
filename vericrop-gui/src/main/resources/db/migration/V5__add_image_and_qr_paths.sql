@@ -11,6 +11,7 @@ ALTER TABLE batches
 ADD COLUMN qr_code_path VARCHAR(512);
 
 -- Add prime_rate and rejection_rate columns for batch quality metrics
+-- Note: Rates are stored as fractions (0.0000 to 1.0000), not percentages
 ALTER TABLE batches 
 ADD COLUMN prime_rate NUMERIC(5, 4);
 

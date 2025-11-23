@@ -65,19 +65,26 @@ public class OrderEventConsumer {
         logger.info("✅ Order processed successfully: {}", event.getOrderId());
     }
     
+    // Price adjustment constants
+    private static final double PRIME_BONUS_MULTIPLIER = 0.2;  // 20% bonus for prime quality
+    private static final double REJECTION_PENALTY_MULTIPLIER = 0.3;  // 30% penalty for rejections
+    
     /**
      * Calculate price adjustment based on quality metrics
+     * Business logic:
+     * - Prime quality items command a premium (up to 20% increase)
+     * - Rejected items reduce the price (up to 30% decrease)
      */
     private double calculatePriceAdjustment(OrderEvent event) {
         if (event.getPricePerUnit() == null || event.getQuantityOrdered() == null) {
             return event.getTotalPrice();
         }
         
-        // Apply quality-based pricing:
-        // - Prime rate increases price by up to 20%
-        // - Rejection rate decreases price by up to 30%
-        double primeBonus = event.getPrimeRate() != null ? event.getPrimeRate() * 0.2 : 0.0;
-        double rejectionPenalty = event.getRejectionRate() != null ? event.getRejectionRate() * 0.3 : 0.0;
+        // Apply quality-based pricing
+        double primeBonus = event.getPrimeRate() != null ? 
+            event.getPrimeRate() * PRIME_BONUS_MULTIPLIER : 0.0;
+        double rejectionPenalty = event.getRejectionRate() != null ? 
+            event.getRejectionRate() * REJECTION_PENALTY_MULTIPLIER : 0.0;
         
         double adjustmentFactor = 1.0 + primeBonus - rejectionPenalty;
         double adjustedPricePerUnit = event.getPricePerUnit() * adjustmentFactor;
