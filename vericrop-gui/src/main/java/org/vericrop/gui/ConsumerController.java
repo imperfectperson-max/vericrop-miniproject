@@ -10,6 +10,7 @@ import javafx.stage.Stage;
 import java.util.Set;
 import java.util.HashSet;
 import java.io.File;
+import java.io.IOException;
 import org.vericrop.gui.util.QRDecoder;
 import com.google.zxing.NotFoundException;
 
@@ -99,9 +100,12 @@ public class ConsumerController {
             } catch (NotFoundException e) {
                 showAlert(Alert.AlertType.ERROR, "QR Code Not Found", 
                     "No QR code was found in the selected image. Please select an image containing a valid QR code.");
+            } catch (IOException e) {
+                showAlert(Alert.AlertType.ERROR, "File Error", 
+                    "Failed to read the image file: " + e.getMessage());
             } catch (Exception e) {
                 showAlert(Alert.AlertType.ERROR, "Error Reading QR Code", 
-                    "Failed to read QR code from the image: " + e.getMessage());
+                    "An unexpected error occurred while reading the QR code: " + e.getMessage());
             }
         }
     }

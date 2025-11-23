@@ -76,8 +76,9 @@ public class QRDecoder {
             Result result = reader.decode(bitmap);
             String decodedText = result.getText();
             
-            logger.info("Successfully decoded QR code from {}: {}", 
-                imageFile.getName(), decodedText.substring(0, Math.min(50, decodedText.length())));
+            // Log only metadata to avoid exposing sensitive information
+            logger.info("Successfully decoded QR code from {} (content length: {} characters)", 
+                imageFile.getName(), decodedText.length());
             
             return decodedText;
         } catch (NotFoundException e) {
