@@ -76,4 +76,66 @@ public class AppConfiguration {
     public org.vericrop.service.ScenarioManager scenarioManager() {
         return new org.vericrop.service.ScenarioManager();
     }
+    
+    /**
+     * Create DeliverySimulator bean.
+     * Dependencies will be injected from other beans.
+     */
+    @Bean
+    public org.vericrop.service.DeliverySimulator deliverySimulator(
+            org.vericrop.service.MessageService messageService,
+            org.vericrop.service.AlertService alertService) {
+        return new org.vericrop.service.DeliverySimulator(messageService, alertService);
+    }
+    
+    /**
+     * Create MessageService bean.
+     */
+    @Bean
+    public org.vericrop.service.MessageService messageService() {
+        return new org.vericrop.service.MessageService(true);
+    }
+    
+    /**
+     * Create AlertService bean.
+     */
+    @Bean
+    public org.vericrop.service.AlertService alertService() {
+        return new org.vericrop.service.AlertService();
+    }
+    
+    /**
+     * Create MapService bean.
+     */
+    @Bean
+    public org.vericrop.service.MapService mapService() {
+        return new org.vericrop.service.MapService();
+    }
+    
+    /**
+     * Create TemperatureService bean.
+     */
+    @Bean
+    public org.vericrop.service.TemperatureService temperatureService() {
+        return new org.vericrop.service.TemperatureService();
+    }
+    
+    /**
+     * Create SimulationManager bean with full dependencies.
+     * This is the singleton that manages all simulation state.
+     */
+    @Bean
+    public org.vericrop.service.simulation.SimulationManager simulationManager(
+            org.vericrop.service.DeliverySimulator deliverySimulator,
+            org.vericrop.service.MapService mapService,
+            org.vericrop.service.TemperatureService temperatureService,
+            org.vericrop.service.AlertService alertService,
+            org.vericrop.service.MapSimulator mapSimulator,
+            org.vericrop.service.ScenarioManager scenarioManager) {
+        // Initialize the singleton
+        org.vericrop.service.simulation.SimulationManager.initialize(
+            deliverySimulator, mapService, temperatureService, alertService,
+            mapSimulator, scenarioManager);
+        return org.vericrop.service.simulation.SimulationManager.getInstance();
+    }
 }
