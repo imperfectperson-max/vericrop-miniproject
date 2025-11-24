@@ -72,8 +72,14 @@ public class MapSimulationEvent {
     
     @Override
     public String toString() {
-        return String.format("MapSimulationEvent{batchId='%s', location='%s', progress=%.1f%%, status='%s', temp=%.1f°C, humidity=%.1f%%}",
-                batchId, locationName, progress * 100, status, temperature, humidity);
+        // Only include environmental data if it appears to be initialized (non-zero)
+        if (temperature != 0.0 || humidity != 0.0) {
+            return String.format("MapSimulationEvent{batchId='%s', location='%s', progress=%.1f%%, status='%s', temp=%.1f°C, humidity=%.1f%%}",
+                    batchId, locationName, progress * 100, status, temperature, humidity);
+        } else {
+            return String.format("MapSimulationEvent{batchId='%s', location='%s', progress=%.1f%%, status='%s'}",
+                    batchId, locationName, progress * 100, status);
+        }
     }
     
     @Override

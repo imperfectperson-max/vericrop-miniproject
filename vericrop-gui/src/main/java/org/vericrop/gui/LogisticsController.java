@@ -1073,7 +1073,8 @@ public class LogisticsController implements SimulationListener {
      */
     private String calculateETA(double progress) {
         if (progress >= PROGRESS_COMPLETE) return "ARRIVED";
-        double remaining = 1.0 - (progress / PROGRESS_COMPLETE);
+        // Progress is percentage, convert to decimal for calculation
+        double remaining = 1.0 - (progress / 100.0);
         int etaMinutes = (int) (remaining * ESTIMATED_TOTAL_TRIP_MINUTES);
         return etaMinutes + " min";
     }
