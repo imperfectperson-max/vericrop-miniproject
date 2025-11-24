@@ -75,11 +75,19 @@ class LogisticsControllerStatusTransitionTest {
      * Helper method that mimics the determineStatusFromProgress logic in LogisticsController.
      * This is duplicated here for testing purposes.
      * 
-     * IMPORTANT: If you modify the status logic in LogisticsController,
-     * you must update this method to match.
+     * IMPORTANT: If you modify the status logic or thresholds in LogisticsController,
+     * you MUST update this method to match. The thresholds are:
+     * - PROGRESS_DEPARTING_THRESHOLD = 10.0
+     * - PROGRESS_EN_ROUTE_THRESHOLD = 30.0
+     * - PROGRESS_APPROACHING_THRESHOLD = 70.0
+     * - PROGRESS_AT_WAREHOUSE_THRESHOLD = 90.0
+     * - PROGRESS_COMPLETE = 100.0
+     * 
+     * TODO: Consider extracting these constants to a shared configuration class
+     * to avoid duplication and maintenance issues.
      */
     private String getStatusForProgress(double progressPercent) {
-        // Constants from LogisticsController
+        // Constants from LogisticsController (keep in sync!)
         final double PROGRESS_COMPLETE = 100.0;
         final double PROGRESS_AT_WAREHOUSE_THRESHOLD = 90.0;
         final double PROGRESS_APPROACHING_THRESHOLD = 70.0;
