@@ -1,8 +1,12 @@
 package org.vericrop.service.simulation;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.vericrop.dto.SimulationEvent;
+import org.vericrop.dto.TemperatureComplianceEvent;
 import org.vericrop.service.*;
 import org.vericrop.service.models.Alert;
 import org.vericrop.service.models.GeoCoordinate;
@@ -10,6 +14,7 @@ import org.vericrop.service.models.RouteWaypoint;
 import org.vericrop.service.models.Scenario;
 
 import java.util.List;
+import java.util.Properties;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -43,6 +48,8 @@ public class SimulationManager {
     private final AtomicReference<SimulationState> currentSimulation;
     private final AtomicBoolean running;
     private final ScheduledExecutorService complianceCheckExecutor;
+    private KafkaProducer<String, String> temperatureProducer;
+    private final ObjectMapper objectMapper;
     
     /**
      * Internal state holder for current simulation.
@@ -111,6 +118,11 @@ public class SimulationManager {
         this.running = new AtomicBoolean(false);
         this.complianceCheckExecutor = Executors.newScheduledThreadPool(1, 
             r -> new Thread(r, "SimulationManager-ComplianceCheck"));
+        this.objectMapper = new ObjectMapper();
+        
+        // Initialize Kafka producer for temperature events
+        initializeTemperatureProducer();
+        
         logger.info("SimulationManager initialized with integrated services including map simulation");
     }
     
@@ -556,6 +568,10 @@ public class SimulationManager {
         state.currentTemperature = event.getTemperature();
         state.currentHumidity = event.getHumidity();
         
+        // Publish temperature event to Kafka for live dashboard updates
+        // This is the key fix: bridge simulation temperature data to Kafka stream
+        publishTemperatureEvent(event);
+        
         // Notify progress update to all listeners
         notifyProgress(event.getBatchId(), event.getProgressPercent(), event.getLocationName());
         
@@ -637,6 +653,69 @@ public class SimulationManager {
     }
     
     /**
+     * Initialize Kafka producer for publishing temperature events during simulation.
+     * This allows simulated temperature readings to flow to the logistics dashboard.
+     */
+    private void initializeTemperatureProducer() {
+        try {
+            Properties props = new Properties();
+            props.put("bootstrap.servers", "localhost:9092");
+            props.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer");
+            props.put("value.serializer", "org.apache.kafka.common.serialization.StringSerializer");
+            props.put("acks", "1");
+            props.put("retries", 3);
+            props.put("max.in.flight.requests.per.connection", 1);
+            
+            this.temperatureProducer = new KafkaProducer<>(props);
+            logger.info("✅ Temperature event producer initialized for simulation streaming");
+        } catch (Exception e) {
+            logger.warn("⚠️  Failed to initialize temperature producer: {}. Temperature streaming will be disabled.", 
+                       e.getMessage());
+            this.temperatureProducer = null;
+        }
+    }
+    
+    /**
+     * Publish a temperature compliance event to Kafka for live dashboard updates.
+     * This bridges SimulationService events to the temperature-compliance Kafka topic.
+     * 
+     * @param event SimulationEvent containing temperature data
+     */
+    private void publishTemperatureEvent(SimulationEvent event) {
+        if (temperatureProducer == null) {
+            return; // Kafka not available
+        }
+        
+        try {
+            // Create temperature compliance event from simulation event
+            TemperatureComplianceEvent tempEvent = new TemperatureComplianceEvent(
+                event.getBatchId(),
+                event.getTemperature(),
+                true, // Assume compliant for now, compliance checking happens separately
+                "simulation",
+                String.format("Simulated temperature reading at %s", event.getLocationName())
+            );
+            tempEvent.setTimestamp(event.getTimestamp());
+            
+            // Serialize and publish
+            String value = objectMapper.writeValueAsString(tempEvent);
+            ProducerRecord<String, String> record = new ProducerRecord<>(
+                "temperature-compliance", event.getBatchId(), value);
+            
+            temperatureProducer.send(record, (metadata, exception) -> {
+                if (exception != null) {
+                    logger.error("Error publishing temperature event: {}", exception.getMessage());
+                } else {
+                    logger.debug("📡 Temperature event published: {}°C for batch {}", 
+                               event.getTemperature(), event.getBatchId());
+                }
+            });
+        } catch (Exception e) {
+            logger.error("Failed to publish temperature event: {}", e.getMessage());
+        }
+    }
+    
+    /**
      * Shutdown the manager and clean up resources.
      */
     public void shutdown() {
@@ -659,6 +738,16 @@ public class SimulationManager {
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 complianceCheckExecutor.shutdownNow();
+            }
+        }
+        
+        // Close temperature producer
+        if (temperatureProducer != null) {
+            try {
+                temperatureProducer.close();
+                logger.info("Temperature event producer closed");
+            } catch (Exception e) {
+                logger.error("Error closing temperature producer", e);
             }
         }
         
