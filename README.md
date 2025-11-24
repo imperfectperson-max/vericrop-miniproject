@@ -176,13 +176,26 @@ Kafka messaging service for event-driven communication:
 - `quality-alerts`: Quality threshold alerts
 - `logistics-events`: Shipment tracking events
 - `blockchain-events`: Blockchain transactions
-- `batch-created-events`: Batch creation notifications (NEW)
-- `order-events`: Order placement and processing events (NEW)
+- `batch-created-events`: Batch creation notifications
+- `order-events`: Order placement and processing events
+- `scenario-events`: Scenario execution lifecycle events (NEW)
+- `temperature-events`: Temperature monitoring and violation events (NEW)
+- `supplier-compliance-events`: Supplier compliance status updates (NEW)
+
+**Concurrent Scenario Orchestration** (NEW):
+- 🎯 **ScenarioController**: Orchestrates concurrent execution across 6 domains (scenarios, delivery, map, temperature, supplier_compliance, simulations)
+- 🔄 **Parallel Execution**: Multiple scenarios (NORMAL, HOT_TRANSPORT, COLD_STORAGE, HUMID_ROUTE, EXTREME_DELAY) run concurrently using CompletableFuture
+- 📊 **Domain Integration**: TemperatureService monitors temp compliance, MapService generates routes, SupplierComplianceService tracks performance
+- 📡 **Event Publishing**: Kafka events published at start/complete/fail for each scenario and domain
+- ⚡ **Result Aggregation**: Cross-domain status monitoring and result collection
 
 **New Features**:
 - 🎯 **Order Processing**: OrderEventConsumer handles orders with quality disclosure
 - 💰 **Dynamic Pricing**: Price adjustments based on quality metrics (prime/rejection rates)
 - 📦 **Batch Tracking**: BatchCreatedEvent for real-time batch notifications
+- 🌡️ **Temperature Monitoring**: Real-time cold chain compliance tracking
+- 🗺️ **Route Generation**: Automated route planning with environmental conditions
+- 📈 **Supplier Compliance**: Performance metrics and compliance evaluation
 
 ### ml-service
 
@@ -836,6 +849,119 @@ The VeriCrop GUI generates various output files during operation:
 - **Format**: JSON
 - **Content**: Immutable blockchain records for batches
 - **Usage**: Audit trail, verification
+
+### Concurrent Scenario Execution (NEW)
+
+VeriCrop supports concurrent execution of multiple delivery scenarios with integrated monitoring across all domains. This feature enables running different environmental conditions simultaneously and comparing results.
+
+#### Architecture
+
+The system coordinates 6 domains for concurrent scenario execution:
+1. **Scenarios** - Environmental condition presets (NORMAL, HOT_TRANSPORT, COLD_STORAGE, HUMID_ROUTE, EXTREME_DELAY)
+2. **Delivery** - Shipment simulation with quality decay
+3. **Map** - Route generation with waypoints and geographic data
+4. **Temperature** - Cold chain compliance monitoring
+5. **Supplier Compliance** - Performance metrics and evaluation
+6. **Simulations** - Orchestrated parallel execution management
+
+#### Components
+
+**ScenarioController** (`vericrop-core/src/main/java/org/vericrop/service/ScenarioController.java`)
+- Orchestrates concurrent execution across all 6 domains
+- Uses CompletableFuture for non-blocking parallel processing
+- Aggregates results from all domains
+- Provides cross-domain status monitoring API
+
+**Domain Services:**
+- **TemperatureService**: Tracks temperature readings, violations, and compliance
+- **MapService**: Generates routes with environmental conditions applied by scenario
+- **SupplierComplianceService**: Evaluates supplier performance (success rate, spoilage rate, quality decay)
+
+**SimulationOrchestrator** (Enhanced)
+- Manages thread pool for concurrent scenario execution (pool size: 20)
+- Publishes Kafka events for scenario lifecycle (STARTED, RUNNING, COMPLETED, FAILED)
+- Monitors active orchestrations and publishes periodic status updates
+
+#### Usage Example
+
+```java
+// Initialize services
+MessageService messageService = new MessageService();
+AlertService alertService = new AlertService();
+DeliverySimulator deliverySimulator = new DeliverySimulator(messageService, alertService);
+SimulationOrchestrator orchestrator = new SimulationOrchestrator(deliverySimulator, alertService, messageService);
+TemperatureService temperatureService = new TemperatureService();
+MapService mapService = new MapService();
+SupplierComplianceService complianceService = new SupplierComplianceService();
+
+ScenarioController controller = new ScenarioController(
+    orchestrator, deliverySimulator, temperatureService, 
+    mapService, complianceService, messageService);
+
+// Define scenarios to run concurrently
+List<Scenario> scenarios = Arrays.asList(
+    Scenario.NORMAL,
+    Scenario.HOT_TRANSPORT,
+    Scenario.COLD_STORAGE
+);
+
+// Execute scenarios concurrently
+GeoCoordinate origin = new GeoCoordinate(40.7128, -74.0060, "New York");
+GeoCoordinate destination = new GeoCoordinate(42.3601, -71.0589, "Boston");
+
+CompletableFuture<ScenarioExecutionResult> future = controller.executeScenarios(
+    origin, destination, 
+    5,        // waypoints
+    60.0,     // avg speed km/h
+    "FARMER_001",
+    scenarios,
+    1000      // update interval ms
+);
+
+ScenarioExecutionResult result = future.get();
+
+// Check results
+System.out.println("Success: " + result.isSuccess());
+System.out.println("Scenarios started: " + result.getScenarioBatchIds().size());
+
+// Get real-time status
+Map<String, Object> status = controller.getExecutionStatus(result.getExecutionId());
+System.out.println("Running scenarios: " + status.get("scenario_count"));
+```
+
+#### Kafka Event Streams
+
+**scenario-events** topic:
+- `STARTED`: Scenario execution began
+- `RUNNING`: Scenario is actively running
+- `COMPLETED`: Scenario finished successfully
+- `FAILED`: Scenario encountered an error
+
+**temperature-events** topic:
+- `MONITORING_STARTED`: Temperature monitoring activated for batch
+- `READING`: Temperature reading recorded
+- `VIOLATION`: Temperature outside safe range (2-8°C)
+- `COMPLIANT`: Batch remained within temperature thresholds
+- `MONITORING_STOPPED`: Monitoring ended
+
+**supplier-compliance-events** topic:
+- `DELIVERY_RECORDED`: Delivery outcome recorded
+- `COMPLIANCE_UPDATED`: Compliance status recalculated
+- `WARNING`: Supplier performance degrading
+- `NON_COMPLIANT`: Supplier below compliance thresholds
+
+#### Testing
+
+Comprehensive unit tests verify concurrent execution:
+- **TemperatureServiceTest**: 7 tests for monitoring and violations
+- **MapServiceTest**: 8 tests for route generation with scenarios
+- **SupplierComplianceServiceTest**: 10 tests for compliance tracking
+- **ScenarioControllerTest**: 6 tests including full 6-domain integration
+
+Run tests:
+```bash
+./gradlew :vericrop-core:test --tests "*ScenarioControllerTest"
+```
 
 ### Logistics and Supply Chain Directory (NEW)
 - **Location**: `logistics-and-supply-chain/`
