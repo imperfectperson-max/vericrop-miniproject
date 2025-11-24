@@ -28,6 +28,9 @@ public class SimulationManager {
     private static final int COMPLIANCE_INITIAL_DELAY_SECONDS = 10;
     private static final int COMPLIANCE_CHECK_INTERVAL_SECONDS = 15;
     
+    // Route generation constants
+    private static final double WAREHOUSE_LOCATION_OFFSET = 0.05; // Degrees lat/lon offset for warehouse
+    
     private final DeliverySimulator deliverySimulator;
     private final MapService mapService;
     private final TemperatureService temperatureService;
@@ -204,8 +207,8 @@ public class SimulationManager {
             GeoCoordinate destModel = new GeoCoordinate(destination.getLatitude(), destination.getLongitude(), destination.getName());
             
             // Generate intermediate warehouse location (midpoint with slight offset)
-            double warehouseLat = (origin.getLatitude() + destination.getLatitude()) / 2.0 + 0.05;
-            double warehouseLon = (origin.getLongitude() + destination.getLongitude()) / 2.0 + 0.05;
+            double warehouseLat = (origin.getLatitude() + destination.getLatitude()) / 2.0 + WAREHOUSE_LOCATION_OFFSET;
+            double warehouseLon = (origin.getLongitude() + destination.getLongitude()) / 2.0 + WAREHOUSE_LOCATION_OFFSET;
             GeoCoordinate warehouse = new GeoCoordinate(warehouseLat, warehouseLon, "Distribution Warehouse");
             
             List<RouteWaypoint> route = mapService.generateMultiLegRoute(
@@ -244,7 +247,7 @@ public class SimulationManager {
             currentSimulation.set(state);
             running.set(true);
             
-            // Step 6: Start temperature compliance checking
+            // Step 5: Start temperature compliance checking
             logger.info("Step 5: Starting temperature compliance monitoring...");
             startComplianceChecking(batchId);
             

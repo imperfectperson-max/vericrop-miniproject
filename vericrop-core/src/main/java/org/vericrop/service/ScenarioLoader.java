@@ -85,14 +85,12 @@ public class ScenarioLoader {
         };
         
         for (String scenarioFile : scenarioFiles) {
-            try {
-                InputStream is = getClass().getResourceAsStream(scenarioFile);
+            try (InputStream is = getClass().getResourceAsStream(scenarioFile)) {
                 if (is != null) {
                     JsonNode root = objectMapper.readTree(is);
                     ScenarioDefinition def = objectMapper.treeToValue(root, ScenarioDefinition.class);
                     loadedScenarios.put(def.getId(), def);
                     logger.info("Loaded scenario: {} - {}", def.getId(), def.getDescription());
-                    is.close();
                 } else {
                     logger.warn("Scenario file not found: {} (continuing without it)", scenarioFile);
                 }

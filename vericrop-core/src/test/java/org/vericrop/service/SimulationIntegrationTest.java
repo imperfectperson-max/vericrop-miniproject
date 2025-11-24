@@ -21,8 +21,8 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 public class SimulationIntegrationTest {
     
-    // Test constants
-    private static final double HOT_TRANSPORT_MIN_TEMP = 8.0; // °C
+    // Test constants - use scenario temperature drift value
+    private static final double HOT_TRANSPORT_MIN_TEMP = 5.0 + Scenario.HOT_TRANSPORT.getTemperatureDrift() - 2.0; // Expected: > 11°C avg, allow margin
     
     private MessageService messageService;
     private AlertService alertService;
