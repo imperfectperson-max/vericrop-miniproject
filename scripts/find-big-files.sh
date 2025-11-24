@@ -99,7 +99,8 @@ echo "Repository size summary:"
 echo "------------------------------------------------------------------------"
 REPO_SIZE=$(du -sh . 2>/dev/null | awk '{print $1}')
 GIT_SIZE=$(du -sh .git 2>/dev/null | awk '{print $1}')
-WORKING_SIZE=$(du -sh --exclude=.git . 2>/dev/null | awk '{print $1}')
+# Calculate working tree size by finding all files excluding .git directory
+WORKING_SIZE=$(find . -type f -not -path './.git/*' -exec du -ch {} + 2>/dev/null | grep total$ | awk '{print $1}')
 
 echo "Total repository size:     $REPO_SIZE"
 echo "Git history size (.git):   $GIT_SIZE"
