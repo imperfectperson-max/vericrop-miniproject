@@ -60,4 +60,20 @@ public class AppConfiguration {
     public KafkaProducerService kafkaProducerService() {
         return new KafkaProducerService(kafkaEnabled);
     }
+    
+    /**
+     * Create MapSimulator bean for grid-based simulation.
+     */
+    @Bean
+    public org.vericrop.service.MapSimulator mapSimulator() {
+        return new org.vericrop.service.MapSimulator();
+    }
+    
+    /**
+     * Create ScenarioManager bean for scenario selection and configuration.
+     */
+    @Bean
+    public org.vericrop.service.ScenarioManager scenarioManager() {
+        return new org.vericrop.service.ScenarioManager();
+    }
 }

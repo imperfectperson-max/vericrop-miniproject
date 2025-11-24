@@ -75,6 +75,70 @@ $env:VERICROP_LOAD_DEMO="true"
 
 See [vericrop-gui/README.md](vericrop-gui/README.md) for detailed demo mode documentation.
 
+### Map Simulation and Scenario Management
+
+VeriCrop now includes integrated map simulation that runs alongside delivery simulations, providing a grid-based visualization of entity positions (producers, consumers, warehouses, vehicles, resources) as the simulation progresses.
+
+**Key Features:**
+- **MapSimulator**: Grid-based simulation tracking entity positions in real-time
+- **ScenarioManager**: Unified manager for selecting and configuring delivery scenarios
+- **REST API**: Access current map state via `/api/simulation/map` endpoint
+- **Three Pre-configured Scenarios**:
+  - `scenario-01` (NORMAL): Normal cold-chain delivery (2-5°C, short spike allowed)
+  - `scenario-02` (COLD_STORAGE): Strict cold-chain (1-4°C, no spikes)
+  - `scenario-03` (HOT_TRANSPORT): High-risk delivery (0-6°C, multiple temperature events)
+
+**Using the Simulation API:**
+
+```bash
+# Get current map state snapshot
+curl http://localhost:8080/api/simulation/map
+
+# List all available scenarios
+curl http://localhost:8080/api/simulation/scenarios
+
+# Get specific scenario details
+curl http://localhost:8080/api/simulation/scenarios/scenario-01
+
+# Get simulation status including map state
+curl http://localhost:8080/api/simulation/status
+```
+
+**Example Response:**
+```json
+{
+  "timestamp": 1700000000000,
+  "simulation_step": 42,
+  "grid_width": 20,
+  "grid_height": 20,
+  "scenario_id": "NORMAL",
+  "entities": [
+    {
+      "id": "producer-BATCH_001",
+      "type": "PRODUCER",
+      "x": 2,
+      "y": 10,
+      "metadata": {"batch_id": "BATCH_001"}
+    },
+    {
+      "id": "vehicle-BATCH_001",
+      "type": "DELIVERY_VEHICLE",
+      "x": 12,
+      "y": 10,
+      "metadata": {
+        "batch_id": "BATCH_001",
+        "current_waypoint": 8,
+        "phase": "In transit - midpoint"
+      }
+    }
+  ]
+}
+```
+
+**Selecting Scenarios in ProducerController:**
+
+When starting a simulation through the ProducerController, the system automatically uses the appropriate scenario based on batch parameters. The MapSimulator is initialized with the selected scenario and steps forward in sync with the delivery simulation, updating entity positions each tick.
+
 ## Architecture
 
 VeriCrop follows a microservices architecture with event-driven communication:
