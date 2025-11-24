@@ -234,6 +234,9 @@ public class LogisticsController implements SimulationListener {
             return;
         }
         
+        System.out.println("🗺️  Received map event: " + event.getBatchId() + 
+                         " at progress " + (event.getProgress() * 100) + "% - " + event.getLocationName());
+        
         Platform.runLater(() -> {
             try {
                 // Update environmental data tracking from map event
@@ -282,11 +285,15 @@ public class LogisticsController implements SimulationListener {
     /**
      * Determine status string based on progress percentage.
      * Used to detect status transitions and prevent duplicate alerts.
+     * Only transitions to "Delivered" at exactly 100% progress to prevent
+     * duplicate alerts at high progress levels (95-99%).
      * @param progressPercent Progress as percentage (0-100)
      * @return Status string
      */
     private String determineStatusFromProgress(double progressPercent) {
-        if (progressPercent >= PROGRESS_COMPLETE) {
+        // Use exact comparison for terminal state to prevent duplicates
+        // This ensures "Delivered" only triggers once when progress hits exactly 100%
+        if (progressPercent == PROGRESS_COMPLETE) {
             return "Delivered";
         } else if (progressPercent >= PROGRESS_AT_WAREHOUSE_THRESHOLD) {
             return "At Warehouse";
@@ -311,6 +318,9 @@ public class LogisticsController implements SimulationListener {
             System.err.println("⚠️ Received null or invalid temperature compliance event");
             return;
         }
+        
+        System.out.println("🌡️  Received temperature event: " + event.getBatchId() + 
+                         " = " + event.getTemperature() + "°C (compliant: " + event.isCompliant() + ")");
         
         Platform.runLater(() -> {
             try {
@@ -1212,18 +1222,28 @@ public class LogisticsController implements SimulationListener {
     /**
      * Initialize map marker at the origin point.
      * Clears any existing trail and resets status tracking.
+     * This ensures a clean slate when restarting or starting a new simulation.
      */
     private void initializeMapMarker(String batchId) {
-        if (mapContainer == null) return;
+        if (mapContainer == null) {
+            System.err.println("⚠️  Map container is null, cannot initialize marker");
+            return;
+        }
         
         try {
             // Remove any existing marker and trail for this batch
             MapVisualization existing = activeShipments.get(batchId);
             if (existing != null) {
+                System.out.println("🧹 Cleaning up existing marker for batch: " + batchId);
+                // Stop any running animation
+                if (existing.animation != null) {
+                    existing.animation.stop();
+                }
                 // Clean up old trail points
                 for (Circle trailPoint : existing.trailPoints) {
                     mapContainer.getChildren().remove(trailPoint);
                 }
+                existing.trailPoints.clear();
                 mapContainer.getChildren().removeAll(existing.shipmentCircle, existing.shipmentLabel);
             }
             
@@ -1238,14 +1258,16 @@ public class LogisticsController implements SimulationListener {
             visualization.shipmentLabel.setFill(Color.DARKBLUE);
             
             // Initialize status tracking (starts at Created)
+            // This is critical for preventing duplicate alerts
             visualization.lastStatus = "Created";
             
             mapContainer.getChildren().addAll(visualization.shipmentCircle, visualization.shipmentLabel);
             activeShipments.put(batchId, visualization);
             
-            System.out.println("Initialized map marker at origin for: " + batchId);
+            System.out.println("✅ Initialized map marker at origin for: " + batchId);
         } catch (Exception e) {
-            System.err.println("Error initializing map marker: " + e.getMessage());
+            System.err.println("❌ Error initializing map marker: " + e.getMessage());
+            e.printStackTrace();
         }
     }
     
@@ -1336,41 +1358,48 @@ public class LogisticsController implements SimulationListener {
     /**
      * Initialize temperature chart series for this batch.
      * Clears demo data on first real simulation.
+     * Thread-safe: can be called from Kafka consumer threads.
      */
     private void initializeTemperatureChartSeries(String batchId) {
-        if (temperatureChart == null) return;
-        
-        try {
-            // Clear demo data if this is the first real simulation
-            if (temperatureSeriesMap.isEmpty() && temperatureChart.getData().size() > 0) {
-                // Check if demo data is present
-                boolean hasDemo = temperatureChart.getData().stream()
-                    .anyMatch(series -> series.getName().contains(DEMO_DATA_SUFFIX));
-                if (hasDemo) {
-                    System.out.println("Clearing demo data from temperature chart");
-                    temperatureChart.getData().clear();
-                }
-            }
-            
-            // Check if series already exists
-            if (temperatureSeriesMap.containsKey(batchId)) {
-                System.out.println("Temperature chart series already exists for: " + batchId);
-                return;
-            }
-            
-            // Create new series for this batch
-            XYChart.Series<String, Number> series = new XYChart.Series<>();
-            series.setName(batchId);
-            
-            // Add to chart and tracking map
-            temperatureChart.getData().add(series);
-            temperatureSeriesMap.put(batchId, series);
-            
-            System.out.println("Initialized temperature chart series for: " + batchId);
-        } catch (Exception e) {
-            System.err.println("Error initializing temperature chart: " + e.getMessage());
-            e.printStackTrace();
+        if (temperatureChart == null) {
+            System.err.println("⚠️  Temperature chart is null, cannot initialize series");
+            return;
         }
+        
+        // Ensure chart operations run on JavaFX thread
+        Platform.runLater(() -> {
+            try {
+                // Clear demo data if this is the first real simulation
+                if (temperatureSeriesMap.isEmpty() && temperatureChart.getData().size() > 0) {
+                    // Check if demo data is present
+                    boolean hasDemo = temperatureChart.getData().stream()
+                        .anyMatch(series -> series.getName().contains(DEMO_DATA_SUFFIX));
+                    if (hasDemo) {
+                        System.out.println("🧹 Clearing demo data from temperature chart");
+                        temperatureChart.getData().clear();
+                    }
+                }
+                
+                // Check if series already exists
+                if (temperatureSeriesMap.containsKey(batchId)) {
+                    System.out.println("📊 Temperature chart series already exists for: " + batchId);
+                    return;
+                }
+                
+                // Create new series for this batch
+                XYChart.Series<String, Number> series = new XYChart.Series<>();
+                series.setName(batchId);
+                
+                // Add to chart and tracking map
+                temperatureChart.getData().add(series);
+                temperatureSeriesMap.put(batchId, series);
+                
+                System.out.println("✅ Initialized temperature chart series for: " + batchId);
+            } catch (Exception e) {
+                System.err.println("❌ Error initializing temperature chart: " + e.getMessage());
+                e.printStackTrace();
+            }
+        });
     }
     
     @Override

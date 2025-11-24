@@ -334,32 +334,51 @@ public class ConsumerController implements SimulationListener {
     @Override
     public void onSimulationStarted(String batchId, String farmerId) {
         Platform.runLater(() -> {
-            verificationHistory.add(0, "🚚 Batch " + batchId + " is now in transit - Track in Logistics tab");
-            System.out.println("ConsumerController: Simulation started - " + batchId);
+            String timestamp = java.time.LocalDateTime.now().format(
+                    java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            String message = timestamp + ": 🚚 Batch " + batchId + " is now in transit from " + farmerId;
+            verificationHistory.add(0, message);
+            System.out.println("ConsumerController: Simulation started - " + batchId + " from " + farmerId);
         });
     }
     
     @Override
     public void onProgressUpdate(String batchId, double progress, String currentLocation) {
-        // Consumer doesn't need detailed progress updates
+        // Add journey milestone updates for significant progress points
+        // Only update at key milestones to avoid cluttering the history
+        if (progress == 25.0 || progress == 50.0 || progress == 75.0) {
+            Platform.runLater(() -> {
+                String timestamp = java.time.LocalDateTime.now().format(
+                        java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+                String message = String.format("%s: 📍 Batch %s - %.0f%% complete - %s", 
+                                             timestamp, batchId, progress, currentLocation);
+                verificationHistory.add(0, message);
+                System.out.println("ConsumerController: Journey milestone - " + batchId + " at " + progress + "%");
+            });
+        }
     }
     
     @Override
     public void onSimulationStopped(String batchId, boolean completed) {
         Platform.runLater(() -> {
+            String timestamp = java.time.LocalDateTime.now().format(
+                    java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
             String message = completed ? 
-                "✅ Batch " + batchId + " delivered successfully" : 
-                "⏹ Delivery stopped for batch " + batchId;
+                timestamp + ": ✅ Batch " + batchId + " delivered successfully - Ready for verification" : 
+                timestamp + ": ⏹ Delivery stopped for batch " + batchId;
             verificationHistory.add(0, message);
-            System.out.println("ConsumerController: " + message);
+            System.out.println("ConsumerController: " + (completed ? "Delivery completed" : "Delivery stopped") + " - " + batchId);
         });
     }
     
     @Override
     public void onSimulationError(String batchId, String error) {
         Platform.runLater(() -> {
-            verificationHistory.add(0, "❌ Delivery issue for batch " + batchId);
-            System.err.println("ConsumerController: Simulation error - " + error);
+            String timestamp = java.time.LocalDateTime.now().format(
+                    java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            String message = timestamp + ": ❌ Delivery issue for batch " + batchId + " - " + error;
+            verificationHistory.add(0, message);
+            System.err.println("ConsumerController: Simulation error - " + error + " for batch " + batchId);
         });
     }
 }
