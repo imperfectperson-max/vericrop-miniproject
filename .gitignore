@@ -103,3 +103,53 @@ blockchain.json
 vericrop_chain.json
 dev_blockchain.json
 airflow/logs/*
+
+# Node.js / npm (if used in future)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+.pnpm-debug.log*
+
+# Python virtual environments
+venv/
+env/
+ENV/
+.venv
+.pyenv
+.python-version
+*.egg-info/
+dist/
+*.egg
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+.pytest_cache/
+.tox/
+
+# Build artifacts
+target/
+*.class
+*.log
+*.tmp
+*.swp
+*.swo
+*~
+
+# Large files that should use Git LFS
+*.pt
+*.h5
+*.pkl
+*.pickle
+*.model
+
+# Temporary files
+/tmp/
+temp/
+*.tmp

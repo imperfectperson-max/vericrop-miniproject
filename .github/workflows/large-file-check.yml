@@ -1,0 +1,108 @@
+name: Large File Check
+
+on:
+  push:
+    branches: [ main, develop, 'copilot/**' ]
+  pull_request:
+    branches: [ main, develop ]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  check-large-files:
+    name: Check for Large Files
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch all history for comprehensive checking
+    
+    - name: Check for large files in PR changes
+      if: github.event_name == 'pull_request'
+      run: |
+        echo "Checking for large files (>5MB) in pull request changes..."
+        MAX_SIZE=5242880  # 5MB in bytes
+        LARGE_FILES_FOUND=0
+        
+        # Get list of changed files in this PR
+        git diff --name-only origin/${{ github.base_ref }}...${{ github.sha }} > changed_files.txt
+        
+        echo "Changed files:"
+        cat changed_files.txt
+        echo ""
+        
+        # Check each changed file
+        while IFS= read -r file; do
+          if [ -f "$file" ]; then
+            FILE_SIZE=$(stat -f%z "$file" 2>/dev/null || stat -c%s "$file" 2>/dev/null)
+            if [ "$FILE_SIZE" -gt "$MAX_SIZE" ]; then
+              SIZE_MB=$(echo "scale=2; $FILE_SIZE / 1048576" | bc)
+              echo "❌ LARGE FILE DETECTED: $file (${SIZE_MB}MB)"
+              LARGE_FILES_FOUND=1
+            fi
+          fi
+        done < changed_files.txt
+        
+        if [ "$LARGE_FILES_FOUND" -eq 1 ]; then
+          echo ""
+          echo "===================================================================="
+          echo "ERROR: Large files detected (>5MB)"
+          echo "===================================================================="
+          echo ""
+          echo "Large files should not be committed directly to the repository."
+          echo ""
+          echo "Please use one of the following alternatives:"
+          echo "  1. Use Git LFS (Large File Storage) for binary files"
+          echo "  2. Store large files externally (cloud storage, CDN)"
+          echo "  3. Generate files at build/runtime instead of committing them"
+          echo "  4. Use release assets for distributing large binaries"
+          echo ""
+          echo "For more information, see docs/README_REPO_SIZE.md"
+          echo "===================================================================="
+          exit 1
+        else
+          echo "✅ No large files detected in changes"
+        fi
+    
+    - name: Check for large files in repository (push to main/develop)
+      if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+      run: |
+        echo "Scanning repository for large files (>5MB)..."
+        MAX_SIZE=5242880  # 5MB in bytes
+        LARGE_FILES_FOUND=0
+        
+        # Find all files larger than 5MB
+        find . -type f -not -path './.git/*' -size +5M -exec ls -lh {} \; | while read -r line; do
+          echo "⚠️  Large file found: $line"
+          LARGE_FILES_FOUND=1
+        done
+        
+        # Use the find-big-files script if available
+        if [ -f "scripts/find-big-files.sh" ]; then
+          echo ""
+          echo "Running find-big-files.sh for detailed report..."
+          bash scripts/find-big-files.sh
+        fi
+        
+        # Note: We don't fail on push to main/develop (already merged)
+        # This is informational only
+        echo ""
+        echo "Note: This check is informational for main/develop branches."
+        echo "Large files already merged should be cleaned up using the"
+        echo "instructions in docs/CLEANUP_HISTORY.md"
+    
+    - name: Comment on PR with results
+      if: github.event_name == 'pull_request' && failure()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: '⚠️ **Large File Check Failed**\n\nThis PR contains files larger than 5MB. Please remove these files or migrate them to Git LFS.\n\nFor guidance, see:\n- `docs/README_REPO_SIZE.md` - Repository size management\n- `docs/CLEANUP_HISTORY.md` - How to remove large files\n\nConsider using:\n- Git LFS for binary assets\n- External storage for large files\n- GitHub Release assets for binaries'
+          })
