@@ -1441,13 +1441,15 @@ public class LogisticsController implements SimulationListener {
         try {
             // Find the checkpoint circle in map container
             Circle checkpointCircle = null;
+            final double COORDINATE_TOLERANCE = 1.0;
+            
             for (javafx.scene.Node node : mapContainer.getChildren()) {
                 if (node instanceof Circle) {
                     Circle circle = (Circle) node;
                     // Check if this is a checkpoint (not a shipment marker)
                     if (circle.getUserData() == null && 
-                        Math.abs(circle.getCenterX() - x) < 1 && 
-                        Math.abs(circle.getCenterY() - y) < 1) {
+                        Math.abs(circle.getCenterX() - x) < COORDINATE_TOLERANCE && 
+                        Math.abs(circle.getCenterY() - y) < COORDINATE_TOLERANCE) {
                         checkpointCircle = circle;
                         break;
                     }
@@ -1456,20 +1458,24 @@ public class LogisticsController implements SimulationListener {
             
             if (checkpointCircle == null) return;
             
-            // Create pulsing animation to highlight checkpoint
+            // Store original color before animation to ensure proper restoration
             Circle finalCheckpoint = checkpointCircle;
+            Color originalColor = (Color) finalCheckpoint.getFill();
+            double originalRadius = finalCheckpoint.getRadius();
+            
+            // Create pulsing animation to highlight checkpoint
             Timeline pulseAnimation = new Timeline(
                 new KeyFrame(Duration.ZERO,
-                    new KeyValue(finalCheckpoint.radiusProperty(), 8),
-                    new KeyValue(finalCheckpoint.fillProperty(), finalCheckpoint.getFill())
+                    new KeyValue(finalCheckpoint.radiusProperty(), originalRadius),
+                    new KeyValue(finalCheckpoint.fillProperty(), originalColor)
                 ),
                 new KeyFrame(Duration.millis(500),
                     new KeyValue(finalCheckpoint.radiusProperty(), 12),
                     new KeyValue(finalCheckpoint.fillProperty(), Color.GOLD)
                 ),
                 new KeyFrame(Duration.millis(1000),
-                    new KeyValue(finalCheckpoint.radiusProperty(), 8),
-                    new KeyValue(finalCheckpoint.fillProperty(), finalCheckpoint.getFill())
+                    new KeyValue(finalCheckpoint.radiusProperty(), originalRadius),
+                    new KeyValue(finalCheckpoint.fillProperty(), originalColor)
                 )
             );
             pulseAnimation.setCycleCount(2); // Pulse twice
