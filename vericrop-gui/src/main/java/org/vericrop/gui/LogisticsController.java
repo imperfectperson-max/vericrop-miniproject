@@ -227,6 +227,11 @@ public class LogisticsController implements SimulationListener {
      * Updates map visualization with real-time position data and environmental data.
      */
     private void handleMapSimulationEvent(MapSimulationEvent event) {
+        if (event == null || event.getBatchId() == null) {
+            System.err.println("⚠️ Received null or invalid map simulation event");
+            return;
+        }
+        
         Platform.runLater(() -> {
             try {
                 // Update environmental data tracking from map event
@@ -242,8 +247,9 @@ public class LogisticsController implements SimulationListener {
                 updateShipmentEnvironmentalData(event.getBatchId());
                 
                 // Log event to alerts
+                String locationName = event.getLocationName() != null ? event.getLocationName() : "Unknown Location";
                 String alertMsg = String.format("🗺️ %s: %.0f%% - %s", 
-                    event.getBatchId(), event.getProgress() * 100, event.getLocationName());
+                    event.getBatchId(), event.getProgress() * 100, locationName);
                 if (!alerts.contains(alertMsg)) {
                     alerts.add(0, alertMsg);
                     if (alerts.size() > MAX_ALERT_ITEMS) {
@@ -251,7 +257,8 @@ public class LogisticsController implements SimulationListener {
                     }
                 }
             } catch (Exception e) {
-                System.err.println("Error handling map simulation event: " + e.getMessage());
+                System.err.println("❌ Error handling map simulation event: " + e.getMessage());
+                e.printStackTrace();
             }
         });
     }
@@ -262,6 +269,11 @@ public class LogisticsController implements SimulationListener {
      * Note: Humidity is tracked via MapSimulationEvent which includes both temp and humidity.
      */
     private void handleTemperatureComplianceEvent(TemperatureComplianceEvent event) {
+        if (event == null || event.getBatchId() == null) {
+            System.err.println("⚠️ Received null or invalid temperature compliance event");
+            return;
+        }
+        
         Platform.runLater(() -> {
             try {
                 // Update environmental data tracking (temperature only)
@@ -278,15 +290,17 @@ public class LogisticsController implements SimulationListener {
                 
                 // Add alert if not compliant
                 if (!event.isCompliant()) {
+                    String details = event.getDetails() != null ? event.getDetails() : "Temperature out of range";
                     String alertMsg = String.format("🌡️ ALERT: %s - %.1f°C - %s", 
-                        event.getBatchId(), event.getTemperature(), event.getDetails());
+                        event.getBatchId(), event.getTemperature(), details);
                     alerts.add(0, alertMsg);
                     if (alerts.size() > MAX_ALERT_ITEMS) {
                         alerts.remove(alerts.size() - 1);
                     }
                 }
             } catch (Exception e) {
-                System.err.println("Error handling temperature compliance event: " + e.getMessage());
+                System.err.println("❌ Error handling temperature compliance event: " + e.getMessage());
+                e.printStackTrace();
             }
         });
     }
@@ -338,7 +352,15 @@ public class LogisticsController implements SimulationListener {
      * Update map visualization based on map simulation event.
      */
     private void updateMapFromEvent(MapSimulationEvent event) {
-        if (mapContainer == null) return;
+        if (mapContainer == null) {
+            System.err.println("⚠️ Map container is null, cannot update map visualization");
+            return;
+        }
+        
+        if (event == null || event.getBatchId() == null) {
+            System.err.println("⚠️ Invalid event or batch ID, cannot update map");
+            return;
+        }
         
         try {
             // Calculate position on map canvas
@@ -349,6 +371,9 @@ public class LogisticsController implements SimulationListener {
             double originY = 100;
             
             double progress = event.getProgress();
+            // Clamp progress to valid range [0, 1]
+            progress = Math.max(0.0, Math.min(1.0, progress));
+            
             double currentX = originX + (destinationX - originX) * progress;
             double currentY = originY;
             
@@ -375,7 +400,8 @@ public class LogisticsController implements SimulationListener {
                 visualization.shipmentLabel.setY(currentY - 15);
             }
         } catch (Exception e) {
-            System.err.println("Error updating map from event: " + e.getMessage());
+            System.err.println("❌ Error updating map from event: " + e.getMessage());
+            e.printStackTrace();
         }
     }
     
