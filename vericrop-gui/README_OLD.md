@@ -308,7 +308,6 @@ vericrop-gui/
 │   ├── ProducerController.java    # Farm dashboard controller
 │   ├── LogisticsController.java   # Logistics dashboard
 │   ├── ConsumerController.java    # Consumer dashboard
-│   ├── AnalyticsController.java   # Analytics dashboard
 │   ├── config/
 │   │   └── AppConfiguration.java  # Spring configuration
 │   ├── controller/

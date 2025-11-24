@@ -314,12 +314,7 @@ java -version  # Should be 17+
    - Added BlockchainService and FileLedgerService support
    - Enhanced shutdown for demo services
 
-2. **vericrop-gui/src/main/java/org/vericrop/gui/AnalyticsController.java**
-   - Fixed table column bindings
-   - Made export preview null-safe
-   - Added demo mode detection
-
-3. **vericrop-gui/src/main/java/org/vericrop/gui/LogisticsController.java**
+2. **vericrop-gui/src/main/java/org/vericrop/gui/LogisticsController.java**
    - Fixed table column bindings
    - Made map visualization null-safe
    - Made sync service startup safe

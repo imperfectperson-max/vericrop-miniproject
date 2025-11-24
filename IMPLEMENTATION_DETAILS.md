@@ -12,7 +12,6 @@ All hardcoded demo and sample data has been removed from the codebase and gated 
 
 **Changes:**
 - `BlockchainInitializer.java`: Demo blocks only loaded when `VERICROP_LOAD_DEMO=true`
-- `AnalyticsController.java`: Sample KPIs and charts gated by demo flag
 - `LogisticsController.java`: Sample shipments and alerts gated by demo flag
 - `ConsumerController.java`: Mock verification data gated by demo flag
 - `app.py` (ML service): Dummy predictions only when demo mode enabled
@@ -142,7 +141,6 @@ Real-time delivery simulation with route generation and environmental monitoring
 All pie charts and graphs now have proper labels, legends, and titles.
 
 **Changes:**
-- `AnalyticsController.java`: Added titles and percentage labels to pie charts
 - `LogisticsController.java`: Added chart titles and legends
 - Charts show legend by default
 - Pie slices include percentage in labels
@@ -265,7 +263,6 @@ vericrop-core/src/test/java/org/vericrop/service/
 **Modified Files:**
 ```
 vericrop-gui/src/main/java/org/vericrop/gui/
-├── AnalyticsController.java            (demo flag + chart labels)
 ├── LogisticsController.java            (demo flag + chart labels)
 ├── ConsumerController.java             (demo flag)
 └── util/BlockchainInitializer.java     (demo flag)
