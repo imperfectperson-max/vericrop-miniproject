@@ -27,9 +27,6 @@
             <Button fx:id="backToProducerButton" text="🏠 Producer"
                     style="-fx-background-color: #2E8B57; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8; -fx-padding: 8 12;"
                     onAction="#handleBackToProducer"/>
-            <Button fx:id="analyticsButton" text="📊 Analytics"
-                    style="-fx-background-color: #6B7280; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8; -fx-padding: 8 12;"
-                    onAction="#handleShowAnalytics"/>
             <Button fx:id="logisticsButton" text="🚚 Logistics"
                     style="-fx-background-color: #F59E0B; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8; -fx-padding: 8 12;"
                     onAction="#handleShowLogistics"/>

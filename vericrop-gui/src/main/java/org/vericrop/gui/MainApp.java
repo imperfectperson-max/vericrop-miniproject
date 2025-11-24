@@ -153,10 +153,6 @@ public class MainApp extends Application {
         switchToScreen("consumer.fxml");
     }
 
-    public void showAnalyticsScreen() {
-        switchToScreen("analytics.fxml");
-    }
-
     public void showInboxScreen() {
         switchToScreen("inbox.fxml");
     }

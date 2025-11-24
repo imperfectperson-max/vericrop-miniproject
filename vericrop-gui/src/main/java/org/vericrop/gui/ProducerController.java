@@ -98,7 +98,6 @@ public class ProducerController implements SimulationListener {
     @FXML private VBox rightPanel;
 
     // Navigation buttons
-    @FXML private Button analyticsButton;
     @FXML private Button logisticsButton;
     @FXML private Button consumerButton;
 
@@ -203,9 +202,6 @@ public class ProducerController implements SimulationListener {
     }
 
     private void setupNavigationButtons() {
-        if (analyticsButton != null) {
-            analyticsButton.setOnAction(e -> handleShowAnalytics());
-        }
         if (logisticsButton != null) {
             logisticsButton.setOnAction(e -> handleShowLogistics());
         }
@@ -1415,11 +1411,6 @@ public class ProducerController implements SimulationListener {
     }
 
     // Navigation methods
-    @FXML
-    private void handleShowAnalytics() {
-        MainApp.getInstance().showAnalyticsScreen();
-    }
-
     @FXML
     private void handleShowLogistics() {
         MainApp.getInstance().showLogisticsScreen();

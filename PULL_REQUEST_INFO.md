@@ -117,16 +117,14 @@ a2bb59c - Address code review feedback: extract hardcoded constants and improve 
 8. `vericrop-gui/src/test/java/org/vericrop/gui/models/ParticipantTest.java`
 9. `vericrop-gui/CONTACTS_AND_MESSAGING.md`
 
-### Modified Files (7)
+### Modified Files (6)
 1. `vericrop-gui/src/main/java/org/vericrop/gui/app/ApplicationContext.java`
 2. `vericrop-gui/src/main/java/org/vericrop/gui/MainApp.java`
 3. `vericrop-gui/src/main/java/org/vericrop/gui/ProducerController.java`
 4. `vericrop-gui/src/main/java/org/vericrop/gui/LogisticsController.java`
-5. `vericrop-gui/src/main/java/org/vericrop/gui/AnalyticsController.java`
-6. `vericrop-gui/src/main/resources/fxml/producer.fxml`
-7. `vericrop-gui/src/main/resources/fxml/logistics.fxml`
-8. `vericrop-gui/src/main/resources/fxml/analytics.fxml`
-9. `README.md`
+5. `vericrop-gui/src/main/resources/fxml/producer.fxml`
+6. `vericrop-gui/src/main/resources/fxml/logistics.fxml`
+7. `README.md`
 
 ## ✅ Quality Assurance
 

@@ -44,11 +44,9 @@ All screens now fully functional with proper data binding:
 ```
 
 ### Phase 2: Table Bindings & UI Fixes ✅
-**Files**: `AnalyticsController.java`, `LogisticsController.java`, `ConsumerController.java`
+**Files**: `LogisticsController.java`, `ConsumerController.java`
 
 **Fixed Issues**:
-- ✅ AnalyticsController: supplierTable & alertsTable bindings
-- ✅ AnalyticsController: Null-safe export preview
 - ✅ LogisticsController: shipmentsTable bindings (7 columns)
 - ✅ LogisticsController: Null-safe map visualization
 - ✅ LogisticsController: Safe sync service initialization
@@ -115,11 +113,10 @@ Use the comprehensive test plan in `DEMO_MODE_GUIDE.md`:
 
 ## 📊 Implementation Statistics
 
-### Files Modified: 8
+### Files Modified: 7
 1. `MainApp.java` - Full screen support
 2. `ApplicationContext.java` - Service infrastructure
-3. `AnalyticsController.java` - Table bindings + safety
-4. `LogisticsController.java` - Table bindings + null-safety
+3. `LogisticsController.java` - Table bindings + null-safety
 5. `ConsumerController.java` - Demo enhancements
 6. `README.md` - Quick start guide
 7. `vericrop-gui/README.md` - Detailed guide

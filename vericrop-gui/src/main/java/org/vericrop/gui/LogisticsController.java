@@ -54,7 +54,6 @@ public class LogisticsController implements SimulationListener {
 
     // Navigation buttons
     @FXML private Button backToProducerButton;
-    @FXML private Button analyticsButton;
     @FXML private Button consumerButton;
     @FXML private Button messagesButton;
     @FXML private Button logoutButton;
@@ -517,9 +516,6 @@ public class LogisticsController implements SimulationListener {
         if (backToProducerButton != null) {
             backToProducerButton.setOnAction(e -> handleBackToProducer());
         }
-        if (analyticsButton != null) {
-            analyticsButton.setOnAction(e -> handleShowAnalytics());
-        }
         if (consumerButton != null) {
             consumerButton.setOnAction(e -> handleShowConsumer());
         }
@@ -901,14 +897,6 @@ public class LogisticsController implements SimulationListener {
         MainApp mainApp = MainApp.getInstance();
         if (mainApp != null) {
             mainApp.showProducerScreen();
-        }
-    }
-
-    @FXML
-    private void handleShowAnalytics() {
-        MainApp mainApp = MainApp.getInstance();
-        if (mainApp != null) {
-            mainApp.showAnalyticsScreen();
         }
     }
 

@@ -409,7 +409,7 @@ for (Map<String, Object> orch : orchestrations) {
 
 ### Integration with GUI Controllers
 
-The orchestrator integrates seamlessly with existing GUI controllers (LogisticsController, AnalyticsController, ProducerController). These controllers can observe simulation updates via:
+The orchestrator integrates seamlessly with existing GUI controllers (LogisticsController, ProducerController). These controllers can observe simulation updates via:
 
 1. **MessageService polling**: Controllers poll `MessageService.getMessagesByShipment(batchId)` to get updates
 2. **AlertService listeners**: Controllers register listeners with `AlertService.addListener(...)` to receive real-time alerts
