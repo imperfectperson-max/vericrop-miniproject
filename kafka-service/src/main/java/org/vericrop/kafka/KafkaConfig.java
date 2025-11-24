@@ -17,6 +17,26 @@ public class KafkaConfig {
     public static final String TOPIC_BLOCKCHAIN_EVENTS = "blockchain-events";
     public static final String TOPIC_ENVIRONMENTAL_DATA = "environmental-data";
     public static final String TOPIC_CONSUMER_VERIFICATIONS = "consumer-verifications";
+    
+    // Orchestrator Topics
+    public static final String TOPIC_ORCHESTRATOR_START = "vericrop.orchestrator.start";
+    public static final String TOPIC_ORCHESTRATOR_COMPLETED = "vericrop.orchestrator.completed";
+    
+    // Controller Command Topics
+    public static final String TOPIC_CONTROLLER_SCENARIOS_COMMAND = "vericrop.controller.scenarios.command";
+    public static final String TOPIC_CONTROLLER_DELIVERY_COMMAND = "vericrop.controller.delivery.command";
+    public static final String TOPIC_CONTROLLER_MAP_COMMAND = "vericrop.controller.map.command";
+    public static final String TOPIC_CONTROLLER_TEMPERATURE_COMMAND = "vericrop.controller.temperature.command";
+    public static final String TOPIC_CONTROLLER_SUPPLIER_COMPLIANCE_COMMAND = "vericrop.controller.supplier_compliance.command";
+    public static final String TOPIC_CONTROLLER_SIMULATIONS_COMMAND = "vericrop.controller.simulations.command";
+    
+    // Controller Status Topics
+    public static final String TOPIC_CONTROLLER_SCENARIOS_STATUS = "vericrop.controller.scenarios.status";
+    public static final String TOPIC_CONTROLLER_DELIVERY_STATUS = "vericrop.controller.delivery.status";
+    public static final String TOPIC_CONTROLLER_MAP_STATUS = "vericrop.controller.map.status";
+    public static final String TOPIC_CONTROLLER_TEMPERATURE_STATUS = "vericrop.controller.temperature.status";
+    public static final String TOPIC_CONTROLLER_SUPPLIER_COMPLIANCE_STATUS = "vericrop.controller.supplier_compliance.status";
+    public static final String TOPIC_CONTROLLER_SIMULATIONS_STATUS = "vericrop.controller.simulations.status";
 
     public static Properties getProducerProperties() {
         Properties props = new Properties();
