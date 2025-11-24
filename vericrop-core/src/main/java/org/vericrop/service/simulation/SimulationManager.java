@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.vericrop.dto.SimulationEvent;
 import org.vericrop.dto.TemperatureComplianceEvent;
+import org.vericrop.dto.MapSimulationEvent;
 import org.vericrop.service.*;
 import org.vericrop.service.models.Alert;
 import org.vericrop.service.models.GeoCoordinate;
@@ -49,6 +50,7 @@ public class SimulationManager {
     private final AtomicBoolean running;
     private final ScheduledExecutorService complianceCheckExecutor;
     private KafkaProducer<String, String> temperatureProducer;
+    private KafkaProducer<String, String> mapSimulationProducer;
     private final ObjectMapper objectMapper;
     
     /**
@@ -120,8 +122,9 @@ public class SimulationManager {
             r -> new Thread(r, "SimulationManager-ComplianceCheck"));
         this.objectMapper = new ObjectMapper();
         
-        // Initialize Kafka producer for temperature events
+        // Initialize Kafka producers for temperature and map simulation events
         initializeTemperatureProducer();
+        initializeMapSimulationProducer();
         
         logger.info("SimulationManager initialized with integrated services including map simulation");
     }
@@ -572,6 +575,10 @@ public class SimulationManager {
         // This is the key fix: bridge simulation temperature data to Kafka stream
         publishTemperatureEvent(event);
         
+        // Publish map simulation event to Kafka for live map animation
+        // This is the key fix for Bug #2: map markers not animating
+        publishMapSimulationEvent(event);
+        
         // Notify progress update to all listeners
         notifyProgress(event.getBatchId(), event.getProgressPercent(), event.getLocationName());
         
@@ -676,6 +683,29 @@ public class SimulationManager {
     }
     
     /**
+     * Initialize Kafka producer for publishing map simulation events during simulation.
+     * This allows simulated GPS position and progress updates to flow to the logistics dashboard.
+     */
+    private void initializeMapSimulationProducer() {
+        try {
+            Properties props = new Properties();
+            props.put("bootstrap.servers", "localhost:9092");
+            props.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer");
+            props.put("value.serializer", "org.apache.kafka.common.serialization.StringSerializer");
+            props.put("acks", "1");
+            props.put("retries", 3);
+            props.put("max.in.flight.requests.per.connection", 1);
+            
+            this.mapSimulationProducer = new KafkaProducer<>(props);
+            logger.info("✅ Map simulation event producer initialized for simulation streaming");
+        } catch (Exception e) {
+            logger.warn("⚠️  Failed to initialize map simulation producer: {}. Map streaming will be disabled.", 
+                       e.getMessage());
+            this.mapSimulationProducer = null;
+        }
+    }
+    
+    /**
      * Publish a temperature compliance event to Kafka for live dashboard updates.
      * This bridges SimulationService events to the temperature-compliance Kafka topic.
      * 
@@ -716,6 +746,52 @@ public class SimulationManager {
     }
     
     /**
+     * Publish a map simulation event to Kafka for live dashboard updates.
+     * This bridges SimulationService events to the map-simulation Kafka topic.
+     * 
+     * @param event SimulationEvent containing GPS and progress data
+     */
+    private void publishMapSimulationEvent(SimulationEvent event) {
+        if (mapSimulationProducer == null) {
+            return; // Kafka not available
+        }
+        
+        try {
+            // Create map simulation event from simulation event
+            // Convert progress from percentage (0-100) to fraction (0.0-1.0)
+            double progressFraction = event.getProgressPercent() / 100.0;
+            
+            MapSimulationEvent mapEvent = new MapSimulationEvent(
+                event.getBatchId(),
+                event.getLatitude(),
+                event.getLongitude(),
+                event.getLocationName(),
+                progressFraction,
+                event.getStatus(),
+                event.getTemperature(),
+                event.getHumidity()
+            );
+            mapEvent.setTimestamp(event.getTimestamp());
+            
+            // Serialize and publish
+            String value = objectMapper.writeValueAsString(mapEvent);
+            ProducerRecord<String, String> record = new ProducerRecord<>(
+                "map-simulation", event.getBatchId(), value);
+            
+            mapSimulationProducer.send(record, (metadata, exception) -> {
+                if (exception != null) {
+                    logger.error("Error publishing map simulation event: {}", exception.getMessage());
+                } else {
+                    logger.debug("🗺️  Map event published: {}% progress at {} for batch {}", 
+                               event.getProgressPercent(), event.getLocationName(), event.getBatchId());
+                }
+            });
+        } catch (Exception e) {
+            logger.error("Failed to publish map simulation event: {}", e.getMessage());
+        }
+    }
+    
+    /**
      * Shutdown the manager and clean up resources.
      */
     public void shutdown() {
@@ -748,6 +824,16 @@ public class SimulationManager {
                 logger.info("Temperature event producer closed");
             } catch (Exception e) {
                 logger.error("Error closing temperature producer", e);
+            }
+        }
+        
+        // Close map simulation producer
+        if (mapSimulationProducer != null) {
+            try {
+                mapSimulationProducer.close();
+                logger.info("Map simulation event producer closed");
+            } catch (Exception e) {
+                logger.error("Error closing map simulation producer", e);
             }
         }
         
