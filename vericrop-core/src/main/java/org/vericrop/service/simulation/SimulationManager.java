@@ -470,6 +470,38 @@ public class SimulationManager {
     }
     
     /**
+     * Get current temperature reading (°C).
+     */
+    public double getCurrentTemperature() {
+        SimulationState state = currentSimulation.get();
+        return state != null ? state.currentTemperature : 0.0;
+    }
+    
+    /**
+     * Get current humidity reading (%).
+     */
+    public double getCurrentHumidity() {
+        SimulationState state = currentSimulation.get();
+        return state != null ? state.currentHumidity : 0.0;
+    }
+    
+    /**
+     * Get current latitude.
+     */
+    public double getCurrentLatitude() {
+        SimulationState state = currentSimulation.get();
+        return state != null ? state.currentLatitude : 0.0;
+    }
+    
+    /**
+     * Get current longitude.
+     */
+    public double getCurrentLongitude() {
+        SimulationState state = currentSimulation.get();
+        return state != null ? state.currentLongitude : 0.0;
+    }
+    
+    /**
      * Start monitoring progress (simplified implementation).
      * In a real implementation, this would poll the DeliverySimulator for actual progress.
      */

@@ -6,6 +6,8 @@ import javafx.scene.chart.LineChart;
 import javafx.scene.chart.XYChart;
 import javafx.scene.control.*;
 import javafx.scene.layout.Pane;
+import javafx.scene.layout.VBox;
+import javafx.scene.layout.HBox;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.scene.shape.Circle;
@@ -31,6 +33,7 @@ public class LogisticsController implements SimulationListener {
     @FXML private TextArea reportArea;
     @FXML private LineChart<String, Number> temperatureChart;
     @FXML private Pane mapContainer;
+    @FXML private VBox timelineContainer;
 
     // Navigation buttons
     @FXML private Button backToProducerButton;
@@ -658,6 +661,13 @@ public class LogisticsController implements SimulationListener {
             // Initialize temperature chart series
             initializeTemperatureChartSeries(batchId);
             
+            // Add timeline event for simulation start
+            String timestamp = java.time.LocalTime.now().format(
+                java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"));
+            addTimelineEvent("Simulation Started", 
+                           "Batch " + batchId + " dispatch at " + timestamp, 
+                           "#10b981");
+            
             System.out.println("LogisticsController: Simulation started - " + batchId);
         });
     }
@@ -695,6 +705,44 @@ public class LogisticsController implements SimulationListener {
     }
     
     /**
+     * Add timeline event for simulation progress.
+     */
+    private void addTimelineEvent(String title, String description, String iconColor) {
+        if (timelineContainer == null) return;
+        
+        try {
+            // Create timeline item
+            HBox timelineItem = new HBox(10);
+            timelineItem.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+            timelineItem.getStyleClass().add("timeline-item");
+            
+            // Icon
+            Label icon = new Label("●");
+            icon.setStyle("-fx-text-fill: " + iconColor + "; -fx-font-weight: bold;");
+            
+            // Content
+            VBox content = new VBox();
+            Label titleLabel = new Label(title);
+            titleLabel.setStyle("-fx-font-weight: bold;");
+            Label descLabel = new Label(description);
+            content.getChildren().addAll(titleLabel, descLabel);
+            
+            timelineItem.getChildren().addAll(icon, content);
+            
+            // Add to timeline (prepend to show newest first)
+            timelineContainer.getChildren().add(0, timelineItem);
+            
+            // Keep only last 10 events
+            while (timelineContainer.getChildren().size() > 10) {
+                timelineContainer.getChildren().remove(timelineContainer.getChildren().size() - 1);
+            }
+            
+        } catch (Exception e) {
+            System.err.println("Error adding timeline event: " + e.getMessage());
+        }
+    }
+    
+    /**
      * Initialize temperature chart series for this batch.
      */
     private void initializeTemperatureChartSeries(String batchId) {
@@ -714,17 +762,119 @@ public class LogisticsController implements SimulationListener {
         }
     }
     
+    /**
+     * Update temperature chart with live data point.
+     * Implements a sliding window to keep last 60 data points.
+     */
+    private void updateTemperatureChart(String batchId, double temperature) {
+        if (temperatureChart == null || temperatureChart.getData().isEmpty()) {
+            return;
+        }
+        
+        try {
+            // Find the series for this batchId
+            XYChart.Series<String, Number> targetSeries = null;
+            for (XYChart.Series<String, Number> series : temperatureChart.getData()) {
+                if (series.getName().equals(batchId)) {
+                    targetSeries = series;
+                    break;
+                }
+            }
+            
+            // If series doesn't exist, create it
+            if (targetSeries == null) {
+                targetSeries = new XYChart.Series<>();
+                targetSeries.setName(batchId);
+                temperatureChart.getData().add(targetSeries);
+            }
+            
+            // Format timestamp for X-axis
+            String timestamp = java.time.LocalTime.now().format(
+                java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"));
+            
+            // Add new data point
+            targetSeries.getData().add(new XYChart.Data<>(timestamp, temperature));
+            
+            // Implement sliding window: keep only last 60 points
+            final int MAX_DATA_POINTS = 60;
+            if (targetSeries.getData().size() > MAX_DATA_POINTS) {
+                targetSeries.getData().remove(0);
+            }
+            
+            System.out.println(String.format("Temperature chart updated: %s - %.1f°C (points: %d)", 
+                batchId, temperature, targetSeries.getData().size()));
+            
+        } catch (Exception e) {
+            System.err.println("Error updating temperature chart: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
     @Override
     public void onProgressUpdate(String batchId, double progress, String currentLocation) {
         Platform.runLater(() -> {
+            // Get current environmental data from SimulationManager
+            double temperature = 0.0;
+            double humidity = 0.0;
+            
+            try {
+                if (SimulationManager.isInitialized()) {
+                    SimulationManager manager = SimulationManager.getInstance();
+                    temperature = manager.getCurrentTemperature();
+                    humidity = manager.getCurrentHumidity();
+                }
+            } catch (Exception e) {
+                System.err.println("Error getting environmental data: " + e.getMessage());
+            }
+            
             // Update map marker position with smooth animation
             updateMapMarkerPosition(batchId, progress, currentLocation);
             
-            // Update shipments table if it exists
-            updateShipmentsTableRow(batchId, progress, currentLocation);
+            // Update temperature chart with live data
+            updateTemperatureChart(batchId, temperature);
             
-            System.out.println("LogisticsController: Progress update - " + batchId + " at " + progress + "% - " + currentLocation);
+            // Update shipments table with environmental data
+            updateShipmentsTableRow(batchId, progress, currentLocation, temperature, humidity);
+            
+            // Add timeline events for major milestones
+            addTimelineEventForProgress(batchId, progress, currentLocation, temperature);
+            
+            System.out.println("LogisticsController: Progress update - " + batchId + " at " + progress + "% - " + currentLocation + 
+                             String.format(" (Temp: %.1f°C, Humidity: %.1f%%)", temperature, humidity));
         });
+    }
+    
+    /**
+     * Add timeline event for major progress milestones.
+     */
+    private void addTimelineEventForProgress(String batchId, double progress, String location, double temperature) {
+        // Only add timeline events at major milestones to avoid clutter
+        String event = null;
+        String color = null;
+        
+        // Check for milestone progress points
+        int progressInt = (int) progress;
+        if (progressInt == 25) {
+            event = "25% Complete - Departing Origin";
+            color = "#3b82f6";
+        } else if (progressInt == 50) {
+            event = "50% Complete - Midpoint";
+            color = "#3b82f6";
+        } else if (progressInt == 75) {
+            event = "75% Complete - Approaching Destination";
+            color = "#3b82f6";
+        } else if (progressInt == 90) {
+            event = "90% Complete - Arrival Imminent";
+            color = "#f59e0b";
+        }
+        
+        // Add event if milestone reached
+        if (event != null) {
+            String description = String.format("%s | Temp: %.1f°C | Location: %s", 
+                batchId.length() > 8 ? batchId.substring(0, 8) : batchId, 
+                temperature, location);
+            addTimelineEvent(event, description, color);
+        }
     }
     
     /**
@@ -780,7 +930,8 @@ public class LogisticsController implements SimulationListener {
      * Update shipments table row for a specific batch.
      * Since Shipment is immutable, we remove and re-add to update.
      */
-    private void updateShipmentsTableRow(String batchId, double progress, String currentLocation) {
+    private void updateShipmentsTableRow(String batchId, double progress, String currentLocation, 
+                                         double temperature, double humidity) {
         if (shipmentsTable == null) return;
         
         try {
@@ -803,16 +954,16 @@ public class LogisticsController implements SimulationListener {
                 shipments.remove(existingShipment);
             }
             
-            // Create updated shipment (or new if not found)
+            // Create updated shipment with live environmental data
             if (progress < 100) {
                 Shipment updatedShipment = new Shipment(
                     batchId,
                     status,
                     currentLocation != null ? currentLocation : "Unknown",
-                    existingShipment != null ? existingShipment.getTemperature() : 0.0,
-                    existingShipment != null ? existingShipment.getHumidity() : 0.0,
+                    temperature, // Use live temperature data
+                    humidity,    // Use live humidity data
                     String.format("%.0f%% Complete", progress),
-                    existingShipment != null ? existingShipment.getVehicle() : "TRUCK-" + batchId.hashCode() % 1000
+                    existingShipment != null ? existingShipment.getVehicle() : "TRUCK-" + Math.abs(batchId.hashCode() % 1000)
                 );
                 shipments.add(updatedShipment);
             }
@@ -829,6 +980,15 @@ public class LogisticsController implements SimulationListener {
                 "✅ Delivery completed for: " + batchId : 
                 "⏹ Delivery simulation stopped for: " + batchId;
             alerts.add(0, message);
+            
+            // Add timeline event for simulation completion/stop
+            String timestamp = java.time.LocalTime.now().format(
+                java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"));
+            addTimelineEvent(
+                completed ? "Delivery Completed" : "Simulation Stopped",
+                "Batch " + batchId + " " + (completed ? "delivered at" : "stopped at") + " " + timestamp,
+                completed ? "#10b981" : "#ef4444"
+            );
             
             // Clean up map marker after a delay if completed
             if (completed) {
