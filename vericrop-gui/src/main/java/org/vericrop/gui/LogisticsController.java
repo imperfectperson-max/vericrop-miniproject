@@ -14,12 +14,19 @@ import javafx.scene.paint.Color;
 import javafx.scene.text.Text;
 import org.vericrop.service.simulation.SimulationListener;
 import org.vericrop.service.simulation.SimulationManager;
+import org.vericrop.dto.MapSimulationEvent;
+import org.vericrop.dto.TemperatureComplianceEvent;
+import org.vericrop.kafka.consumers.MapSimulationEventConsumer;
+import org.vericrop.kafka.consumers.TemperatureComplianceEventConsumer;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ExecutorService;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 
 public class LogisticsController implements SimulationListener {
 
@@ -46,6 +53,14 @@ public class LogisticsController implements SimulationListener {
     private ScheduledExecutorService syncExecutor;
     private Map<String, MapVisualization> activeShipments = new HashMap<>();
     private org.vericrop.service.DeliverySimulator deliverySimulator;
+    
+    // Kafka consumers for real-time events
+    private MapSimulationEventConsumer mapSimulationConsumer;
+    private TemperatureComplianceEventConsumer temperatureComplianceConsumer;
+    private ExecutorService kafkaConsumerExecutor;
+    
+    // Track temperature chart series by batch ID
+    private Map<String, XYChart.Series<String, Number>> temperatureSeriesMap = new HashMap<>();
 
     // Map visualization constants
     private static final double MAP_WIDTH = 350;
@@ -64,6 +79,9 @@ public class LogisticsController implements SimulationListener {
         setupNavigationButtons();
         setupMapContainer();
         startSyncService();
+        
+        // Initialize Kafka consumers for real-time updates
+        setupKafkaConsumers();
 
         // Get delivery simulator from application context
         try {
@@ -97,6 +115,179 @@ public class LogisticsController implements SimulationListener {
             }
         } catch (Exception e) {
             System.err.println("Warning: Could not register with SimulationManager: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Setup Kafka consumers for real-time map and temperature events.
+     * Runs consumers in background threads and handles events on JavaFX UI thread.
+     */
+    private void setupKafkaConsumers() {
+        try {
+            kafkaConsumerExecutor = Executors.newFixedThreadPool(2);
+            
+            // Create map simulation consumer with event handler
+            mapSimulationConsumer = new MapSimulationEventConsumer(
+                "logistics-ui-group",
+                this::handleMapSimulationEvent
+            );
+            
+            // Create temperature compliance consumer with event handler
+            temperatureComplianceConsumer = new TemperatureComplianceEventConsumer(
+                "logistics-ui-group",
+                this::handleTemperatureComplianceEvent
+            );
+            
+            // Start consumers in background threads
+            kafkaConsumerExecutor.submit(() -> {
+                try {
+                    mapSimulationConsumer.startConsuming();
+                } catch (Exception e) {
+                    System.err.println("Map simulation consumer error: " + e.getMessage());
+                }
+            });
+            
+            kafkaConsumerExecutor.submit(() -> {
+                try {
+                    temperatureComplianceConsumer.startConsuming();
+                } catch (Exception e) {
+                    System.err.println("Temperature compliance consumer error: " + e.getMessage());
+                }
+            });
+            
+            System.out.println("✅ Kafka consumers initialized for logistics monitoring");
+        } catch (Exception e) {
+            System.err.println("⚠️ Failed to initialize Kafka consumers: " + e.getMessage());
+            // Continue without Kafka - fallback to SimulationListener updates
+        }
+    }
+    
+    /**
+     * Handle map simulation event from Kafka.
+     * Updates map visualization with real-time position data.
+     */
+    private void handleMapSimulationEvent(MapSimulationEvent event) {
+        Platform.runLater(() -> {
+            try {
+                // Update map marker position based on event data
+                updateMapFromEvent(event);
+                
+                // Log event to alerts
+                String alertMsg = String.format("🗺️ %s: %.0f%% - %s", 
+                    event.getBatchId(), event.getProgress() * 100, event.getLocationName());
+                if (!alerts.contains(alertMsg)) {
+                    alerts.add(0, alertMsg);
+                    if (alerts.size() > 50) {
+                        alerts.remove(alerts.size() - 1);
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("Error handling map simulation event: " + e.getMessage());
+            }
+        });
+    }
+    
+    /**
+     * Handle temperature compliance event from Kafka.
+     * Updates temperature chart with real-time data points.
+     */
+    private void handleTemperatureComplianceEvent(TemperatureComplianceEvent event) {
+        Platform.runLater(() -> {
+            try {
+                // Add data point to temperature chart
+                addTemperatureDataPoint(event);
+                
+                // Add alert if not compliant
+                if (!event.isCompliant()) {
+                    String alertMsg = String.format("🌡️ ALERT: %s - %.1f°C - %s", 
+                        event.getBatchId(), event.getTemperature(), event.getDetails());
+                    alerts.add(0, alertMsg);
+                    if (alerts.size() > 50) {
+                        alerts.remove(alerts.size() - 1);
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("Error handling temperature compliance event: " + e.getMessage());
+            }
+        });
+    }
+    
+    /**
+     * Update map visualization based on map simulation event.
+     */
+    private void updateMapFromEvent(MapSimulationEvent event) {
+        if (mapContainer == null) return;
+        
+        try {
+            // Calculate position on map canvas
+            double mapWidth = 350;
+            double mapHeight = 200;
+            double originX = 50;
+            double destinationX = 300;
+            double originY = 100;
+            
+            double progress = event.getProgress();
+            double currentX = originX + (destinationX - originX) * progress;
+            double currentY = originY;
+            
+            MapVisualization visualization = activeShipments.get(event.getBatchId());
+            if (visualization == null) {
+                // Create new marker
+                visualization = new MapVisualization();
+                visualization.shipmentCircle = new Circle(currentX, currentY, 6, Color.ORANGE);
+                visualization.shipmentCircle.setUserData("shipment");
+                
+                String displayId = event.getBatchId().length() > 8 ? 
+                    event.getBatchId().substring(0, 8) : event.getBatchId();
+                visualization.shipmentLabel = new Text(currentX - 15, currentY - 15, "🚚 " + displayId);
+                visualization.shipmentLabel.setUserData("shipment");
+                visualization.shipmentLabel.setFill(Color.DARKBLUE);
+                
+                mapContainer.getChildren().addAll(visualization.shipmentCircle, visualization.shipmentLabel);
+                activeShipments.put(event.getBatchId(), visualization);
+            } else {
+                // Update existing marker
+                visualization.shipmentCircle.setCenterX(currentX);
+                visualization.shipmentCircle.setCenterY(currentY);
+                visualization.shipmentLabel.setX(currentX - 15);
+                visualization.shipmentLabel.setY(currentY - 15);
+            }
+        } catch (Exception e) {
+            System.err.println("Error updating map from event: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Add temperature data point to chart for given batch.
+     */
+    private void addTemperatureDataPoint(TemperatureComplianceEvent event) {
+        if (temperatureChart == null) return;
+        
+        try {
+            // Get or create series for this batch
+            XYChart.Series<String, Number> series = temperatureSeriesMap.get(event.getBatchId());
+            if (series == null) {
+                series = new XYChart.Series<>();
+                series.setName(event.getBatchId());
+                temperatureSeriesMap.put(event.getBatchId(), series);
+                temperatureChart.getData().add(series);
+            }
+            
+            // Format timestamp as time string
+            String timeLabel = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"));
+            
+            // Add data point
+            series.getData().add(new XYChart.Data<>(timeLabel, event.getTemperature()));
+            
+            // Keep chart size reasonable - limit to last 20 points
+            if (series.getData().size() > 20) {
+                series.getData().remove(0);
+            }
+            
+            System.out.println("Added temperature point: " + event.getBatchId() + " = " + 
+                event.getTemperature() + "°C at " + timeLabel);
+        } catch (Exception e) {
+            System.err.println("Error adding temperature data point: " + e.getMessage());
         }
     }
 
@@ -640,9 +831,22 @@ public class LogisticsController implements SimulationListener {
             System.err.println("Error unregistering from SimulationManager: " + e.getMessage());
         }
         
+        // Stop Kafka consumers
+        if (mapSimulationConsumer != null) {
+            mapSimulationConsumer.stop();
+        }
+        if (temperatureComplianceConsumer != null) {
+            temperatureComplianceConsumer.stop();
+        }
+        if (kafkaConsumerExecutor != null && !kafkaConsumerExecutor.isShutdown()) {
+            kafkaConsumerExecutor.shutdownNow();
+        }
+        
         if (syncExecutor != null && !syncExecutor.isShutdown()) {
             syncExecutor.shutdownNow();
         }
+        
+        System.out.println("🔴 LogisticsController cleanup complete");
     }
     
     // ========== SimulationListener Implementation ==========
@@ -701,12 +905,19 @@ public class LogisticsController implements SimulationListener {
         if (temperatureChart == null) return;
         
         try {
+            // Check if series already exists
+            if (temperatureSeriesMap.containsKey(batchId)) {
+                System.out.println("Temperature chart series already exists for: " + batchId);
+                return;
+            }
+            
             // Create new series for this batch
             XYChart.Series<String, Number> series = new XYChart.Series<>();
             series.setName(batchId);
             
-            // Add to chart
+            // Add to chart and tracking map
             temperatureChart.getData().add(series);
+            temperatureSeriesMap.put(batchId, series);
             
             System.out.println("Initialized temperature chart series for: " + batchId);
         } catch (Exception e) {
