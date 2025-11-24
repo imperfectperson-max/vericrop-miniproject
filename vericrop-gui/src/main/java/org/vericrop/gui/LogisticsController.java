@@ -8,18 +8,25 @@ import javafx.scene.control.*;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.VBox;
 import javafx.scene.layout.HBox;
+import java.util.Optional;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Line;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Text;
+import javafx.animation.Timeline;
+import javafx.animation.KeyFrame;
+import javafx.animation.KeyValue;
+import javafx.util.Duration;
 import org.vericrop.service.simulation.SimulationListener;
 import org.vericrop.service.simulation.SimulationManager;
 import org.vericrop.dto.MapSimulationEvent;
 import org.vericrop.dto.TemperatureComplianceEvent;
 import org.vericrop.kafka.consumers.MapSimulationEventConsumer;
 import org.vericrop.kafka.consumers.TemperatureComplianceEventConsumer;
+import org.vericrop.kafka.producers.QualityAlertProducer;
+import org.vericrop.kafka.events.QualityAlertEvent;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -62,6 +69,9 @@ public class LogisticsController implements SimulationListener {
     private MapSimulationEventConsumer mapSimulationConsumer;
     private TemperatureComplianceEventConsumer temperatureComplianceConsumer;
     private ExecutorService kafkaConsumerExecutor;
+    
+    // Kafka producer for alerts
+    private QualityAlertProducer qualityAlertProducer;
     
     // Track temperature chart series by batch ID (thread-safe for Kafka consumer access)
     private Map<String, XYChart.Series<String, Number>> temperatureSeriesMap = new ConcurrentHashMap<>();
@@ -162,6 +172,15 @@ public class LogisticsController implements SimulationListener {
         try {
             kafkaConsumerExecutor = Executors.newFixedThreadPool(2);
             
+            // Initialize alert producer
+            try {
+                qualityAlertProducer = new QualityAlertProducer();
+                System.out.println("✅ Quality alert producer initialized");
+            } catch (Exception e) {
+                System.err.println("⚠️ Failed to initialize alert producer: " + e.getMessage());
+                // Continue without alert producer
+            }
+            
             // Create map simulation consumer with event handler
             mapSimulationConsumer = new MapSimulationEventConsumer(
                 "logistics-ui-group",
@@ -194,6 +213,7 @@ public class LogisticsController implements SimulationListener {
             System.out.println("✅ Kafka consumers initialized for logistics monitoring");
         } catch (Exception e) {
             System.err.println("⚠️ Failed to initialize Kafka consumers: " + e.getMessage());
+            e.printStackTrace();
             // Continue without Kafka - fallback to SimulationListener updates
         }
     }
@@ -864,13 +884,137 @@ public class LogisticsController implements SimulationListener {
 
     @FXML
     private void handleSimulateAlert() {
+        // Show dialog to select alert scenario
         Platform.runLater(() -> {
-            String timestamp = java.time.LocalDateTime.now().format(
-                    java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"));
-            alerts.add(0, "🚨 SIMULATED [" + timestamp + "]: Temperature breach detected - 8.5°C");
-            showAlert(Alert.AlertType.WARNING, "Alert Simulated",
-                    "A temperature breach alert has been simulated");
+            try {
+                // Create alert scenario selection dialog
+                ChoiceDialog<String> dialog = new ChoiceDialog<>("Temperature Breach",
+                    "Temperature Breach", "Humidity Breach", "Quality Drop", "Delayed Delivery");
+                dialog.setTitle("Select Alert Scenario");
+                dialog.setHeaderText("Choose an alert scenario to simulate");
+                dialog.setContentText("Scenario:");
+                
+                Optional<String> result = dialog.showAndWait();
+                if (!result.isPresent()) {
+                    return;
+                }
+                
+                String scenario = result.get();
+                String batchId = getActiveBatchIdOrDefault();
+                
+                // Generate appropriate alert based on scenario
+                QualityAlertEvent alertEvent;
+                String alertMessage;
+                
+                switch (scenario) {
+                    case "Temperature Breach":
+                        double tempValue = 8.5;
+                        alertEvent = new QualityAlertEvent(
+                            batchId, "TEMPERATURE_BREACH", "HIGH",
+                            "Temperature exceeded safe threshold",
+                            tempValue, 8.0
+                        );
+                        alertEvent.setSensorId("TEMP-SENSOR-001");
+                        alertEvent.setLocation("Highway Mile 30");
+                        alertMessage = String.format("🌡️ TEMPERATURE BREACH: %s - %.1f°C (threshold: 8.0°C)", 
+                            batchId, tempValue);
+                        break;
+                        
+                    case "Humidity Breach":
+                        double humidityValue = 92.0;
+                        alertEvent = new QualityAlertEvent(
+                            batchId, "HUMIDITY_BREACH", "MEDIUM",
+                            "Humidity exceeded optimal range",
+                            humidityValue, 90.0
+                        );
+                        alertEvent.setSensorId("HUMID-SENSOR-001");
+                        alertEvent.setLocation("Highway Mile 30");
+                        alertMessage = String.format("💧 HUMIDITY BREACH: %s - %.1f%% (threshold: 90.0%%)", 
+                            batchId, humidityValue);
+                        break;
+                        
+                    case "Quality Drop":
+                        double qualityValue = 65.0;
+                        alertEvent = new QualityAlertEvent(
+                            batchId, "QUALITY_DROP", "CRITICAL",
+                            "Product quality has degraded below acceptable level",
+                            qualityValue, 70.0
+                        );
+                        alertEvent.setSensorId("QUALITY-SENSOR-001");
+                        alertEvent.setLocation("Distribution Center");
+                        alertMessage = String.format("⚠️ QUALITY DROP: %s - %.1f%% (threshold: 70.0%%)", 
+                            batchId, qualityValue);
+                        break;
+                        
+                    case "Delayed Delivery":
+                        double delayMinutes = 45.0;
+                        alertEvent = new QualityAlertEvent(
+                            batchId, "DELIVERY_DELAY", "LOW",
+                            "Delivery is experiencing unexpected delays",
+                            delayMinutes, 30.0
+                        );
+                        alertEvent.setLocation("Highway Mile 50");
+                        alertMessage = String.format("⏰ DELAYED DELIVERY: %s - %.0f min delay", 
+                            batchId, delayMinutes);
+                        break;
+                        
+                    default:
+                        return;
+                }
+                
+                // Publish alert to Kafka if producer is available
+                if (qualityAlertProducer != null) {
+                    try {
+                        qualityAlertProducer.sendQualityAlert(alertEvent);
+                        System.out.println("✅ Published alert to Kafka: " + alertEvent);
+                    } catch (Exception e) {
+                        System.err.println("❌ Failed to publish alert to Kafka: " + e.getMessage());
+                        e.printStackTrace();
+                    }
+                } else {
+                    System.out.println("⚠️ Alert producer not available, alert not published to Kafka");
+                }
+                
+                // Update Live Alerts Panel immediately
+                String timestamp = java.time.LocalDateTime.now().format(
+                        java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"));
+                String fullAlert = "[" + timestamp + "] " + alertMessage;
+                alerts.add(0, fullAlert);
+                
+                // Keep only recent alerts
+                if (alerts.size() > MAX_ALERT_ITEMS) {
+                    alerts.remove(alerts.size() - 1);
+                }
+                
+                // Show confirmation dialog
+                showAlert(Alert.AlertType.WARNING, "Alert Triggered",
+                        "Alert scenario '" + scenario + "' has been triggered:\n\n" + alertMessage + 
+                        "\n\nAlert published to Kafka topic and Live Alerts Panel updated.");
+                
+            } catch (Exception e) {
+                System.err.println("❌ Error simulating alert: " + e.getMessage());
+                e.printStackTrace();
+                showAlert(Alert.AlertType.ERROR, "Alert Error",
+                        "Failed to simulate alert: " + e.getMessage());
+            }
         });
+    }
+    
+    /**
+     * Get an active batch ID or return a default value for alert simulation.
+     * Tries to get a batch from active shipments first, otherwise uses a default.
+     */
+    private String getActiveBatchIdOrDefault() {
+        // Try to get an active shipment batch ID
+        if (!activeShipments.isEmpty()) {
+            return activeShipments.keySet().iterator().next();
+        }
+        // Try to get from shipments table
+        if (!shipments.isEmpty()) {
+            return shipments.get(0).getBatchId();
+        }
+        // Default batch ID
+        return "BATCH_DEMO_" + System.currentTimeMillis();
     }
 
     @FXML
@@ -940,8 +1084,24 @@ public class LogisticsController implements SimulationListener {
             kafkaConsumerExecutor.shutdownNow();
         }
         
+        // Close Kafka producer
+        if (qualityAlertProducer != null) {
+            try {
+                qualityAlertProducer.close();
+            } catch (Exception e) {
+                System.err.println("Error closing alert producer: " + e.getMessage());
+            }
+        }
+        
         if (syncExecutor != null && !syncExecutor.isShutdown()) {
             syncExecutor.shutdownNow();
+        }
+        
+        // Stop all animations
+        for (MapVisualization viz : activeShipments.values()) {
+            if (viz.animation != null) {
+                viz.animation.stop();
+            }
         }
         
         System.out.println("🔴 LogisticsController cleanup complete");
@@ -1081,11 +1241,23 @@ public class LogisticsController implements SimulationListener {
     
     /**
      * Initialize temperature chart series for this batch.
+     * Clears demo data on first real simulation.
      */
     private void initializeTemperatureChartSeries(String batchId) {
         if (temperatureChart == null) return;
         
         try {
+            // Clear demo data if this is the first real simulation
+            if (temperatureSeriesMap.isEmpty() && temperatureChart.getData().size() > 0) {
+                // Check if demo data is present
+                boolean hasDemo = temperatureChart.getData().stream()
+                    .anyMatch(series -> series.getName().contains("(demo)"));
+                if (hasDemo) {
+                    System.out.println("Clearing demo data from temperature chart");
+                    temperatureChart.getData().clear();
+                }
+            }
+            
             // Check if series already exists
             if (temperatureSeriesMap.containsKey(batchId)) {
                 System.out.println("Temperature chart series already exists for: " + batchId);
@@ -1103,6 +1275,7 @@ public class LogisticsController implements SimulationListener {
             System.out.println("Initialized temperature chart series for: " + batchId);
         } catch (Exception e) {
             System.err.println("Error initializing temperature chart: " + e.getMessage());
+            e.printStackTrace();
         }
     }
     
@@ -1128,7 +1301,7 @@ public class LogisticsController implements SimulationListener {
     
     /**
      * Update map marker position with smooth animation based on progress.
-     * Animates marker from previous position to new position.
+     * Animates marker from previous position to new position using JavaFX Timeline.
      */
     private void updateMapMarkerPosition(String batchId, double progress, String currentLocation) {
         if (mapContainer == null) return;
@@ -1141,13 +1314,13 @@ public class LogisticsController implements SimulationListener {
             
             MapVisualization visualization = activeShipments.get(batchId);
             if (visualization == null) {
-                // Create new visualization
+                // Create new visualization at initial position
                 visualization = new MapVisualization();
-                visualization.shipmentCircle = new Circle(newX, newY, 6, Color.ORANGE);
+                visualization.shipmentCircle = new Circle(ORIGIN_X, ORIGIN_Y, 6, Color.ORANGE);
                 visualization.shipmentCircle.setUserData("shipment");
                 
                 String displayId = batchId.length() > 8 ? batchId.substring(0, 8) : batchId;
-                visualization.shipmentLabel = new Text(newX - 15, newY - 15, "🚚 " + displayId);
+                visualization.shipmentLabel = new Text(ORIGIN_X - 15, ORIGIN_Y - 15, "🚚 " + displayId);
                 visualization.shipmentLabel.setUserData("shipment");
                 visualization.shipmentLabel.setFill(Color.DARKBLUE);
                 
@@ -1155,23 +1328,51 @@ public class LogisticsController implements SimulationListener {
                 activeShipments.put(batchId, visualization);
                 
                 System.out.println("Created new map marker for: " + batchId + " at " + progress + "%");
-            } else {
-                // Animate existing visualization to new position
-                // Use simple position updates for smooth movement
-                visualization.shipmentCircle.setCenterX(newX);
-                visualization.shipmentCircle.setCenterY(newY);
-                visualization.shipmentLabel.setX(newX - 15);
-                visualization.shipmentLabel.setY(newY - 15);
-                
-                // Update label text with current location if available
-                if (currentLocation != null && !currentLocation.isEmpty()) {
-                    String displayId = batchId.length() > 8 ? batchId.substring(0, 8) : batchId;
-                    visualization.shipmentLabel.setText("🚚 " + displayId);
-                }
             }
+            
+            // Stop any existing animation for this marker
+            if (visualization.animation != null) {
+                visualization.animation.stop();
+            }
+            
+            // Get current position
+            double currentX = visualization.shipmentCircle.getCenterX();
+            double currentY = visualization.shipmentCircle.getCenterY();
+            
+            // Create smooth animation from current position to new position
+            // Duration based on distance traveled (smoother for small movements)
+            double distance = Math.sqrt(Math.pow(newX - currentX, 2) + Math.pow(newY - currentY, 2));
+            double animationDuration = Math.max(500, Math.min(2000, distance * 10)); // 0.5-2 seconds
+            
+            Timeline timeline = new Timeline(
+                new KeyFrame(Duration.millis(animationDuration),
+                    new KeyValue(visualization.shipmentCircle.centerXProperty(), newX),
+                    new KeyValue(visualization.shipmentCircle.centerYProperty(), newY)
+                )
+            );
+            
+            // Also animate label position
+            timeline.getKeyFrames().add(
+                new KeyFrame(Duration.millis(animationDuration),
+                    new KeyValue(visualization.shipmentLabel.xProperty(), newX - 15),
+                    new KeyValue(visualization.shipmentLabel.yProperty(), newY - 15)
+                )
+            );
+            
+            // Update label text with current location if available
+            if (currentLocation != null && !currentLocation.isEmpty()) {
+                String displayId = batchId.length() > 8 ? batchId.substring(0, 8) : batchId;
+                visualization.shipmentLabel.setText("🚚 " + displayId);
+            }
+            
+            visualization.animation = timeline;
+            timeline.play();
+            
+            System.out.println("Animating marker for: " + batchId + " to " + progress + "% (" + newX + ", " + newY + ")");
             
         } catch (Exception e) {
             System.err.println("Error updating map marker: " + e.getMessage());
+            e.printStackTrace();
         }
     }
     
@@ -1283,6 +1484,10 @@ public class LogisticsController implements SimulationListener {
         try {
             MapVisualization visualization = activeShipments.remove(batchId);
             if (visualization != null) {
+                // Stop any running animation
+                if (visualization.animation != null) {
+                    visualization.animation.stop();
+                }
                 mapContainer.getChildren().removeAll(visualization.shipmentCircle, visualization.shipmentLabel);
                 System.out.println("Cleaned up map marker for: " + batchId);
             }
@@ -1303,6 +1508,7 @@ public class LogisticsController implements SimulationListener {
     private static class MapVisualization {
         Circle shipmentCircle;
         Text shipmentLabel;
+        Timeline animation; // Track animation for cleanup
     }
 
     // Data model class
