@@ -80,24 +80,36 @@ public class LogisticsRestController {
         // Track emitter for cleanup
         activeEmitters.computeIfAbsent(shipmentId, k -> ConcurrentHashMap.newKeySet()).add(emitter);
         
-        // Handle emitter completion and timeout
+        // Store listener reference for cleanup
+        final Consumer<SimulationEvent>[] listenerRef = new Consumer[1];
+        
+        // Update completion handler to cleanup subscription
         emitter.onCompletion(() -> {
             logger.debug("SSE stream completed for shipment: {}", shipmentId);
+            if (listenerRef[0] != null) {
+                simulationService.unsubscribeFromTemperatureUpdates(shipmentId, listenerRef[0]);
+            }
             cleanupEmitter(shipmentId, emitter);
         });
         
         emitter.onTimeout(() -> {
             logger.debug("SSE stream timed out for shipment: {}", shipmentId);
+            if (listenerRef[0] != null) {
+                simulationService.unsubscribeFromTemperatureUpdates(shipmentId, listenerRef[0]);
+            }
             cleanupEmitter(shipmentId, emitter);
         });
         
         emitter.onError((ex) -> {
             logger.error("SSE stream error for shipment: {}", shipmentId, ex);
+            if (listenerRef[0] != null) {
+                simulationService.unsubscribeFromTemperatureUpdates(shipmentId, listenerRef[0]);
+            }
             cleanupEmitter(shipmentId, emitter);
         });
         
-        // Start streaming in background thread
-        new Thread(() -> {
+        // Start streaming using Spring's async capabilities
+        java.util.concurrent.CompletableFuture.runAsync(() -> {
             try {
                 // Send initial historical readings
                 List<SimulationEvent> historicalReadings = simulationService.getHistoricalTemperatureReadings(shipmentId);
@@ -124,6 +136,8 @@ public class LogisticsRestController {
                             logger.error("Error sending temperature event", e);
                         }
                     };
+                    
+                    listenerRef[0] = listener; // Store for cleanup
                     
                     boolean subscribed = simulationService.subscribeToTemperatureUpdates(shipmentId, listener);
                     
@@ -160,7 +174,7 @@ public class LogisticsRestController {
                 sendErrorEvent(emitter, "Error streaming temperature data: " + e.getMessage());
                 emitter.complete();
             }
-        }).start();
+        });
         
         return emitter;
     }

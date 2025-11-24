@@ -49,7 +49,7 @@ class LogisticsRestControllerTest {
         ResponseEntity<Map<String, Object>> response = controller.health();
         
         assertNotNull(response);
-        assertEquals(200, response.getStatusCodeValue());
+        assertEquals(200, response.getStatusCode().value());
         assertNotNull(response.getBody());
         assertEquals("UP", response.getBody().get("status"));
         assertEquals("logistics-api", response.getBody().get("service"));
@@ -68,7 +68,7 @@ class LogisticsRestControllerTest {
         ResponseEntity<Map<String, Object>> response = controller.getTemperatureHistory(shipmentId, 100);
         
         assertNotNull(response);
-        assertEquals(200, response.getStatusCodeValue());
+        assertEquals(200, response.getStatusCode().value());
         
         Map<String, Object> body = response.getBody();
         assertNotNull(body);
@@ -131,7 +131,7 @@ class LogisticsRestControllerTest {
         ResponseEntity<Map<String, Object>> response = controller.getTemperatureHistory(shipmentId, 100);
         
         assertNotNull(response);
-        assertEquals(200, response.getStatusCodeValue());
+        assertEquals(200, response.getStatusCode().value());
         
         Map<String, Object> body = response.getBody();
         assertNotNull(body);
@@ -179,7 +179,7 @@ class LogisticsRestControllerTest {
         ResponseEntity<Map<String, Object>> response = controller.getTemperatureHistory(shipmentId, 5);
         
         assertNotNull(response);
-        assertEquals(200, response.getStatusCodeValue());
+        assertEquals(200, response.getStatusCode().value());
         
         Map<String, Object> body = response.getBody();
         assertNotNull(body);
@@ -204,6 +204,13 @@ class LogisticsRestControllerTest {
         assertNotNull(emitter);
         assertNotNull(emitter.getTimeout());
         
+        // Give async task time to execute
+        try {
+            Thread.sleep(200);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        
         // Verify service was called
         verify(simulationService).getHistoricalTemperatureReadings(shipmentId);
         verify(simulationService).isSimulationRunning(shipmentId);
@@ -224,9 +231,9 @@ class LogisticsRestControllerTest {
         
         assertNotNull(emitter);
         
-        // Give background thread time to execute
+        // Give async task time to execute
         try {
-            Thread.sleep(100);
+            Thread.sleep(200);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
@@ -243,7 +250,7 @@ class LogisticsRestControllerTest {
         ResponseEntity<Map<String, Object>> response = controller.getActiveShipments();
         
         assertNotNull(response);
-        assertEquals(200, response.getStatusCodeValue());
+        assertEquals(200, response.getStatusCode().value());
         
         Map<String, Object> body = response.getBody();
         assertNotNull(body);
