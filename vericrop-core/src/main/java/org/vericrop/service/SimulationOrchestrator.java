@@ -38,12 +38,14 @@ public class SimulationOrchestrator {
      */
     private static class OrchestrationState {
         final String orchestrationId;
+        final String farmerId;
         final Map<Scenario, String> scenarioBatchIds;
         final long startTime;
         volatile boolean running;
         
-        OrchestrationState(String orchestrationId, Map<Scenario, String> scenarioBatchIds) {
+        OrchestrationState(String orchestrationId, String farmerId, Map<Scenario, String> scenarioBatchIds) {
             this.orchestrationId = orchestrationId;
+            this.farmerId = farmerId;
             this.scenarioBatchIds = new ConcurrentHashMap<>(scenarioBatchIds);
             this.startTime = System.currentTimeMillis();
             this.running = true;
@@ -189,7 +191,7 @@ public class SimulationOrchestrator {
         }
         
         // Store orchestration state
-        OrchestrationState state = new OrchestrationState(orchestrationId, scenarioBatchIds);
+        OrchestrationState state = new OrchestrationState(orchestrationId, farmerId, scenarioBatchIds);
         activeOrchestrations.put(orchestrationId, state);
         
         // Wait for all simulations to start (non-blocking via separate task)
@@ -292,7 +294,7 @@ public class SimulationOrchestrator {
                     // Publish scenario completed events to Kafka for each batch
                     for (Map.Entry<Scenario, String> entry : state.scenarioBatchIds.entrySet()) {
                         publishScenarioEvent(state.orchestrationId, "COMPLETED", 
-                                           entry.getKey().name(), "UNKNOWN", entry.getValue());
+                                           entry.getKey().name(), state.farmerId, entry.getValue());
                     }
                     
                     // Remove from active orchestrations after a delay

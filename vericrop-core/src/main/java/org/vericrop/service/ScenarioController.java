@@ -176,7 +176,7 @@ public class ScenarioController {
                 logger.info("All routes generated for execution: {}", executionId);
                 
                 // Phase 3: Start concurrent simulations via orchestrator
-                // Convert models.GeoCoordinate to DeliverySimulator.GeoCoordinate
+                // Create DeliverySimulator coordinate instances from model coordinates
                 DeliverySimulator.GeoCoordinate simOrigin = DeliverySimulator.GeoCoordinate.fromModel(origin);
                 DeliverySimulator.GeoCoordinate simDestination = DeliverySimulator.GeoCoordinate.fromModel(destination);
                 
