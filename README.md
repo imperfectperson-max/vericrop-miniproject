@@ -17,6 +17,7 @@
 - [Local Development](#local-development)
 - [Verify Services](#verify-services)
 - [Configuration](#configuration)
+- [Concurrent Scenario Orchestration](#concurrent-scenario-orchestration)
 - [Authentication and Messaging](#authentication-and-messaging)
 - [ML Service Contract](#ml-service-contract)
 - [Running Tests](#running-tests)
@@ -33,6 +34,7 @@ VeriCrop is a comprehensive mini-project that demonstrates modern supply chain m
 - **Real-time Messaging**: Kafka-based event streaming for supply chain events
 - **Interactive GUI**: JavaFX desktop application for farm management, logistics, consumer verification, and analytics
 - **Workflow Orchestration**: Apache Airflow for automated quality evaluation pipelines
+- **Concurrent Orchestration**: Thread-safe parallel execution of six scenario groups (scenarios, delivery, map, temperature, supplier compliance, simulations)
 
 ### Goals
 
@@ -952,6 +954,117 @@ nano .env
 ```
 
 **Important**: Never commit `.env` files with real credentials to version control. The `.env.example` is tracked for reference only.
+
+## Concurrent Scenario Orchestration
+
+VeriCrop provides a powerful orchestration system for executing multiple scenario groups concurrently across all controllers. This enables parallel processing of complex workflows with thread-safe aggregation of results.
+
+### Overview
+
+The orchestration service manages concurrent execution of six scenario groups:
+- **SCENARIOS**: General scenario simulations
+- **DELIVERY**: Delivery tracking and logistics flows
+- **MAP**: Map and route visualization
+- **TEMPERATURE**: Temperature monitoring and environmental data
+- **SUPPLIER_COMPLIANCE**: Supplier compliance checks and validation
+- **SIMULATIONS**: Advanced simulation workflows
+
+### REST API Endpoints
+
+#### Execute Specific Scenarios
+```bash
+POST /api/orchestration/execute
+
+# Example request
+curl -X POST http://localhost:8080/api/orchestration/execute \
+  -H "Content-Type: application/json" \
+  -d '{
+    "userId": "user-123",
+    "scenarioGroups": ["SCENARIOS", "DELIVERY", "MAP"],
+    "context": {
+      "batchId": "BATCH-001",
+      "farmerId": "FARM-123"
+    },
+    "timeoutMs": 30000
+  }'
+
+# Example response
+{
+  "requestId": "abc123",
+  "success": true,
+  "message": "All 3 scenario groups executed successfully",
+  "durationMs": 1250,
+  "startTime": "2024-11-24T05:43:13.157Z",
+  "endTime": "2024-11-24T05:43:14.407Z",
+  "scenarioStatuses": {
+    "SCENARIOS": {
+      "status": "SUCCESS",
+      "message": "Completed successfully",
+      "timestamp": "2024-11-24T05:43:13.257Z",
+      "errorDetails": null
+    },
+    "DELIVERY": { ... },
+    "MAP": { ... }
+  }
+}
+```
+
+#### Execute All Scenarios
+```bash
+POST /api/orchestration/execute-all
+
+# Executes all 6 scenario groups concurrently
+curl -X POST http://localhost:8080/api/orchestration/execute-all \
+  -H "Content-Type: application/json" \
+  -d '{
+    "userId": "user-123",
+    "context": {
+      "batchId": "BATCH-001"
+    },
+    "timeoutMs": 60000
+  }'
+```
+
+### Configuration
+
+Set environment variables to configure Kafka and Airflow integration:
+
+```bash
+# Kafka Configuration
+KAFKA_BOOTSTRAP_SERVERS=localhost:9092
+
+# Airflow Configuration (optional, gracefully degrades if not available)
+AIRFLOW_BASE_URL=http://localhost:8080
+AIRFLOW_USERNAME=admin
+AIRFLOW_PASSWORD=admin
+```
+
+### Key Features
+
+- **Concurrent Execution**: Uses CompletableFuture for parallel scenario processing
+- **Thread-Safe**: Concurrent result aggregation with proper synchronization
+- **Kafka Integration**: Publishes events to scenario-specific topics
+- **Airflow Integration**: Triggers DAGs for analytics workflows
+- **Partial Failure Handling**: Tracks per-scenario status (SUCCESS, FAILURE, TIMEOUT, PARTIAL)
+- **Graceful Degradation**: Continues execution even if Kafka or Airflow are unavailable
+- **Comprehensive Logging**: Detailed logs for debugging and monitoring
+
+### Performance
+
+With 6 scenario groups executing in parallel:
+- Sequential execution: ~6000ms (assuming 1000ms per scenario)
+- Concurrent execution: ~1200ms (with overhead)
+- **Performance gain: ~5x faster**
+
+### Documentation
+
+For detailed information, see:
+📖 **[ORCHESTRATION.md](ORCHESTRATION.md)** - Complete orchestration guide with:
+- Architecture and components
+- API usage examples
+- Testing guide
+- Error handling
+- Best practices
 
 ## Authentication and Messaging
 
