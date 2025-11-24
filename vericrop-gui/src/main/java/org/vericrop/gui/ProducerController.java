@@ -1137,18 +1137,17 @@ public class ProducerController implements SimulationListener {
             final String finalBatchId = selectedBatchId; // Make final for lambda
             
             // Immediately provide UI feedback - disable Start, enable Stop
-            Platform.runLater(() -> {
-                if (startSimButton != null) {
-                    startSimButton.setDisable(true);
-                }
-                if (stopSimButton != null) {
-                    stopSimButton.setDisable(false);
-                }
-                if (simStatusLabel != null) {
-                    simStatusLabel.setText("⏳ Starting simulation...");
-                    simStatusLabel.setStyle("-fx-text-fill: #F59E0B;");
-                }
-            });
+            // No Platform.runLater needed since @FXML methods run on JavaFX thread
+            if (startSimButton != null) {
+                startSimButton.setDisable(true);
+            }
+            if (stopSimButton != null) {
+                stopSimButton.setDisable(false);
+            }
+            if (simStatusLabel != null) {
+                simStatusLabel.setText("⏳ Starting simulation...");
+                simStatusLabel.setStyle("-fx-text-fill: #F59E0B;");
+            }
 
             // Run all blocking/long-running operations asynchronously
             CompletableFuture.runAsync(() -> {
@@ -1200,23 +1199,7 @@ public class ProducerController implements SimulationListener {
                     // Handle errors and restore button states on UI thread
                     System.err.println("❌ Failed to start simulation: " + e.getMessage());
                     e.printStackTrace();
-                    
-                    Platform.runLater(() -> {
-                        // Restore button states
-                        if (startSimButton != null) {
-                            startSimButton.setDisable(false);
-                        }
-                        if (stopSimButton != null) {
-                            stopSimButton.setDisable(true);
-                        }
-                        if (simStatusLabel != null) {
-                            simStatusLabel.setText("❌ Error: " + e.getMessage());
-                            simStatusLabel.setStyle("-fx-text-fill: #DC2626;");
-                        }
-                        
-                        // Show error alert
-                        showError("Failed to start simulation: " + e.getMessage());
-                    });
+                    handleSimulationError(e.getMessage());
                 }
             }, backgroundExecutor);
 
@@ -1224,24 +1207,31 @@ public class ProducerController implements SimulationListener {
             // Handle synchronous errors (e.g., batch selection dialog errors)
             System.err.println("❌ Failed to start simulation (synchronous error): " + e.getMessage());
             e.printStackTrace();
-            
-            Platform.runLater(() -> {
-                // Restore button states
-                if (startSimButton != null) {
-                    startSimButton.setDisable(false);
-                }
-                if (stopSimButton != null) {
-                    stopSimButton.setDisable(true);
-                }
-                if (simStatusLabel != null) {
-                    simStatusLabel.setText("❌ Error: " + e.getMessage());
-                    simStatusLabel.setStyle("-fx-text-fill: #DC2626;");
-                }
-                
-                // Show error alert
-                showError("Failed to start simulation: " + e.getMessage());
-            });
+            handleSimulationError(e.getMessage());
         }
+    }
+    
+    /**
+     * Helper method to handle simulation errors consistently.
+     * Restores button states and shows error message on the UI thread.
+     */
+    private void handleSimulationError(String errorMessage) {
+        Platform.runLater(() -> {
+            // Restore button states
+            if (startSimButton != null) {
+                startSimButton.setDisable(false);
+            }
+            if (stopSimButton != null) {
+                stopSimButton.setDisable(true);
+            }
+            if (simStatusLabel != null) {
+                simStatusLabel.setText("❌ Error: " + errorMessage);
+                simStatusLabel.setStyle("-fx-text-fill: #DC2626;");
+            }
+        });
+        
+        // Show error alert (already uses Platform.runLater internally)
+        showError("Failed to start simulation: " + errorMessage);
     }
     private void analyzeImageWithAI(File imageFile) {
         Platform.runLater(() -> {
