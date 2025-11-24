@@ -21,7 +21,6 @@ public class ConsumerController implements SimulationListener {
     @FXML private TextField batchIdField;
     @FXML private ListView<String> verificationHistoryList;
     @FXML private Button backToProducerButton;
-    @FXML private Button analyticsButton;
     @FXML private Button logisticsButton;
 
     private ObservableList<String> verificationHistory = FXCollections.observableArrayList();
@@ -59,9 +58,6 @@ public class ConsumerController implements SimulationListener {
     private void setupNavigationButtons() {
         if (backToProducerButton != null) {
             backToProducerButton.setOnAction(e -> handleBackToProducer());
-        }
-        if (analyticsButton != null) {
-            analyticsButton.setOnAction(e -> handleShowAnalytics());
         }
         if (logisticsButton != null) {
             logisticsButton.setOnAction(e -> handleShowLogistics());
@@ -177,14 +173,6 @@ public class ConsumerController implements SimulationListener {
         MainApp mainApp = MainApp.getInstance();
         if (mainApp != null) {
             mainApp.showProducerScreen();
-        }
-    }
-
-    @FXML
-    private void handleShowAnalytics() {
-        MainApp mainApp = MainApp.getInstance();
-        if (mainApp != null) {
-            mainApp.showAnalyticsScreen();
         }
     }
 

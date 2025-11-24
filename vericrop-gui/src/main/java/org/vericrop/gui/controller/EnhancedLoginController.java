@@ -174,7 +174,7 @@ public class EnhancedLoginController {
                 mainApp.showConsumerScreen();
                 break;
             case "ADMIN":
-                mainApp.showAnalyticsScreen();
+                mainApp.showProducerScreen();
                 break;
             default:
                 logger.warn("Unknown role: {}, defaulting to producer screen", role);

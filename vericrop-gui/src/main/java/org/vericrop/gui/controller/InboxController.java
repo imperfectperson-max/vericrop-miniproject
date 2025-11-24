@@ -136,7 +136,7 @@ public class InboxController {
                     mainApp.showConsumerScreen();
                     break;
                 case "ADMIN":
-                    mainApp.showAnalyticsScreen();
+                    mainApp.showProducerScreen();
                     break;
                 default:
                     mainApp.showProducerScreen();

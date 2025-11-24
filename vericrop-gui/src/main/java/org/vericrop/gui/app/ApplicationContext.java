@@ -40,7 +40,6 @@ public class ApplicationContext {
     // Business services
     private final AuthenticationService authenticationService;
     private final BatchService batchService;
-    private final AnalyticsService analyticsService;
     
     // Core services from vericrop-core
     private final MessageService messageService;
@@ -78,7 +77,6 @@ public class ApplicationContext {
         
         // Initialize business services
         this.authenticationService = new AuthenticationService(dataSource);
-        this.analyticsService = new AnalyticsService(mlClientService);
         this.batchService = new BatchService(mlClientService, kafkaMessagingService, batchRepository);
         
         // Initialize core services
@@ -179,10 +177,6 @@ public class ApplicationContext {
 
     public BatchService getBatchService() {
         return batchService;
-    }
-
-    public AnalyticsService getAnalyticsService() {
-        return analyticsService;
     }
 
     public UserDao getUserDao() {
