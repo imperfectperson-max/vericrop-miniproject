@@ -1121,13 +1121,9 @@ public class ProducerController implements SimulationListener {
             }
 
             // Get farmer ID from field or use default (make it final for lambda)
-            final String farmerId;
-            String tempFarmerId = farmerField.getText();
-            if (tempFarmerId == null || tempFarmerId.trim().isEmpty()) {
-                farmerId = "Unknown Farmer";
-            } else {
-                farmerId = tempFarmerId;
-            }
+            final String farmerId = (farmerField.getText() != null && !farmerField.getText().trim().isEmpty()) 
+                    ? farmerField.getText().trim() 
+                    : "Unknown Farmer";
 
             // Generate sample route: Farm to Warehouse
             final var origin = new org.vericrop.service.DeliverySimulator.GeoCoordinate(
@@ -1226,13 +1222,25 @@ public class ProducerController implements SimulationListener {
 
         } catch (Exception e) {
             // Handle synchronous errors (e.g., batch selection dialog errors)
+            System.err.println("❌ Failed to start simulation (synchronous error): " + e.getMessage());
+            e.printStackTrace();
+            
             Platform.runLater(() -> {
+                // Restore button states
+                if (startSimButton != null) {
+                    startSimButton.setDisable(false);
+                }
+                if (stopSimButton != null) {
+                    stopSimButton.setDisable(true);
+                }
                 if (simStatusLabel != null) {
                     simStatusLabel.setText("❌ Error: " + e.getMessage());
                     simStatusLabel.setStyle("-fx-text-fill: #DC2626;");
                 }
+                
+                // Show error alert
+                showError("Failed to start simulation: " + e.getMessage());
             });
-            e.printStackTrace();
         }
     }
     private void analyzeImageWithAI(File imageFile) {
