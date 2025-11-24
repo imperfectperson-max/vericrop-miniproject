@@ -572,6 +572,12 @@ public class SimulationManager {
         // This is the key fix: bridge simulation temperature data to Kafka stream
         publishTemperatureEvent(event);
         
+        // Notify listeners with temperature update (works even without Kafka)
+        // This ensures temperature charts update in real-time regardless of Kafka availability
+        boolean compliant = isTemperatureCompliant(event.getTemperature());
+        notifyTemperatureUpdate(event.getBatchId(), event.getTemperature(), event.getHumidity(),
+                               event.getLocationName(), event.getTimestamp(), compliant);
+        
         // Notify progress update to all listeners
         notifyProgress(event.getBatchId(), event.getProgressPercent(), event.getLocationName());
         
@@ -632,6 +638,29 @@ public class SimulationManager {
                 logger.error("Error notifying listener of simulation error", e);
             }
         }
+    }
+    
+    /**
+     * Notify all listeners of temperature update.
+     * This ensures temperature data reaches listeners even when Kafka is unavailable.
+     */
+    private void notifyTemperatureUpdate(String batchId, double temperature, double humidity,
+                                        String locationName, long timestamp, boolean compliant) {
+        for (SimulationListener listener : listeners) {
+            try {
+                listener.onTemperatureUpdate(batchId, temperature, humidity, locationName, timestamp, compliant);
+            } catch (Exception e) {
+                logger.error("Error notifying listener of temperature update", e);
+            }
+        }
+    }
+    
+    /**
+     * Check if temperature is within compliant range.
+     * Cold chain products should be between 2°C and 8°C.
+     */
+    private boolean isTemperatureCompliant(double temperature) {
+        return temperature >= 2.0 && temperature <= 8.0;
     }
     
     /**

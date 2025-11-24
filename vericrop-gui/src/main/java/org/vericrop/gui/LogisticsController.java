@@ -1611,6 +1611,48 @@ public class LogisticsController implements SimulationListener {
             System.err.println("LogisticsController: Simulation error - " + error);
         });
     }
+    
+    @Override
+    public void onTemperatureUpdate(String batchId, double temperature, double humidity, 
+                                   String locationName, long timestamp, boolean compliant) {
+        Platform.runLater(() -> {
+            try {
+                // Update environmental data tracking
+                ShipmentEnvironmentalData envData = environmentalDataMap.computeIfAbsent(
+                    batchId, k -> new ShipmentEnvironmentalData());
+                envData.temperature = temperature;
+                envData.humidity = humidity;
+                
+                // Create a TemperatureComplianceEvent for chart update
+                TemperatureComplianceEvent event = new TemperatureComplianceEvent(
+                    batchId, temperature, compliant, "simulation",
+                    String.format("Temperature reading at %s", locationName != null ? locationName : "unknown"));
+                event.setTimestamp(timestamp);
+                
+                // Add data point to temperature chart
+                addTemperatureDataPoint(event);
+                
+                // Update shipments table with new environmental data
+                updateShipmentEnvironmentalData(batchId);
+                
+                // Add alert if not compliant
+                if (!compliant) {
+                    String alertMsg = String.format("🌡️ ALERT: %s - %.1f°C - Temperature out of range", 
+                        batchId, temperature);
+                    alerts.add(0, alertMsg);
+                    if (alerts.size() > MAX_ALERT_ITEMS) {
+                        alerts.remove(alerts.size() - 1);
+                    }
+                }
+                
+                System.out.println("✅ Temperature update received via listener: " + batchId + 
+                                  " = " + temperature + "°C at " + locationName);
+            } catch (Exception e) {
+                System.err.println("❌ Error handling temperature update via listener: " + e.getMessage());
+                e.printStackTrace();
+            }
+        });
+    }
 
     // Helper class for map visualization
     private static class MapVisualization {

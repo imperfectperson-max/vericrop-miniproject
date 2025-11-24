@@ -41,4 +41,20 @@ public interface SimulationListener {
     default void onSimulationError(String batchId, String error) {
         // Default implementation does nothing
     }
+    
+    /**
+     * Called when temperature data is available during simulation.
+     * This provides real-time temperature updates for monitoring and charting.
+     * 
+     * @param batchId the ID of the batch being simulated
+     * @param temperature current temperature in Celsius
+     * @param humidity current humidity percentage
+     * @param locationName name of current location
+     * @param timestamp timestamp of the reading in milliseconds since epoch
+     * @param compliant whether the temperature is within acceptable range
+     */
+    default void onTemperatureUpdate(String batchId, double temperature, double humidity, 
+                                    String locationName, long timestamp, boolean compliant) {
+        // Default implementation does nothing - listeners can choose to implement this
+    }
 }
