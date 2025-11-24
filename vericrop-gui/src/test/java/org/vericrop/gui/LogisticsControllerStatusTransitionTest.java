@@ -121,7 +121,7 @@ class LogisticsControllerStatusTransitionTest {
         
         // Use exact comparison for terminal state to prevent duplicates
         // This ensures "Delivered" only triggers once when progress hits exactly 100%
-        if (progressPercent >= PROGRESS_COMPLETE && progressPercent == 100.0) {
+        if (progressPercent == PROGRESS_COMPLETE) {
             return "Delivered";
         } else if (progressPercent >= PROGRESS_AT_WAREHOUSE_THRESHOLD) {
             return "At Warehouse";
