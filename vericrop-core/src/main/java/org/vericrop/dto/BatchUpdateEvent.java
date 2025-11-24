@@ -13,6 +13,8 @@ public class BatchUpdateEvent {
     private String location;
     private Double qualityScore;
     private String details;
+    private Double primeRate;
+    private Double rejectionRate;
     
     public BatchUpdateEvent() {
         this.timestamp = System.currentTimeMillis();
@@ -53,6 +55,14 @@ public class BatchUpdateEvent {
     
     public String getDetails() { return details; }
     public void setDetails(String details) { this.details = details; }
+    
+    @JsonProperty("prime_rate")
+    public Double getPrimeRate() { return primeRate; }
+    public void setPrimeRate(Double primeRate) { this.primeRate = primeRate; }
+    
+    @JsonProperty("rejection_rate")
+    public Double getRejectionRate() { return rejectionRate; }
+    public void setRejectionRate(Double rejectionRate) { this.rejectionRate = rejectionRate; }
     
     @Override
     public String toString() {

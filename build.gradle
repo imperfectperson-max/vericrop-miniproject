@@ -97,6 +97,9 @@ project(':vericrop-gui') {
         implementation project(':ml-client')
         implementation project(':kafka-service')
 
+        // JavaFX dependencies (including charts for PieChart support)
+        implementation "org.openjfx:javafx-controls:17.0.6"
+        
         // Spring Boot and Web
         implementation 'org.springframework.boot:spring-boot-starter-web'
         
