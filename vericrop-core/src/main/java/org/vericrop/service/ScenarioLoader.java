@@ -21,6 +21,10 @@ public class ScenarioLoader {
     private static final Logger logger = LoggerFactory.getLogger(ScenarioLoader.class);
     private static final ObjectMapper objectMapper = new ObjectMapper();
     
+    // Temperature mapping thresholds for scenario inference
+    private static final double HOT_TRANSPORT_THRESHOLD = 7.0; // °C
+    private static final double COLD_STORAGE_THRESHOLD = 0.0; // °C
+    
     private final Map<String, ScenarioDefinition> loadedScenarios;
     
     /**
@@ -131,10 +135,10 @@ public class ScenarioLoader {
             double avgTemp = (def.getTarget().getMin() + def.getTarget().getMax()) / 2.0;
             
             // Map temperature ranges to scenarios
-            if (avgTemp < 0) {
+            if (avgTemp < COLD_STORAGE_THRESHOLD) {
                 logger.debug("Mapping scenario {} to COLD_STORAGE (avg temp: {})", scenarioId, avgTemp);
                 return Scenario.COLD_STORAGE;
-            } else if (avgTemp > 7) {
+            } else if (avgTemp > HOT_TRANSPORT_THRESHOLD) {
                 logger.debug("Mapping scenario {} to HOT_TRANSPORT (avg temp: {})", scenarioId, avgTemp);
                 return Scenario.HOT_TRANSPORT;
             }

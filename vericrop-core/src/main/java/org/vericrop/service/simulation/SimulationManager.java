@@ -21,6 +21,13 @@ public class SimulationManager {
     private static final Logger logger = LoggerFactory.getLogger(SimulationManager.class);
     private static volatile SimulationManager instance;
     
+    // Compliance monitoring constants
+    private static final double VIOLATION_RATE_THRESHOLD = 10.0; // Percent
+    private static final double CRITICAL_VIOLATION_RATE_THRESHOLD = 30.0; // Percent
+    private static final double TEMPERATURE_MAX_THRESHOLD = 8.0; // °C
+    private static final int COMPLIANCE_INITIAL_DELAY_SECONDS = 10;
+    private static final int COMPLIANCE_CHECK_INTERVAL_SECONDS = 15;
+    
     private final DeliverySimulator deliverySimulator;
     private final MapService mapService;
     private final TemperatureService temperatureService;
@@ -68,7 +75,8 @@ public class SimulationManager {
         this.listeners = new CopyOnWriteArrayList<>();
         this.currentSimulation = new AtomicReference<>();
         this.running = new AtomicBoolean(false);
-        this.complianceCheckExecutor = Executors.newScheduledThreadPool(1);
+        this.complianceCheckExecutor = Executors.newScheduledThreadPool(1, 
+            r -> new Thread(r, "SimulationManager-ComplianceCheck"));
         logger.info("SimulationManager initialized with integrated services");
     }
     
@@ -277,7 +285,7 @@ public class SimulationManager {
                         double violationRate = (double) monitoring.getViolationCount() / 
                                               monitoring.getReadingCount() * 100.0;
                         
-                        if (violationRate > 10.0) { // More than 10% violations
+                        if (violationRate > VIOLATION_RATE_THRESHOLD) {
                             String message = String.format(
                                 "Temperature compliance violation: %.1f%% of readings out of range " +
                                 "(min: %.1f°C, max: %.1f°C, avg: %.1f°C)",
@@ -285,7 +293,7 @@ public class SimulationManager {
                                 monitoring.getMaxTemp(), monitoring.getAvgTemp()
                             );
                             
-                            Alert.Severity severity = violationRate > 30.0 ? 
+                            Alert.Severity severity = violationRate > CRITICAL_VIOLATION_RATE_THRESHOLD ? 
                                 Alert.Severity.CRITICAL : Alert.Severity.HIGH;
                             
                             Alert alert = new Alert(
@@ -295,7 +303,7 @@ public class SimulationManager {
                                 severity,
                                 message,
                                 monitoring.getAvgTemp(),
-                                8.0, // Threshold
+                                TEMPERATURE_MAX_THRESHOLD,
                                 System.currentTimeMillis(),
                                 "Compliance Monitor"
                             );
@@ -315,7 +323,7 @@ public class SimulationManager {
             } catch (Exception e) {
                 logger.error("Error in compliance checking for batch: {}", batchId, e);
             }
-        }, 10, 15, TimeUnit.SECONDS); // Check every 15 seconds after initial 10s delay
+        }, COMPLIANCE_INITIAL_DELAY_SECONDS, COMPLIANCE_CHECK_INTERVAL_SECONDS, TimeUnit.SECONDS);
         
         logger.info("Started compliance checking for batch: {}", batchId);
     }

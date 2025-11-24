@@ -21,6 +21,9 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 public class SimulationIntegrationTest {
     
+    // Test constants
+    private static final double HOT_TRANSPORT_MIN_TEMP = 8.0; // °C
+    
     private MessageService messageService;
     private AlertService alertService;
     private DeliverySimulator deliverySimulator;
@@ -185,7 +188,8 @@ public class SimulationIntegrationTest {
         
         // HOT_TRANSPORT should have higher average temperature than normal (5°C)
         // With +8°C drift, expect average around 13°C
-        assertTrue(avgTemp > 8.0, "HOT_TRANSPORT scenario should produce higher temperatures");
+        assertTrue(avgTemp > HOT_TRANSPORT_MIN_TEMP, 
+                  "HOT_TRANSPORT scenario should produce higher temperatures");
     }
     
     @Test
