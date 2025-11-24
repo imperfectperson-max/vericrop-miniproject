@@ -6,6 +6,8 @@ import javafx.scene.chart.LineChart;
 import javafx.scene.chart.XYChart;
 import javafx.scene.control.*;
 import javafx.scene.layout.Pane;
+import javafx.scene.layout.VBox;
+import javafx.scene.layout.HBox;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.scene.shape.Circle;
@@ -25,6 +27,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ConcurrentHashMap;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 
@@ -38,6 +41,7 @@ public class LogisticsController implements SimulationListener {
     @FXML private TextArea reportArea;
     @FXML private LineChart<String, Number> temperatureChart;
     @FXML private Pane mapContainer;
+    @FXML private VBox timelineContainer;
 
     // Navigation buttons
     @FXML private Button backToProducerButton;
@@ -61,6 +65,24 @@ public class LogisticsController implements SimulationListener {
     
     // Track temperature chart series by batch ID
     private Map<String, XYChart.Series<String, Number>> temperatureSeriesMap = new HashMap<>();
+    
+    // Track latest environmental data by batch ID for shipments table
+    private Map<String, ShipmentEnvironmentalData> environmentalDataMap = new ConcurrentHashMap<>();
+    
+    /**
+     * Helper class to track environmental data for a shipment
+     */
+    private static class ShipmentEnvironmentalData {
+        double temperature = 4.0; // Default cold-chain temp
+        double humidity = 65.0; // Default humidity
+        
+        ShipmentEnvironmentalData() {}
+        
+        ShipmentEnvironmentalData(double temp, double humidity) {
+            this.temperature = temp;
+            this.humidity = humidity;
+        }
+    }
 
     // Map visualization constants
     private static final double MAP_WIDTH = 350;
@@ -194,8 +216,17 @@ public class LogisticsController implements SimulationListener {
     private void handleTemperatureComplianceEvent(TemperatureComplianceEvent event) {
         Platform.runLater(() -> {
             try {
+                // Update environmental data tracking
+                ShipmentEnvironmentalData envData = environmentalDataMap.computeIfAbsent(
+                    event.getBatchId(), k -> new ShipmentEnvironmentalData());
+                envData.temperature = event.getTemperature();
+                // Note: humidity is not in temperature event, would need separate event type or combined event
+                
                 // Add data point to temperature chart
                 addTemperatureDataPoint(event);
+                
+                // Update shipments table with new temperature (if row exists)
+                updateShipmentEnvironmentalData(event.getBatchId());
                 
                 // Add alert if not compliant
                 if (!event.isCompliant()) {
@@ -210,6 +241,49 @@ public class LogisticsController implements SimulationListener {
                 System.err.println("Error handling temperature compliance event: " + e.getMessage());
             }
         });
+    }
+    
+    /**
+     * Update shipment environmental data in the table (temperature/humidity).
+     * Finds existing shipment row and updates it with latest environmental data.
+     */
+    private void updateShipmentEnvironmentalData(String batchId) {
+        if (shipmentsTable == null) return;
+        
+        try {
+            ShipmentEnvironmentalData envData = environmentalDataMap.get(batchId);
+            if (envData == null) return;
+            
+            // Find and update existing shipment
+            Shipment existingShipment = null;
+            for (Shipment shipment : shipments) {
+                if (shipment.getBatchId().equals(batchId)) {
+                    existingShipment = shipment;
+                    break;
+                }
+            }
+            
+            if (existingShipment != null) {
+                // Remove old shipment
+                shipments.remove(existingShipment);
+                
+                // Create updated shipment with new environmental data
+                Shipment updatedShipment = new Shipment(
+                    existingShipment.getBatchId(),
+                    existingShipment.getStatus(),
+                    existingShipment.getLocation(),
+                    envData.temperature,
+                    envData.humidity,
+                    existingShipment.getEta(),
+                    existingShipment.getVehicle()
+                );
+                
+                // Add updated shipment
+                shipments.add(updatedShipment);
+            }
+        } catch (Exception e) {
+            System.err.println("Error updating shipment environmental data: " + e.getMessage());
+        }
     }
     
     /**
@@ -899,6 +973,88 @@ public class LogisticsController implements SimulationListener {
     }
     
     /**
+     * Update timeline based on current simulation progress.
+     * Shows visual state progression: Created → In Transit → At Warehouse → Delivered
+     */
+    private void updateTimeline(String batchId, double progress, String status) {
+        if (timelineContainer == null) return;
+        
+        Platform.runLater(() -> {
+            try {
+                // Clear existing timeline
+                timelineContainer.getChildren().clear();
+                
+                // Determine which states are completed based on progress
+                boolean createdComplete = true;
+                boolean inTransitComplete = progress >= 10;
+                boolean approachingComplete = progress >= 70;
+                boolean deliveredComplete = progress >= 100;
+                
+                // Add "Created" state
+                addTimelineItem("Created", 
+                    "Batch " + batchId + " created at origin",
+                    createdComplete);
+                
+                // Add "In Transit" state
+                addTimelineItem("In Transit", 
+                    String.format("Delivery progress: %.0f%%", progress),
+                    inTransitComplete);
+                
+                // Add "Approaching Warehouse" state
+                addTimelineItem("Approaching", 
+                    progress >= 70 ? "Nearing destination" : "Not yet approaching",
+                    approachingComplete);
+                
+                // Add "At Warehouse / Delivered" state
+                addTimelineItem("Delivered", 
+                    deliveredComplete ? "Delivery complete" : "ETA: " + calculateETA(progress),
+                    deliveredComplete);
+                
+            } catch (Exception e) {
+                System.err.println("Error updating timeline: " + e.getMessage());
+            }
+        });
+    }
+    
+    /**
+     * Add a timeline item to the timeline container.
+     */
+    private void addTimelineItem(String title, String description, boolean completed) {
+        HBox timelineItem = new HBox(10);
+        timelineItem.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        timelineItem.getStyleClass().add("timeline-item");
+        
+        // Bullet point (filled if completed, empty if not)
+        Label bullet = new Label(completed ? "●" : "○");
+        bullet.setStyle(completed ? 
+            "-fx-text-fill: #10b981; -fx-font-weight: bold;" : 
+            "-fx-text-fill: #64748b;");
+        
+        // Title and description
+        VBox textBox = new VBox();
+        Label titleLabel = new Label(title);
+        titleLabel.setStyle(completed ? 
+            "-fx-font-weight: bold;" : 
+            "-fx-text-fill: #64748b;");
+        Label descLabel = new Label(description);
+        descLabel.setStyle(completed ? "" : "-fx-text-fill: #64748b;");
+        
+        textBox.getChildren().addAll(titleLabel, descLabel);
+        timelineItem.getChildren().addAll(bullet, textBox);
+        timelineContainer.getChildren().add(timelineItem);
+    }
+    
+    /**
+     * Calculate ETA string based on progress.
+     */
+    private String calculateETA(double progress) {
+        if (progress >= 100) return "ARRIVED";
+        double remaining = 1.0 - (progress / 100.0);
+        int etaMinutes = (int) (remaining * 120); // Assuming 2 hour total trip
+        return etaMinutes + " min";
+    }
+    
+    /**
      * Initialize temperature chart series for this batch.
      */
     private void initializeTemperatureChartSeries(String batchId) {
@@ -933,6 +1089,13 @@ public class LogisticsController implements SimulationListener {
             
             // Update shipments table if it exists
             updateShipmentsTableRow(batchId, progress, currentLocation);
+            
+            // Update timeline to show current state
+            String status = progress < 30 ? "In Transit - Departing" : 
+                           progress < 70 ? "In Transit - En Route" :
+                           progress < 90 ? "In Transit - Approaching" : 
+                           progress >= 100 ? "Delivered" : "At Warehouse";
+            updateTimeline(batchId, progress, status);
             
             System.out.println("LogisticsController: Progress update - " + batchId + " at " + progress + "% - " + currentLocation);
         });
@@ -1014,16 +1177,20 @@ public class LogisticsController implements SimulationListener {
                 shipments.remove(existingShipment);
             }
             
+            // Get latest environmental data for this batch
+            ShipmentEnvironmentalData envData = environmentalDataMap.computeIfAbsent(
+                batchId, k -> new ShipmentEnvironmentalData());
+            
             // Create updated shipment (or new if not found)
             if (progress < 100) {
                 Shipment updatedShipment = new Shipment(
                     batchId,
                     status,
                     currentLocation != null ? currentLocation : "Unknown",
-                    existingShipment != null ? existingShipment.getTemperature() : 0.0,
-                    existingShipment != null ? existingShipment.getHumidity() : 0.0,
+                    envData.temperature,
+                    envData.humidity,
                     String.format("%.0f%% Complete", progress),
-                    existingShipment != null ? existingShipment.getVehicle() : "TRUCK-" + batchId.hashCode() % 1000
+                    existingShipment != null ? existingShipment.getVehicle() : "TRUCK-" + Math.abs(batchId.hashCode() % 1000)
                 );
                 shipments.add(updatedShipment);
             }
