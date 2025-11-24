@@ -15,6 +15,11 @@ import java.net.URL;
 /**
  * Main JavaFX Application entry point for VeriCrop GUI.
  * Initializes ApplicationContext and manages screen navigation.
+ * 
+ * Full-screen mode is set in both start() and switchToScreen() to ensure
+ * consistent full-screen UX across all screens - setFullScreen(true) must be
+ * called after showing the stage, and screen switches create new scenes that
+ * may reset the window state.
  */
 public class MainApp extends Application {
     private static final Logger logger = LoggerFactory.getLogger(MainApp.class);
@@ -51,6 +56,14 @@ public class MainApp extends Application {
             
             // Configure window to be maximized (full screen) on startup
             primaryStage.setMaximized(true);
+            
+            // Enable full-screen mode and clear default exit hint overlay
+            try {
+                primaryStage.setFullScreenExitHint("");
+                primaryStage.setFullScreen(true);
+            } catch (Exception e) {
+                logger.warn("Could not enable full-screen mode on startup: {}", e.getMessage());
+            }
             
             // Add shutdown hook
             primaryStage.setOnCloseRequest(event -> {
@@ -129,10 +142,17 @@ public class MainApp extends Application {
             primaryStage.setMinWidth(1200);
             primaryStage.setMinHeight(800);
             
-            // Set window to full screen on PC
+            // Set window to maximized (fallback for environments without full-screen support)
             primaryStage.setMaximized(true);
             
             primaryStage.show();
+            
+            // Enable full-screen mode after showing the stage
+            try {
+                primaryStage.setFullScreen(true);
+            } catch (Exception e) {
+                logger.warn("Could not enable full-screen mode when switching screens: {}", e.getMessage());
+            }
 
         } catch (Exception e) {
             System.err.println("Error switching to screen " + fxmlFile + ": " + e.getMessage());
