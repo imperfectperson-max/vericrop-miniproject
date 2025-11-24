@@ -114,4 +114,61 @@ class LogisticsServiceTest {
         // After shutdown, simulation should not be active
         assertFalse(service.isSimulationActive(batchId));
     }
+    
+    @Test
+    void testStartMapAndCompliance() {
+        String batchId = "TEST_BATCH_MAP_COMPLIANCE";
+        Duration duration = Duration.ofSeconds(10);
+        
+        // Create a mock TemperatureComplianceService
+        TemperatureComplianceService tempService = new TemperatureComplianceService();
+        
+        try {
+            // Start map and compliance simulations together
+            assertDoesNotThrow(() -> {
+                service.startMapAndCompliance(batchId, duration, tempService, "example-01");
+            });
+            
+            // Verify map simulation is active
+            assertTrue(service.isSimulationActive(batchId), 
+                "Map simulation should be active after starting");
+            
+            // Verify temperature compliance simulation is active
+            assertTrue(tempService.isSimulationActive(batchId),
+                "Temperature compliance simulation should be active after starting");
+            
+            // Wait a moment for simulations to start
+            try {
+                Thread.sleep(2000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            
+            // Stop simulations
+            service.stopSimulation(batchId);
+            tempService.stopSimulation(batchId);
+            
+        } finally {
+            // Clean up
+            tempService.shutdown();
+        }
+    }
+    
+    @Test
+    void testStartMapAndComplianceWithNullTempService() {
+        String batchId = "TEST_BATCH_NO_TEMP";
+        Duration duration = Duration.ofSeconds(10);
+        
+        // Start with null temperature service - should still start map simulation
+        assertDoesNotThrow(() -> {
+            service.startMapAndCompliance(batchId, duration, null, "example-01");
+        });
+        
+        // Verify map simulation is active
+        assertTrue(service.isSimulationActive(batchId), 
+            "Map simulation should be active even with null temperature service");
+        
+        // Stop simulation
+        service.stopSimulation(batchId);
+    }
 }

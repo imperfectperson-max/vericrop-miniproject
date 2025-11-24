@@ -1159,18 +1159,11 @@ public class ProducerController implements SimulationListener {
                     SimulationManager manager = MainApp.getInstance().getApplicationContext().getSimulationManager();
                     manager.startSimulation(finalBatchId, farmerId, origin, destination, 20, 50.0, 10000);
 
-                    // Start map simulation in LogisticsService
+                    // Start map simulation and temperature compliance together via LogisticsService
                     if (logisticsService != null) {
-                        logisticsService.startMapSimulation(finalBatchId, simulationDuration);
-                        System.out.println("🗺️ Map simulation started for batch: " + finalBatchId);
-                    }
-                    
-                    // Start temperature compliance simulation (use scenario-01 as default)
-                    if (temperatureComplianceService != null) {
-                        temperatureComplianceService.startComplianceSimulation(
-                            finalBatchId, "example-01", simulationDuration
+                        logisticsService.startMapAndCompliance(
+                            finalBatchId, simulationDuration, temperatureComplianceService, "example-01"
                         );
-                        System.out.println("🌡️ Temperature compliance simulation started for batch: " + finalBatchId);
                     }
 
                     // Notify logistics controller about the new simulation
