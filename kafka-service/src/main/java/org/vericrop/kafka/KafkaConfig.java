@@ -17,6 +17,11 @@ public class KafkaConfig {
     public static final String TOPIC_BLOCKCHAIN_EVENTS = "blockchain-events";
     public static final String TOPIC_ENVIRONMENTAL_DATA = "environmental-data";
     public static final String TOPIC_CONSUMER_VERIFICATIONS = "consumer-verifications";
+    
+    // Extended simulation topics
+    public static final String TOPIC_BATCH_UPDATES = "batch-updates";
+    public static final String TOPIC_TEMPERATURE_COMPLIANCE = "temperature-compliance";
+    public static final String TOPIC_MAP_SIMULATION = "map-simulation";
 
     public static Properties getProducerProperties() {
         Properties props = new Properties();
