@@ -1,0 +1,10 @@
+{
+  "id": "scenario-02",
+  "description": "Strict cold-chain: target 1-4 C, no spikes",
+  "target": {
+    "min": 1.0,
+    "max": 4.0
+  },
+  "duration_minutes": 45,
+  "spikes": []
+}

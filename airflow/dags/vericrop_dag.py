@@ -17,6 +17,14 @@ logger = logging.getLogger(__name__)
 KAFKA_BOOTSTRAP_SERVERS = os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'localhost:9092')
 VERICROP_API_URL = os.getenv('VERICROP_API_URL', 'http://localhost:8080')
 
+# New endpoints for extended delivery simulation flow:
+# - GET /analytics/recent-batches - Get recent batch information with compliance status
+# - POST /analytics/recent-batches - Update recent batches cache (internal use)
+# - PUT /analytics/batches/{batchId}/compliance - Update compliance status for a batch
+# - GET /consumer/batches/{batchId}/compliance - Get temperature compliance status
+# - POST /consumer/batches/{batchId}/compliance - Update compliance status (internal use)
+# New Kafka topics: batch-updates, temperature-compliance, map-simulation
+
 default_args = {
     'owner': 'vericrop',
     'depends_on_past': False,

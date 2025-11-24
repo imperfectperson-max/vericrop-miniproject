@@ -38,6 +38,11 @@ import org.vericrop.kafka.events.QualityAlertEvent;
 import org.vericrop.gui.util.BlockchainInitializer;
 import org.vericrop.service.simulation.SimulationListener;
 import org.vericrop.service.simulation.SimulationManager;
+import org.vericrop.gui.services.TemperatureComplianceService;
+import org.vericrop.gui.services.LogisticsService;
+import org.vericrop.kafka.producers.BatchUpdateEventProducer;
+import org.vericrop.dto.BatchUpdateEvent;
+import java.time.Duration;
 
 public class ProducerController implements SimulationListener {
     private static final int SHIPMENT_UPDATE_INTERVAL_MS = 2000;
@@ -56,6 +61,11 @@ public class ProducerController implements SimulationListener {
     private LogisticsEventProducer logisticsProducer;
     private BlockchainEventProducer blockchainProducer;
     private QualityAlertProducer qualityAlertProducer;
+    private BatchUpdateEventProducer batchUpdateProducer;
+    
+    // Extended simulation services
+    private TemperatureComplianceService temperatureComplianceService;
+    private LogisticsService logisticsService;
 
     @FXML private ImageView imageView;
     @FXML private Label qualityLabel;
@@ -253,9 +263,14 @@ public class ProducerController implements SimulationListener {
             this.logisticsProducer = new LogisticsEventProducer();
             this.blockchainProducer = new BlockchainEventProducer();
             this.qualityAlertProducer = new QualityAlertProducer();
+            this.batchUpdateProducer = new BatchUpdateEventProducer();
 
             this.kafkaServiceManager = new KafkaServiceManager();
             kafkaServiceManager.startAllConsumers();
+            
+            // Initialize extended simulation services
+            this.temperatureComplianceService = new TemperatureComplianceService();
+            this.logisticsService = new LogisticsService();
 
             System.out.println("✅ Kafka services initialized successfully");
 
@@ -1119,9 +1134,41 @@ public class ProducerController implements SimulationListener {
                     42.3736, -71.1097, "Metro Fresh Warehouse"
             );
 
-            // Use SimulationManager to start simulation
+            // Extended simulation flow:
+            // 1. Increase simulation duration (from 10 to 20 waypoints for longer simulation)
+            // 2. Start map simulation
+            // 3. Start temperature compliance simulation
+            // 4. Publish batch lifecycle events
+            
+            Duration simulationDuration = Duration.ofMinutes(30); // Extended duration
+            
+            // Publish batch lifecycle event: DISPATCHED
+            if (batchUpdateProducer != null) {
+                BatchUpdateEvent dispatchEvent = new BatchUpdateEvent(
+                    selectedBatchId, "DISPATCHED", "Farm Location", null, 
+                    "Batch dispatched for delivery simulation"
+                );
+                batchUpdateProducer.sendBatchUpdateEvent(dispatchEvent);
+                System.out.println("📦 Published DISPATCHED event for batch: " + selectedBatchId);
+            }
+
+            // Use SimulationManager to start simulation with longer duration (20 waypoints instead of 10)
             SimulationManager manager = MainApp.getInstance().getApplicationContext().getSimulationManager();
-            manager.startSimulation(selectedBatchId, farmerId, origin, destination, 10, 50.0, 10000);
+            manager.startSimulation(selectedBatchId, farmerId, origin, destination, 20, 50.0, 10000);
+
+            // Start map simulation in LogisticsService
+            if (logisticsService != null) {
+                logisticsService.startMapSimulation(selectedBatchId, simulationDuration);
+                System.out.println("🗺️ Map simulation started for batch: " + selectedBatchId);
+            }
+            
+            // Start temperature compliance simulation (use scenario-01 as default)
+            if (temperatureComplianceService != null) {
+                temperatureComplianceService.startComplianceSimulation(
+                    selectedBatchId, "example-01", simulationDuration
+                );
+                System.out.println("🌡️ Temperature compliance simulation started for batch: " + selectedBatchId);
+            }
 
             // Notify logistics controller about the new simulation
             notifyLogisticsAboutSimulation(selectedBatchId);
@@ -1130,10 +1177,11 @@ public class ProducerController implements SimulationListener {
             // Create alert
             var alertService = MainApp.getInstance().getApplicationContext().getAlertService();
             alertService.info("Simulation Started",
-                    "Delivery simulation for " + selectedBatchId + " is now running",
+                    "Extended delivery simulation for " + selectedBatchId + " is now running with " +
+                    "map tracking and temperature compliance monitoring",
                     "simulator");
 
-            System.out.println("✅ Simulation started for: " + selectedBatchId);
+            System.out.println("✅ Extended simulation started for: " + selectedBatchId);
 
         } catch (Exception e) {
             Platform.runLater(() -> {
@@ -1343,6 +1391,24 @@ public class ProducerController implements SimulationListener {
 
             String stoppingBatchId = manager.getSimulationId();
             manager.stopSimulation();
+            
+            // Stop extended simulations
+            if (temperatureComplianceService != null) {
+                temperatureComplianceService.stopSimulation(stoppingBatchId);
+            }
+            if (logisticsService != null) {
+                logisticsService.stopSimulation(stoppingBatchId);
+            }
+            
+            // Publish batch lifecycle event: DELIVERED (or stopped)
+            if (batchUpdateProducer != null) {
+                BatchUpdateEvent deliveredEvent = new BatchUpdateEvent(
+                    stoppingBatchId, "DELIVERED", "Warehouse", null, 
+                    "Batch simulation stopped"
+                );
+                batchUpdateProducer.sendBatchUpdateEvent(deliveredEvent);
+                System.out.println("📦 Published DELIVERED event for batch: " + stoppingBatchId);
+            }
 
             // Create alert
             var alertService = MainApp.getInstance().getApplicationContext().getAlertService();
@@ -1867,6 +1933,16 @@ public class ProducerController implements SimulationListener {
         }
         if (qualityAlertProducer != null) {
             qualityAlertProducer.close();
+        }
+        if (batchUpdateProducer != null) {
+            batchUpdateProducer.close();
+        }
+        // Shutdown extended simulation services
+        if (temperatureComplianceService != null) {
+            temperatureComplianceService.shutdown();
+        }
+        if (logisticsService != null) {
+            logisticsService.shutdown();
         }
         System.out.println("🔴 All services cleaned up");
     }
