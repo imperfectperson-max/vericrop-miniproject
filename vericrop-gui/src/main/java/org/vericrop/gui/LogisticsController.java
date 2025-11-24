@@ -651,16 +651,175 @@ public class LogisticsController implements SimulationListener {
     public void onSimulationStarted(String batchId, String farmerId) {
         Platform.runLater(() -> {
             alerts.add(0, "🚚 Delivery simulation started for: " + batchId);
+            
+            // Initialize map marker at origin
+            initializeMapMarker(batchId);
+            
+            // Initialize temperature chart series
+            initializeTemperatureChartSeries(batchId);
+            
             System.out.println("LogisticsController: Simulation started - " + batchId);
         });
+    }
+    
+    /**
+     * Initialize map marker at the origin point.
+     */
+    private void initializeMapMarker(String batchId) {
+        if (mapContainer == null) return;
+        
+        try {
+            // Remove any existing marker for this batch
+            MapVisualization existing = activeShipments.get(batchId);
+            if (existing != null) {
+                mapContainer.getChildren().removeAll(existing.shipmentCircle, existing.shipmentLabel);
+            }
+            
+            // Create new marker at origin
+            MapVisualization visualization = new MapVisualization();
+            visualization.shipmentCircle = new Circle(ORIGIN_X, ORIGIN_Y, 6, Color.ORANGE);
+            visualization.shipmentCircle.setUserData("shipment");
+            
+            String displayId = batchId.length() > 8 ? batchId.substring(0, 8) : batchId;
+            visualization.shipmentLabel = new Text(ORIGIN_X - 15, ORIGIN_Y - 15, "🚚 " + displayId);
+            visualization.shipmentLabel.setUserData("shipment");
+            visualization.shipmentLabel.setFill(Color.DARKBLUE);
+            
+            mapContainer.getChildren().addAll(visualization.shipmentCircle, visualization.shipmentLabel);
+            activeShipments.put(batchId, visualization);
+            
+            System.out.println("Initialized map marker at origin for: " + batchId);
+        } catch (Exception e) {
+            System.err.println("Error initializing map marker: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Initialize temperature chart series for this batch.
+     */
+    private void initializeTemperatureChartSeries(String batchId) {
+        if (temperatureChart == null) return;
+        
+        try {
+            // Create new series for this batch
+            XYChart.Series<String, Number> series = new XYChart.Series<>();
+            series.setName(batchId);
+            
+            // Add to chart
+            temperatureChart.getData().add(series);
+            
+            System.out.println("Initialized temperature chart series for: " + batchId);
+        } catch (Exception e) {
+            System.err.println("Error initializing temperature chart: " + e.getMessage());
+        }
     }
     
     @Override
     public void onProgressUpdate(String batchId, double progress, String currentLocation) {
         Platform.runLater(() -> {
-            // Update could be shown in the map or alerts list
-            System.out.println("LogisticsController: Progress update - " + batchId + " at " + progress + "%");
+            // Update map marker position with smooth animation
+            updateMapMarkerPosition(batchId, progress, currentLocation);
+            
+            // Update shipments table if it exists
+            updateShipmentsTableRow(batchId, progress, currentLocation);
+            
+            System.out.println("LogisticsController: Progress update - " + batchId + " at " + progress + "% - " + currentLocation);
         });
+    }
+    
+    /**
+     * Update map marker position with smooth animation based on progress.
+     * Animates marker from previous position to new position.
+     */
+    private void updateMapMarkerPosition(String batchId, double progress, String currentLocation) {
+        if (mapContainer == null) return;
+        
+        try {
+            // Calculate new position based on progress (linear interpolation along route)
+            double progressFraction = progress / 100.0;
+            double newX = ORIGIN_X + (DESTINATION_X - ORIGIN_X) * progressFraction;
+            double newY = ORIGIN_Y; // Simple horizontal route for now
+            
+            MapVisualization visualization = activeShipments.get(batchId);
+            if (visualization == null) {
+                // Create new visualization
+                visualization = new MapVisualization();
+                visualization.shipmentCircle = new Circle(newX, newY, 6, Color.ORANGE);
+                visualization.shipmentCircle.setUserData("shipment");
+                
+                String displayId = batchId.length() > 8 ? batchId.substring(0, 8) : batchId;
+                visualization.shipmentLabel = new Text(newX - 15, newY - 15, "🚚 " + displayId);
+                visualization.shipmentLabel.setUserData("shipment");
+                visualization.shipmentLabel.setFill(Color.DARKBLUE);
+                
+                mapContainer.getChildren().addAll(visualization.shipmentCircle, visualization.shipmentLabel);
+                activeShipments.put(batchId, visualization);
+                
+                System.out.println("Created new map marker for: " + batchId + " at " + progress + "%");
+            } else {
+                // Animate existing visualization to new position
+                // Use simple position updates for smooth movement
+                visualization.shipmentCircle.setCenterX(newX);
+                visualization.shipmentCircle.setCenterY(newY);
+                visualization.shipmentLabel.setX(newX - 15);
+                visualization.shipmentLabel.setY(newY - 15);
+                
+                // Update label text with current location if available
+                if (currentLocation != null && !currentLocation.isEmpty()) {
+                    String displayId = batchId.length() > 8 ? batchId.substring(0, 8) : batchId;
+                    visualization.shipmentLabel.setText("🚚 " + displayId);
+                }
+            }
+            
+        } catch (Exception e) {
+            System.err.println("Error updating map marker: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Update shipments table row for a specific batch.
+     * Since Shipment is immutable, we remove and re-add to update.
+     */
+    private void updateShipmentsTableRow(String batchId, double progress, String currentLocation) {
+        if (shipmentsTable == null) return;
+        
+        try {
+            // Determine status based on progress
+            String status = progress < 30 ? "In Transit - Departing" : 
+                           progress < 70 ? "In Transit - En Route" :
+                           progress < 90 ? "In Transit - Approaching" : 
+                           progress >= 100 ? "Delivered" : "At Warehouse";
+            
+            // Find and remove existing shipment
+            Shipment existingShipment = null;
+            for (Shipment shipment : shipments) {
+                if (shipment.getBatchId().equals(batchId)) {
+                    existingShipment = shipment;
+                    break;
+                }
+            }
+            
+            if (existingShipment != null) {
+                shipments.remove(existingShipment);
+            }
+            
+            // Create updated shipment (or new if not found)
+            if (progress < 100) {
+                Shipment updatedShipment = new Shipment(
+                    batchId,
+                    status,
+                    currentLocation != null ? currentLocation : "Unknown",
+                    existingShipment != null ? existingShipment.getTemperature() : 0.0,
+                    existingShipment != null ? existingShipment.getHumidity() : 0.0,
+                    String.format("%.0f%% Complete", progress),
+                    existingShipment != null ? existingShipment.getVehicle() : "TRUCK-" + batchId.hashCode() % 1000
+                );
+                shipments.add(updatedShipment);
+            }
+            
+        } catch (Exception e) {
+            System.err.println("Error updating shipments table: " + e.getMessage());
+        }
     }
     
     @Override
@@ -670,8 +829,45 @@ public class LogisticsController implements SimulationListener {
                 "✅ Delivery completed for: " + batchId : 
                 "⏹ Delivery simulation stopped for: " + batchId;
             alerts.add(0, message);
+            
+            // Clean up map marker after a delay if completed
+            if (completed) {
+                // Move marker to destination
+                updateMapMarkerPosition(batchId, 100.0, "Delivered");
+                
+                // Schedule cleanup using syncExecutor instead of creating new thread
+                if (syncExecutor != null && !syncExecutor.isShutdown()) {
+                    syncExecutor.schedule(() -> {
+                        Platform.runLater(() -> cleanupMapMarker(batchId));
+                    }, 5, TimeUnit.SECONDS);
+                } else {
+                    // Fallback: clean up immediately if executor not available
+                    cleanupMapMarker(batchId);
+                }
+            } else {
+                // Remove marker immediately if stopped manually
+                cleanupMapMarker(batchId);
+            }
+            
             System.out.println("LogisticsController: " + message);
         });
+    }
+    
+    /**
+     * Clean up map marker and remove from active shipments.
+     */
+    private void cleanupMapMarker(String batchId) {
+        if (mapContainer == null) return;
+        
+        try {
+            MapVisualization visualization = activeShipments.remove(batchId);
+            if (visualization != null) {
+                mapContainer.getChildren().removeAll(visualization.shipmentCircle, visualization.shipmentLabel);
+                System.out.println("Cleaned up map marker for: " + batchId);
+            }
+        } catch (Exception e) {
+            System.err.println("Error cleaning up map marker: " + e.getMessage());
+        }
     }
     
     @Override

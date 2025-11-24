@@ -2,6 +2,7 @@ package org.vericrop.service.simulation;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.vericrop.dto.SimulationEvent;
 import org.vericrop.service.*;
 import org.vericrop.service.models.Alert;
 import org.vericrop.service.models.GeoCoordinate;
@@ -37,6 +38,7 @@ public class SimulationManager {
     private final AlertService alertService;
     private final MapSimulator mapSimulator;
     private final ScenarioManager scenarioManager;
+    private final SimulationService simulationService;
     private final List<SimulationListener> listeners;
     private final AtomicReference<SimulationState> currentSimulation;
     private final AtomicBoolean running;
@@ -49,15 +51,28 @@ public class SimulationManager {
         final String batchId;
         final String farmerId;
         final long startTime;
+        final List<RouteWaypoint> route;
         double progress;
         String currentLocation;
+        double currentLatitude;
+        double currentLongitude;
+        double currentTemperature;
+        double currentHumidity;
         
-        SimulationState(String batchId, String farmerId) {
+        SimulationState(String batchId, String farmerId, List<RouteWaypoint> route) {
             this.batchId = batchId;
             this.farmerId = farmerId;
             this.startTime = System.currentTimeMillis();
+            this.route = route;
             this.progress = 0.0;
             this.currentLocation = "Starting...";
+            if (route != null && !route.isEmpty()) {
+                RouteWaypoint first = route.get(0);
+                this.currentLatitude = first.getLocation().getLatitude();
+                this.currentLongitude = first.getLocation().getLongitude();
+                this.currentTemperature = first.getTemperature();
+                this.currentHumidity = first.getHumidity();
+            }
         }
     }
     
@@ -88,6 +103,9 @@ public class SimulationManager {
         this.alertService = alertService != null ? alertService : new AlertService();
         this.mapSimulator = mapSimulator != null ? mapSimulator : new MapSimulator();
         this.scenarioManager = scenarioManager != null ? scenarioManager : new ScenarioManager();
+        // Initialize SimulationService with 1000ms default interval
+        this.simulationService = new SimulationService(deliverySimulator, this.mapService, 
+                                                       this.temperatureService, 1000L);
         this.listeners = new CopyOnWriteArrayList<>();
         this.currentSimulation = new AtomicReference<>();
         this.running = new AtomicBoolean(false);
@@ -281,13 +299,20 @@ public class SimulationManager {
             mapSimulator.initializeForScenario(effectiveScenario, batchId, route.size());
             
             // Step 6: Update state
-            SimulationState state = new SimulationState(batchId, farmerId);
+            SimulationState state = new SimulationState(batchId, farmerId, route);
             currentSimulation.set(state);
             running.set(true);
             
             // Step 7: Start temperature compliance checking
             logger.info("Step 7: Starting temperature compliance monitoring...");
             startComplianceChecking(batchId);
+            
+            // Step 8: Start SimulationService with detailed event emission
+            logger.info("Step 8: Starting realtime event emission...");
+            simulationService.startSimulation(batchId, farmerId, route, event -> {
+                // Handle SimulationEvent and notify listeners
+                handleSimulationEvent(event);
+            }, updateIntervalMs);
             
             // Notify listeners
             notifyStarted(batchId, farmerId);
@@ -380,12 +405,16 @@ public class SimulationManager {
         }
         
         try {
+            String stoppedBatchId = state.batchId;
+            
             // Stop simulation in DeliverySimulator
-            deliverySimulator.stopSimulation(state.batchId);
+            deliverySimulator.stopSimulation(stoppedBatchId);
+            
+            // Stop simulation in SimulationService
+            simulationService.stopSimulation(stoppedBatchId);
             
             // Update state
             running.set(false);
-            String stoppedBatchId = state.batchId;
             currentSimulation.set(null);
             
             // Notify listeners
@@ -510,6 +539,34 @@ public class SimulationManager {
     }
     
     /**
+     * Handle SimulationEvent from SimulationService and update state/notify listeners.
+     * This provides detailed GPS and temperature updates to all listeners.
+     */
+    private void handleSimulationEvent(SimulationEvent event) {
+        SimulationState state = currentSimulation.get();
+        if (state == null || !state.batchId.equals(event.getBatchId())) {
+            return;
+        }
+        
+        // Update state with current position and environmental data
+        state.progress = event.getProgressPercent();
+        state.currentLocation = event.getLocationName();
+        state.currentLatitude = event.getLatitude();
+        state.currentLongitude = event.getLongitude();
+        state.currentTemperature = event.getTemperature();
+        state.currentHumidity = event.getHumidity();
+        
+        // Notify progress update to all listeners
+        notifyProgress(event.getBatchId(), event.getProgressPercent(), event.getLocationName());
+        
+        // Check for event type-specific handling
+        if (event.getEventType() == SimulationEvent.EventType.COMPLETED) {
+            // Simulation completed
+            logger.info("Simulation event indicates completion for batch: {}", event.getBatchId());
+        }
+    }
+    
+    /**
      * Notify all listeners that simulation started.
      */
     private void notifyStarted(String batchId, String farmerId) {
@@ -585,6 +642,11 @@ public class SimulationManager {
     public void shutdown() {
         if (running.get()) {
             stopSimulation();
+        }
+        
+        // Shutdown SimulationService
+        if (simulationService != null) {
+            simulationService.shutdown();
         }
         
         // Shutdown compliance check executor

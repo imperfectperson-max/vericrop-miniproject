@@ -69,6 +69,14 @@ vericrop:
   mode: ${VERICROP_MODE:dev}  # dev or prod - controls blockchain initialization speed
   load-demo: ${VERICROP_LOAD_DEMO:false}  # Demo mode disabled by default in production
 
+# Simulation configuration
+simulation:
+  emit:
+    intervalMs: ${SIMULATION_EMIT_INTERVAL_MS:1000}  # Emit simulation events every 1 second by default
+  animation:
+    smooth: ${SIMULATION_ANIMATION_SMOOTH:true}  # Enable smooth marker animation
+    durationMs: ${SIMULATION_ANIMATION_DURATION_MS:800}  # Animation duration per waypoint
+
 # Ledger configuration
 ledger:
   path: ${LEDGER_PATH:ledger}

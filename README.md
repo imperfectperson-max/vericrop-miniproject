@@ -185,6 +185,84 @@ curl -X POST http://localhost:8080/api/simulation/start \
    - Monitor progress via GET `/api/simulation/active-shipments`
    - Check map state via GET `/api/simulation/map`
 
+### Realtime Simulation Updates (NEW)
+
+VeriCrop now features **realtime simulation with live UI updates** that animate delivery progress across Producer, Logistics, and Consumer views.
+
+**Key Features:**
+- 🚚 **Live Route Tracking**: Moving marker animates along the route between Farm and Warehouse
+- 🌡️ **Temperature Monitoring**: Real-time temperature chart updates during transit
+- 📊 **Progress Tracking**: Shipment status updates every second (configurable)
+- 🗺️ **GPS Coordinate Streaming**: Waypoint-level position updates for smooth animation
+- ⏱️ **Timeline Updates**: Status changes (Created, In Transit, At Warehouse, Delivered) with timestamps
+- 🔄 **Multi-View Sync**: All UI screens (Producer, Logistics, Consumer) update simultaneously
+
+**How It Works:**
+
+1. **Event Emission**:
+   - SimulationService emits `SimulationEvent` objects at 1-second intervals (configurable via `simulation.emit.intervalMs`)
+   - Each event contains: GPS coordinates, temperature, humidity, status, ETA, progress%
+
+2. **Event Distribution**:
+   - SimulationManager receives events and notifies all registered `SimulationListener` instances
+   - Controllers implement `SimulationListener` interface to receive updates
+
+3. **UI Updates** (Thread-Safe via Platform.runLater()):
+   - **ProducerController**: Updates simulation status label with progress percentage
+   - **LogisticsController**: Animates map marker, updates temperature chart, refreshes shipments table
+   - **ConsumerController**: Shows shipment status in verification history
+
+**Configuration:**
+
+Edit `application.yml` or set environment variables to customize simulation behavior:
+
+```yaml
+simulation:
+  emit:
+    intervalMs: 1000  # Emit events every 1 second
+  animation:
+    smooth: true      # Enable smooth marker transitions
+    durationMs: 800   # Animation duration per waypoint
+```
+
+**Event Flow:**
+
+```
+ProducerController.startSimulation()
+  ↓
+SimulationManager.startSimulation()
+  ↓
+SimulationService.startSimulation() [emits every 1s]
+  ↓ SimulationEvent
+SimulationManager.handleSimulationEvent()
+  ↓ notifyProgress()
+All Controllers [onProgressUpdate()]
+  ↓ Platform.runLater()
+UI Updates (map animation, charts, tables)
+```
+
+**Manual Testing:**
+
+1. Start the VeriCrop GUI application
+2. Login with credentials (e.g., `farmer` / `farmer123`)
+3. Navigate to **Producer** screen
+4. Upload a product image and create a batch
+5. Click **"Start Simulation"** button
+6. Navigate to **Logistics** screen:
+   - ✅ Observe animated marker moving from Farm (left) to Warehouse (right)
+   - ✅ See progress percentage updating every second
+   - ✅ Watch temperature chart populate with real-time data
+   - ✅ View shipments table updating with current location and status
+7. Navigate to **Consumer** screen:
+   - ✅ See shipment status updates in verification history
+8. Return to **Producer** screen:
+   - ✅ Observe simulation progress in status label
+
+**Stopping Simulation:**
+- Click **"Stop Simulation"** button in Producer screen
+- Marker remains at last position for completed deliveries
+- Marker removed immediately for manual stops
+
 **Selecting Scenarios:**
 
 When starting a simulation through the ProducerController, the system defaults to `scenario-01` (Normal). The three available scenarios are:
