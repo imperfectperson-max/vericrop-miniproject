@@ -518,18 +518,9 @@ public class LogisticsController implements SimulationListener {
         }
 
         Platform.runLater(() -> {
-            // Null-safe map container operations
-            if (mapContainer != null) {
-                try {
-                    // Clear previous visualizations
-                    mapContainer.getChildren().removeIf(node ->
-                            node.getUserData() != null && "shipment".equals(node.getUserData()));
-                } catch (Exception e) {
-                    System.err.println("Error clearing map visualizations: " + e.getMessage());
-                }
-            }
-
             // Update active shipments from simulator
+            // NOTE: Do NOT clear map visualizations here - markers should persist
+            // They are updated in place by updateMapMarkerPosition
             updateActiveShipmentsFromSimulator();
 
             // Update alerts based on simulation status
@@ -1400,11 +1391,93 @@ public class LogisticsController implements SimulationListener {
             visualization.animation = timeline;
             timeline.play();
             
+            // Center camera on checkpoint when reached
+            centerCameraOnCheckpoint(progress, currentLocation);
+            
             System.out.println("Animating marker for: " + batchId + " to " + progress + "% (" + newX + ", " + newY + ")");
             
         } catch (Exception e) {
             System.err.println("Error updating map marker: " + e.getMessage());
             e.printStackTrace();
+        }
+    }
+    
+    /**
+     * Center camera/view on checkpoint when truck reaches it.
+     * Highlights checkpoint markers and provides visual focus.
+     * @param progress Current progress as percentage (0-100)
+     * @param locationName Name of current location
+     */
+    private void centerCameraOnCheckpoint(double progress, String locationName) {
+        if (mapContainer == null) return;
+        
+        try {
+            // Determine if at a major checkpoint
+            boolean atWarehouse = progress >= PROGRESS_AT_WAREHOUSE_THRESHOLD;
+            boolean atFarm = progress < PROGRESS_DEPARTING_THRESHOLD;
+            
+            if (atWarehouse) {
+                // Highlight warehouse checkpoint
+                highlightCheckpoint("warehouse", DESTINATION_X, DESTINATION_Y);
+                System.out.println("📍 Truck reached checkpoint: Warehouse (progress: " + progress + "%)");
+            } else if (atFarm) {
+                // Highlight farm checkpoint
+                highlightCheckpoint("farm", ORIGIN_X, ORIGIN_Y);
+            }
+        } catch (Exception e) {
+            System.err.println("Error centering camera on checkpoint: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Highlight a checkpoint on the map by pulsing its marker.
+     * @param checkpointName Name of checkpoint (for tracking)
+     * @param x X coordinate of checkpoint
+     * @param y Y coordinate of checkpoint
+     */
+    private void highlightCheckpoint(String checkpointName, double x, double y) {
+        if (mapContainer == null) return;
+        
+        try {
+            // Find the checkpoint circle in map container
+            Circle checkpointCircle = null;
+            for (javafx.scene.Node node : mapContainer.getChildren()) {
+                if (node instanceof Circle) {
+                    Circle circle = (Circle) node;
+                    // Check if this is a checkpoint (not a shipment marker)
+                    if (circle.getUserData() == null && 
+                        Math.abs(circle.getCenterX() - x) < 1 && 
+                        Math.abs(circle.getCenterY() - y) < 1) {
+                        checkpointCircle = circle;
+                        break;
+                    }
+                }
+            }
+            
+            if (checkpointCircle == null) return;
+            
+            // Create pulsing animation to highlight checkpoint
+            Circle finalCheckpoint = checkpointCircle;
+            Timeline pulseAnimation = new Timeline(
+                new KeyFrame(Duration.ZERO,
+                    new KeyValue(finalCheckpoint.radiusProperty(), 8),
+                    new KeyValue(finalCheckpoint.fillProperty(), finalCheckpoint.getFill())
+                ),
+                new KeyFrame(Duration.millis(500),
+                    new KeyValue(finalCheckpoint.radiusProperty(), 12),
+                    new KeyValue(finalCheckpoint.fillProperty(), Color.GOLD)
+                ),
+                new KeyFrame(Duration.millis(1000),
+                    new KeyValue(finalCheckpoint.radiusProperty(), 8),
+                    new KeyValue(finalCheckpoint.fillProperty(), finalCheckpoint.getFill())
+                )
+            );
+            pulseAnimation.setCycleCount(2); // Pulse twice
+            pulseAnimation.play();
+            
+            System.out.println("Highlighted checkpoint: " + checkpointName);
+        } catch (Exception e) {
+            System.err.println("Error highlighting checkpoint: " + e.getMessage());
         }
     }
     
@@ -1438,28 +1511,25 @@ public class LogisticsController implements SimulationListener {
             ShipmentEnvironmentalData envData = environmentalDataMap.computeIfAbsent(
                 batchId, k -> new ShipmentEnvironmentalData());
             
-            // Create updated shipment
-            if (progress < PROGRESS_COMPLETE) {
-                Shipment updatedShipment = new Shipment(
-                    batchId,
-                    status,
-                    currentLocation != null ? currentLocation : "Unknown",
-                    envData.temperature,
-                    envData.humidity,
-                    String.format("%.0f%% Complete", progress),
-                    existingShipment != null ? existingShipment.getVehicle() : generateVehicleId(batchId)
-                );
-                
-                if (shipmentIndex >= 0) {
-                    // Replace existing at same index
-                    shipments.set(shipmentIndex, updatedShipment);
-                } else {
-                    // Add new shipment
-                    shipments.add(updatedShipment);
-                }
-            } else if (shipmentIndex >= 0) {
-                // Remove completed shipment
-                shipments.remove(shipmentIndex);
+            // Create updated shipment (keep all shipments in table, including completed ones)
+            String etaDisplay = progress >= PROGRESS_COMPLETE ? "DELIVERED" : String.format("%.0f%% Complete", progress);
+            
+            Shipment updatedShipment = new Shipment(
+                batchId,
+                status,
+                currentLocation != null ? currentLocation : "Unknown",
+                envData.temperature,
+                envData.humidity,
+                etaDisplay,
+                existingShipment != null ? existingShipment.getVehicle() : generateVehicleId(batchId)
+            );
+            
+            if (shipmentIndex >= 0) {
+                // Replace existing at same index to maintain persistent list
+                shipments.set(shipmentIndex, updatedShipment);
+            } else {
+                // Add new shipment to persistent list
+                shipments.add(updatedShipment);
             }
             
         } catch (Exception e) {
