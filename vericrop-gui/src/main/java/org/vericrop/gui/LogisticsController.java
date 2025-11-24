@@ -999,6 +999,7 @@ public class LogisticsController implements SimulationListener {
     /**
      * Update timeline based on current simulation progress.
      * Shows visual state progression: Created → In Transit → At Warehouse → Delivered
+     * @param progress Progress as percentage (0-100)
      * NOTE: Caller must ensure this is called on JavaFX Application Thread
      */
     private void updateTimeline(String batchId, double progress, String status) {
@@ -1068,11 +1069,11 @@ public class LogisticsController implements SimulationListener {
     }
     
     /**
-     * Calculate ETA string based on progress.
+     * Calculate ETA string based on progress (percentage 0-100).
      */
     private String calculateETA(double progress) {
         if (progress >= PROGRESS_COMPLETE) return "ARRIVED";
-        double remaining = 1.0 - (progress / 100.0);
+        double remaining = 1.0 - (progress / PROGRESS_COMPLETE);
         int etaMinutes = (int) (remaining * ESTIMATED_TOTAL_TRIP_MINUTES);
         return etaMinutes + " min";
     }
@@ -1175,7 +1176,8 @@ public class LogisticsController implements SimulationListener {
     
     /**
      * Update shipments table row for a specific batch.
-     * Since Shipment is immutable, we remove and re-add to update.
+     * Uses index-based update for efficiency.
+     * @param progress Progress as percentage (0-100)
      */
     private void updateShipmentsTableRow(String batchId, double progress, String currentLocation) {
         if (shipmentsTable == null) return;
