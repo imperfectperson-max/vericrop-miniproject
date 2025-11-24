@@ -1135,7 +1135,7 @@ public class ProducerController implements SimulationListener {
             final String finalBatchId = selectedBatchId; // Make final for lambda
             
             // Immediately provide UI feedback - disable Start, enable Stop
-            // No Platform.runLater needed since @FXML methods run on JavaFX thread
+            // When called from UI event handler, already on JavaFX thread, no Platform.runLater needed
             updateSimulationButtonStates(true);
             if (simStatusLabel != null) {
                 simStatusLabel.setText("⏳ Starting simulation...");
@@ -1190,6 +1190,7 @@ public class ProducerController implements SimulationListener {
 
                 } catch (Exception e) {
                     // Handle errors and restore button states on UI thread
+                    // Broad catch is intentional: covers simulation, Kafka, service failures
                     System.err.println("❌ Failed to start simulation: " + e.getMessage());
                     e.printStackTrace();
                     handleSimulationError(e.getMessage());
@@ -1198,6 +1199,7 @@ public class ProducerController implements SimulationListener {
 
         } catch (Exception e) {
             // Handle synchronous errors (e.g., batch selection dialog errors)
+            // Broad catch is intentional: covers any startup failures before async execution
             System.err.println("❌ Failed to start simulation (synchronous error): " + e.getMessage());
             e.printStackTrace();
             handleSimulationError(e.getMessage());
