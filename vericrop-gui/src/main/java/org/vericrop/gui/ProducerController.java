@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -115,6 +116,9 @@ public class ProducerController implements SimulationListener {
     
     // Map to store batch info: batch display name -> batch details (for selection dialog)
     private Map<String, Map<String, Object>> batchInfoMap = new HashMap<>();
+    
+    // Map to store quality metrics per batch ID for use in Kafka events
+    private Map<String, Map<String, Double>> batchMetricsMap = new ConcurrentHashMap<>();
 
     public void initialize() {
         backgroundExecutor = Executors.newFixedThreadPool(4);
@@ -350,6 +354,11 @@ public class ProducerController implements SimulationListener {
         qualityData.put("data_hash", dataHash);
         qualityData.put("all_predictions", currentPrediction.get("all_predictions"));
 
+        // Calculate quality metrics before sending to backend
+        String classification = safeGetString(qualityData, "label");
+        double qualityScore = safeGetDouble(qualityData, "quality_score");
+        Map<String, Double> calculatedMetrics = calculateQualityMetrics(classification, qualityScore);
+
         Map<String, Object> batchData = new HashMap<>();
         batchData.put("name", batchName);
         batchData.put("farmer", farmer);
@@ -357,6 +366,20 @@ public class ProducerController implements SimulationListener {
         batchData.put("quantity", quantity);
         batchData.put("quality_data", qualityData);
         batchData.put("data_hash", dataHash);
+        
+        // Add calculated metrics to batch data so backend receives them
+        batchData.put("calculated_prime_rate", calculatedMetrics.get("prime_rate"));
+        batchData.put("calculated_low_quality_rate", calculatedMetrics.get("low_quality_rate"));
+        batchData.put("calculated_rejection_rate", calculatedMetrics.get("rejection_rate"));
+        
+        // Add top-level prime_rate and rejection_rate for backend/dashboard compatibility
+        batchData.put("prime_rate", calculatedMetrics.get("prime_rate"));
+        batchData.put("rejection_rate", calculatedMetrics.get("rejection_rate"));
+
+        System.out.println("📊 Quality metrics calculated in prepareBatchData:");
+        System.out.println("   Prime Rate: " + (calculatedMetrics.get("prime_rate") * 100) + "%");
+        System.out.println("   Low Quality Rate: " + (calculatedMetrics.get("low_quality_rate") * 100) + "%");
+        System.out.println("   Rejection Rate: " + (calculatedMetrics.get("rejection_rate") * 100) + "%");
 
         return batchData;
     }
@@ -703,6 +726,19 @@ public class ProducerController implements SimulationListener {
         Object primeRate = result.get("backend_prime_rate");
         Object rejectionRate = result.get("backend_rejection_rate");
         Object dataHash = ((Map<String, Object>) result.get("batch_data")).get("data_hash");
+        
+        // Store quality metrics for this batch ID for later use in Kafka events
+        Map<String, Double> metrics = new HashMap<>();
+        if (primeRate instanceof Number) {
+            metrics.put("prime_rate", ((Number) primeRate).doubleValue());
+        }
+        if (rejectionRate instanceof Number) {
+            metrics.put("rejection_rate", ((Number) rejectionRate).doubleValue());
+        }
+        if (qualityScore instanceof Number) {
+            metrics.put("quality_score", ((Number) qualityScore).doubleValue());
+        }
+        batchMetricsMap.put(batchId, metrics);
 
         updateBlockchainDisplay();
         loadDashboardData();
@@ -1112,17 +1148,6 @@ public class ProducerController implements SimulationListener {
     @FXML
     private void handleStartSimulation() {
         try {
-            // Check if a simulation is already running
-            if (SimulationManager.isInitialized()) {
-                SimulationManager manager = SimulationManager.getInstance();
-                if (manager.isRunning()) {
-                    String runningBatchId = manager.getSimulationId();
-                    showError("Simulation already running for batch: " + runningBatchId + 
-                             "\nPlease stop the current simulation before starting a new one.");
-                    return;
-                }
-            }
-            
             // Allow selecting a batch from recent batches list
             String selectedBatchId = selectBatchForAction("Select Batch for Delivery Simulation");
             if (selectedBatchId == null) {
@@ -1145,63 +1170,105 @@ public class ProducerController implements SimulationListener {
             final Duration simulationDuration = Duration.ofMinutes(30); // Extended duration
             final String finalBatchId = selectedBatchId; // Make final for lambda
             
-            // Immediately provide UI feedback - disable Start, enable Stop
-            // When called from UI event handler, already on JavaFX thread, no Platform.runLater needed
-            updateSimulationButtonStates(true);
-            if (simStatusLabel != null) {
-                simStatusLabel.setText("⏳ Starting simulation...");
-                simStatusLabel.setStyle("-fx-text-fill: #F59E0B;");
+            // Harden simulation startup with synchronized check and immediate UI state update
+            if (!SimulationManager.isInitialized()) {
+                handleSimulationError("SimulationManager not initialized");
+                return;
             }
-
-            // Run all blocking/long-running operations asynchronously
-            CompletableFuture.runAsync(() -> {
-                try {
-                    // Publish batch lifecycle event: DISPATCHED
-                    if (batchUpdateProducer != null) {
-                        BatchUpdateEvent dispatchEvent = new BatchUpdateEvent(
-                            finalBatchId, "DISPATCHED", "Farm Location", null, 
-                            "Batch dispatched for delivery simulation"
-                        );
-                        batchUpdateProducer.sendBatchUpdateEvent(dispatchEvent);
-                        System.out.println("📦 Published DISPATCHED event for batch: " + finalBatchId);
-                    }
-
-                    // Use SimulationManager to start simulation with longer duration (20 waypoints instead of 10)
-                    SimulationManager manager = MainApp.getInstance().getApplicationContext().getSimulationManager();
-                    System.out.println("🚀 Starting new simulation for batch: " + finalBatchId + 
-                                     " | Farmer: " + farmerId + " | Origin: " + origin.getName());
-                    manager.startSimulation(finalBatchId, farmerId, origin, destination, 20, 50.0, 10000);
-
-                    // Start map simulation and temperature compliance together via LogisticsService
-                    if (logisticsService != null) {
-                        logisticsService.startMapAndCompliance(
-                            finalBatchId, simulationDuration, temperatureComplianceService, "example-01"
-                        );
-                    }
-
-                    // Notify logistics controller about the new simulation
-                    notifyLogisticsAboutSimulation(finalBatchId);
-
-                    // UI updates will be handled by SimulationListener callbacks
-                    // Create alert on UI thread
+            
+            SimulationManager manager = MainApp.getInstance().getApplicationContext().getSimulationManager();
+            
+            // Synchronized block to prevent race conditions and duplicate starts
+            synchronized (manager) {
+                // Re-check isRunning() inside synchronized block to avoid race condition
+                if (manager.isRunning()) {
+                    String runningBatchId = manager.getSimulationId();
                     Platform.runLater(() -> {
-                        var alertService = MainApp.getInstance().getApplicationContext().getAlertService();
-                        alertService.info("Simulation Started",
-                                "Extended delivery simulation for " + finalBatchId + " is now running with " +
-                                "map tracking and temperature compliance monitoring",
-                                "simulator");
+                        showError("Simulation already running for batch: " + runningBatchId + 
+                                 "\nPlease stop the current simulation before starting a new one.");
+                        if (simStatusLabel != null) {
+                            simStatusLabel.setText("⚠ Simulation already running: " + runningBatchId);
+                            simStatusLabel.setStyle("-fx-text-fill: #DC2626;");
+                        }
                     });
-
-                    System.out.println("✅ Extended simulation started for: " + finalBatchId);
-
-                } catch (Exception e) {
-                    // Handle errors and restore button states on UI thread
-                    // Broad catch is intentional: covers simulation, Kafka, service failures
-                    System.err.println("❌ Failed to start simulation: " + e.getMessage());
-                    e.printStackTrace();
-                    handleSimulationError(e.getMessage());
+                    System.out.println("⚠️ Blocked duplicate simulation start attempt for: " + finalBatchId);
+                    return;
                 }
-            }, backgroundExecutor);
+                
+                // Set UI state and activeSimulationId immediately before launching background tasks
+                // This makes the running state visible to other controllers immediately
+                activeSimulationId = finalBatchId;
+                updateSimulationButtonStates(true);
+                if (simStatusLabel != null) {
+                    simStatusLabel.setText("⏳ Starting simulation...");
+                    simStatusLabel.setStyle("-fx-text-fill: #F59E0B;");
+                }
+                
+                System.out.println("🔒 Acquired simulation lock for: " + finalBatchId);
+                
+                // Run all blocking/long-running operations asynchronously
+                CompletableFuture.runAsync(() -> {
+                    try {
+                        // Publish batch lifecycle event: DISPATCHED (with quality metrics if available)
+                        if (batchUpdateProducer != null) {
+                            Map<String, Double> metrics = batchMetricsMap.get(finalBatchId);
+                            BatchUpdateEvent dispatchEvent = new BatchUpdateEvent(
+                                finalBatchId, "DISPATCHED", "Farm Location", null, 
+                                "Batch dispatched for delivery simulation"
+                            );
+                            // Add quality metrics to the event if available
+                            if (metrics != null) {
+                                if (metrics.containsKey("prime_rate")) {
+                                    dispatchEvent.setPrimeRate(metrics.get("prime_rate"));
+                                }
+                                if (metrics.containsKey("rejection_rate")) {
+                                    dispatchEvent.setRejectionRate(metrics.get("rejection_rate"));
+                                }
+                                if (metrics.containsKey("quality_score")) {
+                                    dispatchEvent.setQualityScore(metrics.get("quality_score"));
+                                }
+                            }
+                            batchUpdateProducer.sendBatchUpdateEvent(dispatchEvent);
+                            System.out.println("📦 Published DISPATCHED event for batch: " + finalBatchId + 
+                                             (metrics != null ? " with quality metrics" : ""));
+                        }
+
+                        // Use SimulationManager to start simulation with longer duration (20 waypoints instead of 10)
+                        System.out.println("🚀 Starting new simulation for batch: " + finalBatchId + 
+                                         " | Farmer: " + farmerId + " | Origin: " + origin.getName());
+                        manager.startSimulation(finalBatchId, farmerId, origin, destination, 20, 50.0, 10000);
+
+                        // Start map simulation and temperature compliance together via LogisticsService
+                        if (logisticsService != null) {
+                            logisticsService.startMapAndCompliance(
+                                finalBatchId, simulationDuration, temperatureComplianceService, "example-01"
+                            );
+                        }
+
+                        // Notify logistics controller about the new simulation
+                        notifyLogisticsAboutSimulation(finalBatchId);
+
+                        // UI updates will be handled by SimulationListener callbacks
+                        // Create alert on UI thread
+                        Platform.runLater(() -> {
+                            var alertService = MainApp.getInstance().getApplicationContext().getAlertService();
+                            alertService.info("Simulation Started",
+                                    "Extended delivery simulation for " + finalBatchId + " is now running with " +
+                                    "map tracking and temperature compliance monitoring",
+                                    "simulator");
+                        });
+
+                        System.out.println("✅ Extended simulation started for: " + finalBatchId);
+
+                    } catch (Exception e) {
+                        // Handle errors and restore button states on UI thread
+                        // Broad catch is intentional: covers simulation, Kafka, service failures
+                        System.err.println("❌ Failed to start simulation: " + e.getMessage());
+                        e.printStackTrace();
+                        handleSimulationError(e.getMessage());
+                    }
+                }, backgroundExecutor);
+            }
 
         } catch (Exception e) {
             // Handle synchronous errors (e.g., batch selection dialog errors)
@@ -1460,14 +1527,28 @@ public class ProducerController implements SimulationListener {
                 logisticsService.stopSimulation(stoppingBatchId);
             }
             
-            // Publish batch lifecycle event: DELIVERED (or stopped)
+            // Publish batch lifecycle event: DELIVERED (or stopped) with quality metrics
             if (batchUpdateProducer != null) {
+                Map<String, Double> metrics = batchMetricsMap.get(stoppingBatchId);
                 BatchUpdateEvent deliveredEvent = new BatchUpdateEvent(
                     stoppingBatchId, "DELIVERED", "Warehouse", null, 
                     "Batch simulation stopped"
                 );
+                // Add quality metrics to the event if available
+                if (metrics != null) {
+                    if (metrics.containsKey("prime_rate")) {
+                        deliveredEvent.setPrimeRate(metrics.get("prime_rate"));
+                    }
+                    if (metrics.containsKey("rejection_rate")) {
+                        deliveredEvent.setRejectionRate(metrics.get("rejection_rate"));
+                    }
+                    if (metrics.containsKey("quality_score")) {
+                        deliveredEvent.setQualityScore(metrics.get("quality_score"));
+                    }
+                }
                 batchUpdateProducer.sendBatchUpdateEvent(deliveredEvent);
-                System.out.println("📦 Published DELIVERED event for batch: " + stoppingBatchId);
+                System.out.println("📦 Published DELIVERED event for batch: " + stoppingBatchId + 
+                                 (metrics != null ? " with quality metrics" : ""));
             }
 
             // Create alert
@@ -1519,8 +1600,23 @@ public class ProducerController implements SimulationListener {
                         newBlock.getIndex()
                 );
                 blockchainEvent.setDataHash(dataHash);
-                blockchainEvent.setAdditionalData("Product: " + productType +
-                        " | Quality: " + (qualityScoreObj != null ? qualityScoreObj : "N/A"));
+                
+                // Include quality metrics in additional data for downstream consumers
+                StringBuilder additionalData = new StringBuilder("Product: " + productType);
+                if (qualityScoreObj != null) {
+                    additionalData.append(" | Quality: ").append(
+                        String.format("%.1f%%", ((Number) qualityScoreObj).doubleValue() * 100));
+                }
+                if (primeRateObj != null) {
+                    additionalData.append(" | Prime: ").append(
+                        String.format("%.1f%%", ((Number) primeRateObj).doubleValue() * 100));
+                }
+                if (rejectionRateObj != null) {
+                    additionalData.append(" | Rejection: ").append(
+                        String.format("%.1f%%", ((Number) rejectionRateObj).doubleValue() * 100));
+                }
+                
+                blockchainEvent.setAdditionalData(additionalData.toString());
                 blockchainProducer.sendBlockchainEvent(blockchainEvent);
                 System.out.println("⛓️ Blockchain event sent for batch: " + batchId);
             }
