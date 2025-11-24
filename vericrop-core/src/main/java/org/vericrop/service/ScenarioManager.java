@@ -134,15 +134,14 @@ public class ScenarioManager {
             return Scenario.NORMAL; // Default
         }
         
-        // First try direct mapping (handles both JSON IDs and enum names)
-        // Convert to uppercase for case-insensitive matching, but also try lowercase for JSON IDs
-        Scenario scenario = SCENARIO_MAPPING.get(scenarioId.toUpperCase());
+        // Try direct mapping with original casing first (for JSON scenario IDs like "scenario-01")
+        Scenario scenario = SCENARIO_MAPPING.get(scenarioId);
         if (scenario != null) {
             return scenario;
         }
         
-        // Also try with original casing for JSON scenario IDs (scenario-01, example-02, etc.)
-        scenario = SCENARIO_MAPPING.get(scenarioId);
+        // Try uppercase mapping for enum names (NORMAL, HOT_TRANSPORT, etc.)
+        scenario = SCENARIO_MAPPING.get(scenarioId.toUpperCase());
         if (scenario != null) {
             return scenario;
         }

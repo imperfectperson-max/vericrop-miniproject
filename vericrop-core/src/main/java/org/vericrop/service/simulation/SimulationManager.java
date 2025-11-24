@@ -286,7 +286,7 @@ public class SimulationManager {
             running.set(true);
             
             // Step 7: Start temperature compliance checking
-            logger.info("Step 6: Starting temperature compliance monitoring...");
+            logger.info("Step 7: Starting temperature compliance monitoring...");
             startComplianceChecking(batchId);
             
             // Notify listeners

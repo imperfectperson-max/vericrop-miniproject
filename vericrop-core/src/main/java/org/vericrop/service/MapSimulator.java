@@ -20,6 +20,9 @@ public class MapSimulator {
     private static final int DEFAULT_GRID_WIDTH = 20;
     private static final int DEFAULT_GRID_HEIGHT = 20;
     
+    // Quality degradation factor
+    private static final double QUALITY_DEGRADATION_FACTOR = 0.1;
+    
     // Entity types
     public enum EntityType {
         PRODUCER, CONSUMER, WAREHOUSE, RESOURCE, DELIVERY_VEHICLE
@@ -339,7 +342,7 @@ public class MapSimulator {
             
             // Quality degrades over time - simulate time passing with progress
             double timeFactor = progressPercent / 100.0; // 0 to 1
-            double qualityLoss = spoilageRate * timeFactor * 0.1; // Scaled degradation
+            double qualityLoss = spoilageRate * timeFactor * QUALITY_DEGRADATION_FACTOR; // Scaled degradation
             double newQuality = Math.max(0.0, currentQuality - qualityLoss);
             
             resource.setMetadata("quality", newQuality);

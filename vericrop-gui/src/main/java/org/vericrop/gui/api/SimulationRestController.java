@@ -43,8 +43,7 @@ public class SimulationRestController {
             MapSimulator.MapSnapshot snapshot = mapSimulator.getSnapshot();
             
             if (snapshot == null) {
-                return ResponseEntity.status(HttpStatus.NO_CONTENT)
-                    .body(createErrorResponse("No active simulation"));
+                return ResponseEntity.ok(createErrorResponse("No active simulation"));
             }
             
             Map<String, Object> response = snapshot.toMap();
