@@ -211,6 +211,34 @@ public class ConfigService {
         return getConfig("log.file.path", "logs/vericrop-gui.log");
     }
 
+    // ============================================================================
+    // Airflow Configuration
+    // ============================================================================
+
+    public String getAirflowBaseUrl() {
+        return getConfig("airflow.base.url", "http://localhost:8080");
+    }
+
+    public String getAirflowDagId() {
+        return getConfig("airflow.dag.id", "vericrop_analytics_pipeline");
+    }
+
+    public String getAirflowUsername() {
+        return getConfig("airflow.auth.username", "");
+    }
+
+    public String getAirflowPassword() {
+        return getConfig("airflow.auth.password", "");
+    }
+
+    // ============================================================================
+    // VeriCrop Core Configuration
+    // ============================================================================
+
+    public String getVericropCoreBaseUrl() {
+        return getConfig("vericrop.core.base.url", "http://localhost:8081");
+    }
+
     /**
      * Print current configuration (for debugging)
      */
@@ -222,6 +250,9 @@ public class ConfigService {
         logger.info("Kafka Enabled: {}", isKafkaEnabled());
         logger.info("ML Service URL: {}", getMlServiceUrl());
         logger.info("ML Demo Mode: {}", isMlServiceDemoMode());
+        logger.info("Airflow Base URL: {}", getAirflowBaseUrl());
+        logger.info("Airflow DAG ID: {}", getAirflowDagId());
+        logger.info("VeriCrop Core Base URL: {}", getVericropCoreBaseUrl());
         logger.info("Application Mode: {}", getApplicationMode());
         logger.info("Server Port: {}", getServerPort());
         logger.info("==============================");

@@ -174,3 +174,15 @@ logging:
     name: ${LOG_FILE_PATH:logs/vericrop-gui.log}
     max-size: 10MB
     max-history: 30
+
+# Airflow configuration
+airflow:
+  base-url: ${AIRFLOW_BASE_URL:http://localhost:8080}
+  dag-id: ${AIRFLOW_DAG_ID:vericrop_analytics_pipeline}
+  auth:
+    username: ${AIRFLOW_AUTH_USERNAME:}
+    password: ${AIRFLOW_AUTH_PASSWORD:}
+
+# VeriCrop Core configuration
+vericrop-core:
+  base-url: ${VERICROP_CORE_BASE_URL:http://localhost:8081}

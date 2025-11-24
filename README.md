@@ -185,6 +185,125 @@ curl -X POST http://localhost:8080/api/simulation/start \
    - Monitor progress via GET `/api/simulation/active-shipments`
    - Check map state via GET `/api/simulation/map`
 
+### Analytics Workflow API (NEW)
+
+VeriCrop now includes a robust **Analytics Controller** that coordinates analytics workflows across Airflow, vericrop-core, vericrop-gui, and kafka-service. This enables triggering, monitoring, and delivering analytics results for datasets.
+
+**Key Features:**
+- 🚀 **Airflow Integration**: Trigger and monitor DAG runs for analytics pipelines
+- 📨 **Kafka Events**: Publish analytics request events to Kafka topics
+- 💾 **Job Tracking**: In-memory job store (interface-based for future persistence)
+- 🔄 **Async Callbacks**: Support for asynchronous job status updates
+- 🎯 **RESTful API**: Complete REST endpoints for workflow orchestration
+
+**Available Endpoints:**
+
+```bash
+# Trigger an analytics job
+POST /api/analytics/trigger
+Content-Type: application/json
+
+{
+  "datasetId": "dataset-123",
+  "parameters": {
+    "model": "quality_classifier",
+    "threshold": 0.85
+  },
+  "callbackUrl": "http://callback.example.com/analytics/complete"
+}
+
+# Response
+{
+  "job_id": "550e8400-e29b-41d4-a716-446655440000",
+  "airflow_run_id": "manual__2024-01-15T10:30:00+00:00",
+  "status": "RUNNING",
+  "created_at": "2024-01-15T10:30:00Z"
+}
+
+# Get job status
+GET /api/analytics/{jobId}/status
+
+# Response
+{
+  "job_id": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "running",
+  "created_at": "2024-01-15T10:30:00Z",
+  "updated_at": "2024-01-15T10:32:00Z",
+  "airflow_run_id": "manual__2024-01-15T10:30:00+00:00"
+}
+
+# Get job results (when complete)
+GET /api/analytics/{jobId}/results
+
+# Response (202 if not ready)
+{
+  "job_id": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "running",
+  "message": "Results not yet available"
+}
+
+# Response (200 when complete)
+{
+  "job_id": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "success",
+  "results": {
+    "accuracy": 0.95,
+    "records_processed": 1000,
+    "quality_distribution": {...}
+  },
+  "results_link": "http://vericrop-core/results/550e8400-e29b-41d4-a716-446655440000"
+}
+
+# Callback endpoint for async updates
+POST /api/analytics/{jobId}/callback
+Content-Type: application/json
+
+{
+  "status": "SUCCESS",
+  "results": {
+    "completed": true,
+    "output_file": "s3://bucket/results.json"
+  }
+}
+```
+
+**Configuration:**
+
+The Analytics Controller requires the following configuration properties (set in `application.properties` or `application.yml`, or via environment variables):
+
+```properties
+# Airflow Configuration
+airflow.base.url=http://localhost:8080
+airflow.dag.id=vericrop_analytics_pipeline
+airflow.auth.username=admin
+airflow.auth.password=admin
+
+# VeriCrop Core Configuration
+vericrop.core.base.url=http://localhost:8081
+
+# Kafka Configuration (see Kafka section below)
+kafka.enabled=true
+kafka.bootstrap.servers=localhost:9092
+```
+
+Environment variables override properties file values:
+```bash
+export AIRFLOW_BASE_URL=http://airflow:8080
+export AIRFLOW_DAG_ID=vericrop_analytics_pipeline
+export AIRFLOW_AUTH_USERNAME=your_username
+export AIRFLOW_AUTH_PASSWORD=your_password
+export VERICROP_CORE_BASE_URL=http://vericrop-core:8081
+```
+
+**Kafka Topic:**
+- Analytics requests are published to topic: `vericrop.analytics.requests`
+- Schema: `{ job_id, dataset_id, parameters, timestamp }`
+
+**Testing Without External Services:**
+- Set `kafka.enabled=false` to disable Kafka (for local testing)
+- Mock Airflow responses in unit tests
+- Use in-memory JobStore (no database required)
+
 ### Realtime Simulation Updates (NEW)
 
 VeriCrop now features **realtime simulation with live UI updates** that animate delivery progress across Producer, Logistics, and Consumer views.
