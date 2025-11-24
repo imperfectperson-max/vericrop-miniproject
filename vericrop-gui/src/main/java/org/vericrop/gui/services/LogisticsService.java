@@ -34,6 +34,41 @@ public class LogisticsService {
     }
     
     /**
+     * Start map simulation and temperature compliance together
+     * @param batchId Batch identifier
+     * @param duration Simulation duration
+     * @param tempService Temperature compliance service (nullable)
+     * @param scenarioId Scenario ID for temperature compliance
+     */
+    public void startMapAndCompliance(String batchId, Duration duration, 
+                                      TemperatureComplianceService tempService, String scenarioId) {
+        try {
+            System.out.println("🚀 Starting map and compliance simulations for batch: " + batchId);
+            
+            // Start map simulation (logs its own success message)
+            startMapSimulation(batchId, duration);
+            
+            // Start temperature compliance if service is provided
+            if (tempService != null) {
+                try {
+                    tempService.startComplianceSimulation(batchId, scenarioId, duration);
+                    System.out.println("✅ Temperature compliance simulation started for batch: " + batchId);
+                } catch (Exception e) {
+                    System.err.println("⚠️ Temperature compliance simulation failed for " + batchId + ": " + e.getMessage());
+                    e.printStackTrace();
+                    // Don't fail the entire operation if temperature compliance fails
+                }
+            } else {
+                System.out.println("ℹ️ No temperature compliance service provided for batch: " + batchId);
+            }
+        } catch (Exception e) {
+            System.err.println("❌ Error starting simulations for " + batchId + ": " + e.getMessage());
+            e.printStackTrace();
+            // Don't throw - handle gracefully to prevent UI crashes
+        }
+    }
+    
+    /**
      * Start map simulation for a batch
      * @param batchId Batch identifier
      * @param duration Simulation duration
