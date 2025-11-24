@@ -1112,6 +1112,17 @@ public class ProducerController implements SimulationListener {
     @FXML
     private void handleStartSimulation() {
         try {
+            // Check if a simulation is already running
+            if (SimulationManager.isInitialized()) {
+                SimulationManager manager = SimulationManager.getInstance();
+                if (manager.isRunning()) {
+                    String runningBatchId = manager.getSimulationId();
+                    showError("Simulation already running for batch: " + runningBatchId + 
+                             "\nPlease stop the current simulation before starting a new one.");
+                    return;
+                }
+            }
+            
             // Allow selecting a batch from recent batches list
             String selectedBatchId = selectBatchForAction("Select Batch for Delivery Simulation");
             if (selectedBatchId == null) {
@@ -1157,6 +1168,8 @@ public class ProducerController implements SimulationListener {
 
                     // Use SimulationManager to start simulation with longer duration (20 waypoints instead of 10)
                     SimulationManager manager = MainApp.getInstance().getApplicationContext().getSimulationManager();
+                    System.out.println("🚀 Starting new simulation for batch: " + finalBatchId + 
+                                     " | Farmer: " + farmerId + " | Origin: " + origin.getName());
                     manager.startSimulation(finalBatchId, farmerId, origin, destination, 20, 50.0, 10000);
 
                     // Start map simulation and temperature compliance together via LogisticsService
@@ -1436,6 +1449,7 @@ public class ProducerController implements SimulationListener {
             }
 
             String stoppingBatchId = manager.getSimulationId();
+            System.out.println("⏹ Stopping simulation for batch: " + stoppingBatchId);
             manager.stopSimulation();
             
             // Stop extended simulations
