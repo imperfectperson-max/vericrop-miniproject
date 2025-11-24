@@ -116,6 +116,20 @@ VeriCrop follows a microservices architecture with event-driven communication:
 
 ## Components
 
+### Orchestration System
+
+**NEW**: **Location**: `vericrop-core/orchestrator`, `airflow/dags/vericrop_orchestrator_dag.py`
+
+Event-driven orchestration system that coordinates multiple controllers to run in parallel using Kafka and Airflow:
+- **Orchestrator Component**: Manages controller lifecycle, tracks status, aggregates results
+- **6 Integrated Controllers**: scenarios, delivery, map, temperature, supplier_compliance, simulations
+- **Kafka Topics**: 13 new topics for command/status coordination
+- **Airflow DAG**: Triggers and monitors orchestration workflows
+- **Parallel Execution**: All controllers run simultaneously for efficiency
+- **Timeout Management**: Configurable timeout (default: 5 minutes)
+
+See [docs/ORCHESTRATION.md](docs/ORCHESTRATION.md) for complete documentation.
+
 ### vericrop-gui
 
 **Location**: `vericrop-gui/`
