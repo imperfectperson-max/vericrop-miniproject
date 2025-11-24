@@ -186,13 +186,22 @@ public class LogisticsController implements SimulationListener {
     
     /**
      * Handle map simulation event from Kafka.
-     * Updates map visualization with real-time position data.
+     * Updates map visualization with real-time position data and environmental data.
      */
     private void handleMapSimulationEvent(MapSimulationEvent event) {
         Platform.runLater(() -> {
             try {
+                // Update environmental data tracking from map event
+                ShipmentEnvironmentalData envData = environmentalDataMap.computeIfAbsent(
+                    event.getBatchId(), k -> new ShipmentEnvironmentalData());
+                envData.temperature = event.getTemperature();
+                envData.humidity = event.getHumidity();
+                
                 // Update map marker position based on event data
                 updateMapFromEvent(event);
+                
+                // Update shipments table with new environmental data (if row exists)
+                updateShipmentEnvironmentalData(event.getBatchId());
                 
                 // Log event to alerts
                 String alertMsg = String.format("🗺️ %s: %.0f%% - %s", 
@@ -212,15 +221,16 @@ public class LogisticsController implements SimulationListener {
     /**
      * Handle temperature compliance event from Kafka.
      * Updates temperature chart with real-time data points.
+     * Note: Humidity is tracked via MapSimulationEvent which includes both temp and humidity.
      */
     private void handleTemperatureComplianceEvent(TemperatureComplianceEvent event) {
         Platform.runLater(() -> {
             try {
-                // Update environmental data tracking
+                // Update environmental data tracking (temperature only)
+                // Humidity comes from MapSimulationEvent
                 ShipmentEnvironmentalData envData = environmentalDataMap.computeIfAbsent(
                     event.getBatchId(), k -> new ShipmentEnvironmentalData());
                 envData.temperature = event.getTemperature();
-                // Note: humidity is not in temperature event, would need separate event type or combined event
                 
                 // Add data point to temperature chart
                 addTemperatureDataPoint(event);
@@ -1190,7 +1200,7 @@ public class LogisticsController implements SimulationListener {
                     envData.temperature,
                     envData.humidity,
                     String.format("%.0f%% Complete", progress),
-                    existingShipment != null ? existingShipment.getVehicle() : "TRUCK-" + Math.abs(batchId.hashCode() % 1000)
+                    existingShipment != null ? existingShipment.getVehicle() : generateVehicleId(batchId)
                 );
                 shipments.add(updatedShipment);
             }
@@ -1198,6 +1208,15 @@ public class LogisticsController implements SimulationListener {
         } catch (Exception e) {
             System.err.println("Error updating shipments table: " + e.getMessage());
         }
+    }
+    
+    /**
+     * Generate a consistent vehicle ID for a batch based on its hash.
+     * @param batchId The batch identifier
+     * @return A vehicle ID like "TRUCK-123"
+     */
+    private String generateVehicleId(String batchId) {
+        return "TRUCK-" + Math.abs(batchId.hashCode() % 1000);
     }
     
     @Override

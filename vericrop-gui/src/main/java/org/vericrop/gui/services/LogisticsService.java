@@ -108,8 +108,8 @@ public class LogisticsService {
         long startTime = System.currentTimeMillis();
         long endTime = startTime + duration.toMillis();
         
-        // Publish start event
-        publishMapEvent(batchId, ORIGIN_LAT, ORIGIN_LON, "Farm Location", 0.0, "STARTED");
+        // Publish start event with initial environmental data
+        publishMapEvent(batchId, ORIGIN_LAT, ORIGIN_LON, "Farm Location", 0.0, "STARTED", 4.0, 65.0);
         
         while (System.currentTimeMillis() < endTime && !Thread.currentThread().isInterrupted()) {
             long currentTime = System.currentTimeMillis();
@@ -123,31 +123,38 @@ public class LogisticsService {
             currentLat += (random.nextDouble() - 0.5) * 0.001;
             currentLon += (random.nextDouble() - 0.5) * 0.001;
             
+            // Simulate environmental conditions (temperature and humidity)
+            // Temperature: baseline 4.0°C with small variations
+            double temperature = 4.0 + (random.nextDouble() - 0.5) * 2.0; // 3.0-5.0°C range
+            // Humidity: baseline 65% with variations
+            double humidity = 65.0 + (random.nextDouble() - 0.5) * 10.0; // 60-70% range
+            
             // Determine location name based on progress
             String locationName = getLocationName(progress);
             String status = progress >= 1.0 ? "DELIVERED" : "IN_TRANSIT";
             
-            // Publish position update
-            publishMapEvent(batchId, currentLat, currentLon, locationName, progress, status);
+            // Publish position update with environmental data
+            publishMapEvent(batchId, currentLat, currentLon, locationName, progress, status, temperature, humidity);
             
             // Wait for next update
             Thread.sleep(UPDATE_INTERVAL_SECONDS * 1000);
         }
         
         // Publish final event
-        publishMapEvent(batchId, DEST_LAT, DEST_LON, "Warehouse", 1.0, "DELIVERED");
+        publishMapEvent(batchId, DEST_LAT, DEST_LON, "Warehouse", 1.0, "DELIVERED", 3.8, 62.0);
         
         activeSimulations.remove(batchId);
         System.out.println("✅ Map simulation completed for batch: " + batchId);
     }
     
     /**
-     * Publish a map simulation event
+     * Publish a map simulation event with environmental data
      */
     private void publishMapEvent(String batchId, double lat, double lon, 
-                                  String locationName, double progress, String status) {
+                                  String locationName, double progress, String status,
+                                  double temperature, double humidity) {
         MapSimulationEvent event = new MapSimulationEvent(
-            batchId, lat, lon, locationName, progress, status
+            batchId, lat, lon, locationName, progress, status, temperature, humidity
         );
         producer.sendMapSimulationEvent(event);
     }
