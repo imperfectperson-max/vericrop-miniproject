@@ -115,8 +115,7 @@ public class SimulationService {
         logger.info("Starting simulation for batch: {}, {} waypoints, interval: {}ms", 
                    batchId, route.size(), emitIntervalMs);
         
-        // Calculate total duration and waypoint interval
-        long totalDurationMs = route.get(route.size() - 1).getTimestamp() - route.get(0).getTimestamp();
+        // Get total waypoint count
         int totalWaypoints = route.size();
         
         // Create scheduled task
@@ -141,11 +140,10 @@ public class SimulationService {
                 // Calculate progress
                 double progressPercent = (double) task.currentWaypointIndex / task.route.size() * 100.0;
                 
-                // Calculate ETA (time remaining)
-                long currentTime = System.currentTimeMillis();
-                long startTime = task.route.get(0).getTimestamp();
-                long expectedEndTime = task.route.get(task.route.size() - 1).getTimestamp();
-                long eta = expectedEndTime - currentTime;
+                // Calculate ETA (time remaining) based on progress
+                int remainingWaypoints = task.route.size() - task.currentWaypointIndex;
+                long estimatedTimePerWaypoint = emitIntervalMs; // Approximate time per waypoint
+                long eta = remainingWaypoints * estimatedTimePerWaypoint;
                 if (eta < 0) eta = 0;
                 
                 // Determine status based on progress

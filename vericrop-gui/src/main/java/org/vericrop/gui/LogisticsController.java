@@ -778,40 +778,43 @@ public class LogisticsController implements SimulationListener {
     
     /**
      * Update shipments table row for a specific batch.
+     * Since Shipment is immutable, we remove and re-add to update.
      */
     private void updateShipmentsTableRow(String batchId, double progress, String currentLocation) {
         if (shipmentsTable == null) return;
         
         try {
-            // Find existing shipment in table and update it, or create new one
-            boolean found = false;
+            // Determine status based on progress
+            String status = progress < 30 ? "In Transit - Departing" : 
+                           progress < 70 ? "In Transit - En Route" :
+                           progress < 90 ? "In Transit - Approaching" : 
+                           progress >= 100 ? "Delivered" : "At Warehouse";
+            
+            // Find and remove existing shipment
+            Shipment existingShipment = null;
             for (Shipment shipment : shipments) {
                 if (shipment.getBatchId().equals(batchId)) {
-                    // Note: Shipment class is immutable, so we'd need to remove and re-add
-                    // For now, just log that we'd update it
-                    found = true;
-                    System.out.println("Would update shipment row: " + batchId + " to " + progress + "%");
+                    existingShipment = shipment;
                     break;
                 }
             }
             
-            if (!found && progress < 100) {
-                // Add new shipment to table
-                String status = progress < 30 ? "In Transit - Departing" : 
-                               progress < 70 ? "In Transit - En Route" :
-                               progress < 90 ? "In Transit - Approaching" : "At Warehouse";
-                
-                Shipment newShipment = new Shipment(
+            if (existingShipment != null) {
+                shipments.remove(existingShipment);
+            }
+            
+            // Create updated shipment (or new if not found)
+            if (progress < 100) {
+                Shipment updatedShipment = new Shipment(
                     batchId,
                     status,
                     currentLocation != null ? currentLocation : "Unknown",
-                    0.0, // Temperature will be updated separately
-                    0.0, // Humidity will be updated separately
-                    "Calculating...",
-                    "TRUCK-" + batchId.hashCode() % 1000
+                    existingShipment != null ? existingShipment.getTemperature() : 0.0,
+                    existingShipment != null ? existingShipment.getHumidity() : 0.0,
+                    String.format("%.0f%% Complete", progress),
+                    existingShipment != null ? existingShipment.getVehicle() : "TRUCK-" + batchId.hashCode() % 1000
                 );
-                shipments.add(newShipment);
-                System.out.println("Added new shipment to table: " + batchId);
+                shipments.add(updatedShipment);
             }
             
         } catch (Exception e) {
@@ -832,15 +835,15 @@ public class LogisticsController implements SimulationListener {
                 // Move marker to destination
                 updateMapMarkerPosition(batchId, 100.0, "Delivered");
                 
-                // Schedule cleanup after 5 seconds
-                new Thread(() -> {
-                    try {
-                        Thread.sleep(5000);
+                // Schedule cleanup using syncExecutor instead of creating new thread
+                if (syncExecutor != null && !syncExecutor.isShutdown()) {
+                    syncExecutor.schedule(() -> {
                         Platform.runLater(() -> cleanupMapMarker(batchId));
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                    }
-                }).start();
+                    }, 5, TimeUnit.SECONDS);
+                } else {
+                    // Fallback: clean up immediately if executor not available
+                    cleanupMapMarker(batchId);
+                }
             } else {
                 // Remove marker immediately if stopped manually
                 cleanupMapMarker(batchId);
