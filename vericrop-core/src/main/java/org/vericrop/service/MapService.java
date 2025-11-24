@@ -173,4 +173,96 @@ public class MapService {
         routeRegistry.remove(batchId);
         logger.debug("Cleared route metadata for batch: {}", batchId);
     }
+    
+    /**
+     * Generate a multi-leg route: origin -> warehouse -> destination.
+     * Creates a realistic route that goes through an intermediate warehouse location.
+     * 
+     * @param batchId Batch identifier
+     * @param origin Starting location (farmer)
+     * @param warehouse Intermediate warehouse location
+     * @param destination Final destination (consumer)
+     * @param waypointsPerLeg Number of waypoints per leg
+     * @param startTime Start timestamp
+     * @param avgSpeedKmh Average speed in km/h
+     * @param scenario Delivery scenario
+     * @return Combined list of waypoints for the full route
+     */
+    public List<RouteWaypoint> generateMultiLegRoute(String batchId, GeoCoordinate origin,
+                                                     GeoCoordinate warehouse, GeoCoordinate destination,
+                                                     int waypointsPerLeg, long startTime,
+                                                     double avgSpeedKmh, Scenario scenario) {
+        logger.info("Generating multi-leg route: {} -> {} -> {}", 
+                   origin.getName(), warehouse.getName(), destination.getName());
+        
+        // Generate first leg: origin -> warehouse
+        List<RouteWaypoint> leg1 = generateRoute(
+            batchId + "_leg1", origin, warehouse, waypointsPerLeg, 
+            startTime, avgSpeedKmh, scenario);
+        
+        // Calculate start time for second leg
+        long leg1EndTime = leg1.isEmpty() ? startTime : leg1.get(leg1.size() - 1).getTimestamp();
+        
+        // Generate second leg: warehouse -> destination
+        List<RouteWaypoint> leg2 = generateRoute(
+            batchId + "_leg2", warehouse, destination, waypointsPerLeg,
+            leg1EndTime, avgSpeedKmh, scenario);
+        
+        // Combine legs (exclude duplicate warehouse waypoint)
+        List<RouteWaypoint> fullRoute = new ArrayList<>(leg1);
+        if (!leg2.isEmpty()) {
+            // Skip first waypoint of leg2 as it's the same as last of leg1
+            fullRoute.addAll(leg2.subList(1, leg2.size()));
+        }
+        
+        // Calculate total distance and duration
+        double totalDistance = calculateDistance(origin, warehouse) + 
+                              calculateDistance(warehouse, destination);
+        long totalDuration = fullRoute.isEmpty() ? 0 : 
+                           fullRoute.get(fullRoute.size() - 1).getTimestamp() - startTime;
+        
+        // Register combined route metadata
+        RouteMetadata metadata = new RouteMetadata(batchId, origin, destination,
+                                                   fullRoute.size(), totalDistance, totalDuration);
+        routeRegistry.put(batchId, metadata);
+        
+        logger.info("Generated multi-leg route for batch {}: {} waypoints, {:.2f} km, {} ms",
+                   batchId, fullRoute.size(), totalDistance, totalDuration);
+        
+        return fullRoute;
+    }
+    
+    /**
+     * Concatenate multiple route segments into a single route with proper timestamp progression.
+     * 
+     * @param routeSegments List of route segments to concatenate
+     * @return Combined route with sequential timestamps
+     */
+    public List<RouteWaypoint> concatenateRoutes(List<List<RouteWaypoint>> routeSegments) {
+        if (routeSegments == null || routeSegments.isEmpty()) {
+            return new ArrayList<>();
+        }
+        
+        List<RouteWaypoint> combined = new ArrayList<>();
+        
+        for (int i = 0; i < routeSegments.size(); i++) {
+            List<RouteWaypoint> segment = routeSegments.get(i);
+            if (segment == null || segment.isEmpty()) {
+                continue;
+            }
+            
+            if (i == 0) {
+                // First segment - add all waypoints
+                combined.addAll(segment);
+            } else {
+                // Subsequent segments - skip first waypoint to avoid duplication
+                combined.addAll(segment.subList(1, segment.size()));
+            }
+        }
+        
+        logger.debug("Concatenated {} route segments into {} waypoints", 
+                    routeSegments.size(), combined.size());
+        
+        return combined;
+    }
 }

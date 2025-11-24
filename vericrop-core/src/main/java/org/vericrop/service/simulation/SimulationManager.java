@@ -2,10 +2,14 @@ package org.vericrop.service.simulation;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.vericrop.service.DeliverySimulator;
+import org.vericrop.service.*;
+import org.vericrop.service.models.Alert;
+import org.vericrop.service.models.GeoCoordinate;
+import org.vericrop.service.models.RouteWaypoint;
+import org.vericrop.service.models.Scenario;
 
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -17,10 +21,24 @@ public class SimulationManager {
     private static final Logger logger = LoggerFactory.getLogger(SimulationManager.class);
     private static volatile SimulationManager instance;
     
+    // Compliance monitoring constants
+    private static final double VIOLATION_RATE_THRESHOLD = 10.0; // Percent
+    private static final double CRITICAL_VIOLATION_RATE_THRESHOLD = 30.0; // Percent
+    private static final double TEMPERATURE_MAX_THRESHOLD = 8.0; // °C
+    private static final int COMPLIANCE_INITIAL_DELAY_SECONDS = 10;
+    private static final int COMPLIANCE_CHECK_INTERVAL_SECONDS = 15;
+    
+    // Route generation constants
+    private static final double WAREHOUSE_LOCATION_OFFSET = 0.05; // Degrees lat/lon offset for warehouse
+    
     private final DeliverySimulator deliverySimulator;
+    private final MapService mapService;
+    private final TemperatureService temperatureService;
+    private final AlertService alertService;
     private final List<SimulationListener> listeners;
     private final AtomicReference<SimulationState> currentSimulation;
     private final AtomicBoolean running;
+    private final ScheduledExecutorService complianceCheckExecutor;
     
     /**
      * Internal state holder for current simulation.
@@ -42,14 +60,27 @@ public class SimulationManager {
     }
     
     /**
-     * Private constructor for singleton pattern.
+     * Private constructor for singleton pattern (legacy - backward compatibility).
      */
     private SimulationManager(DeliverySimulator deliverySimulator) {
+        this(deliverySimulator, null, null, null);
+    }
+    
+    /**
+     * Private constructor with full dependencies.
+     */
+    private SimulationManager(DeliverySimulator deliverySimulator, MapService mapService,
+                             TemperatureService temperatureService, AlertService alertService) {
         this.deliverySimulator = deliverySimulator;
+        this.mapService = mapService != null ? mapService : new MapService();
+        this.temperatureService = temperatureService != null ? temperatureService : new TemperatureService();
+        this.alertService = alertService != null ? alertService : new AlertService();
         this.listeners = new CopyOnWriteArrayList<>();
         this.currentSimulation = new AtomicReference<>();
         this.running = new AtomicBoolean(false);
-        logger.info("SimulationManager initialized");
+        this.complianceCheckExecutor = Executors.newScheduledThreadPool(1, 
+            r -> new Thread(r, "SimulationManager-ComplianceCheck"));
+        logger.info("SimulationManager initialized with integrated services");
     }
     
     /**
@@ -64,13 +95,30 @@ public class SimulationManager {
     }
     
     /**
-     * Initialize the SimulationManager singleton.
+     * Initialize the SimulationManager singleton (legacy - backward compatibility).
      * Should be called once during application startup.
      */
     public static synchronized void initialize(DeliverySimulator deliverySimulator) {
         if (instance == null) {
             instance = new SimulationManager(deliverySimulator);
-            logger.info("SimulationManager singleton created");
+            logger.info("SimulationManager singleton created (legacy mode)");
+        }
+    }
+    
+    /**
+     * Initialize the SimulationManager singleton with full dependencies.
+     * Should be called once during application startup.
+     * 
+     * @param deliverySimulator Delivery simulator instance
+     * @param mapService Map service for route generation
+     * @param temperatureService Temperature monitoring service
+     * @param alertService Alert service for compliance violations
+     */
+    public static synchronized void initialize(DeliverySimulator deliverySimulator, MapService mapService,
+                                              TemperatureService temperatureService, AlertService alertService) {
+        if (instance == null) {
+            instance = new SimulationManager(deliverySimulator, mapService, temperatureService, alertService);
+            logger.info("SimulationManager singleton created with integrated services");
         }
     }
     
@@ -111,43 +159,176 @@ public class SimulationManager {
     }
     
     /**
-     * Start a new simulation.
+     * Start a new simulation (legacy method - backward compatibility).
      */
     public void startSimulation(String batchId, String farmerId, 
                                DeliverySimulator.GeoCoordinate origin,
                                DeliverySimulator.GeoCoordinate destination,
                                int numWaypoints, double avgSpeedKmh, long updateIntervalMs) {
+        startSimulation(batchId, farmerId, origin, destination, numWaypoints, avgSpeedKmh, 
+                       updateIntervalMs, null);
+    }
+    
+    /**
+     * Start a new simulation with scenario support.
+     * 
+     * @param batchId Batch identifier
+     * @param farmerId Farmer/producer identifier
+     * @param origin Starting location
+     * @param destination Final destination
+     * @param numWaypoints Number of waypoints per route segment
+     * @param avgSpeedKmh Average speed in km/h
+     * @param updateIntervalMs Update interval for simulation
+     * @param scenario Delivery scenario (null = NORMAL)
+     */
+    public void startSimulation(String batchId, String farmerId, 
+                               DeliverySimulator.GeoCoordinate origin,
+                               DeliverySimulator.GeoCoordinate destination,
+                               int numWaypoints, double avgSpeedKmh, long updateIntervalMs,
+                               Scenario scenario) {
         if (running.get()) {
             logger.warn("Simulation already running for batch: {}", currentSimulation.get().batchId);
             notifyError(batchId, "Another simulation is already running");
             return;
         }
         
+        // Use NORMAL scenario if none provided
+        Scenario effectiveScenario = scenario != null ? scenario : Scenario.NORMAL;
+        
         try {
-            // Generate route
+            logger.info("=== Starting End-to-End Simulation ===");
+            logger.info("Batch: {}, Farmer: {}, Scenario: {}", batchId, farmerId, effectiveScenario.getDisplayName());
+            
             long startTime = System.currentTimeMillis();
-            var route = deliverySimulator.generateRoute(origin, destination, numWaypoints, startTime, avgSpeedKmh);
             
-            // Start simulation in DeliverySimulator
-            deliverySimulator.startSimulation(batchId, route, updateIntervalMs);
+            // Step 1: Generate multi-leg route (Farmer -> Warehouse -> Consumer)
+            logger.info("Step 1: Generating multi-leg route...");
+            GeoCoordinate originModel = new GeoCoordinate(origin.getLatitude(), origin.getLongitude(), origin.getName());
+            GeoCoordinate destModel = new GeoCoordinate(destination.getLatitude(), destination.getLongitude(), destination.getName());
             
-            // Update state
+            // Generate intermediate warehouse location (midpoint with slight offset)
+            double warehouseLat = (origin.getLatitude() + destination.getLatitude()) / 2.0 + WAREHOUSE_LOCATION_OFFSET;
+            double warehouseLon = (origin.getLongitude() + destination.getLongitude()) / 2.0 + WAREHOUSE_LOCATION_OFFSET;
+            GeoCoordinate warehouse = new GeoCoordinate(warehouseLat, warehouseLon, "Distribution Warehouse");
+            
+            List<RouteWaypoint> route = mapService.generateMultiLegRoute(
+                batchId, originModel, warehouse, destModel, 
+                numWaypoints, startTime, avgSpeedKmh, effectiveScenario);
+            
+            logger.info("Generated route with {} waypoints", route.size());
+            
+            // Step 2: Start temperature monitoring
+            logger.info("Step 2: Starting temperature monitoring...");
+            temperatureService.startMonitoring(batchId);
+            
+            // Step 3: Record route temperatures
+            logger.info("Step 3: Recording route environmental data...");
+            temperatureService.recordRoute(batchId, route);
+            
+            // Step 4: Start DeliverySimulator
+            logger.info("Step 4: Starting delivery simulation...");
+            // Convert model waypoints to legacy format
+            List<DeliverySimulator.RouteWaypoint> legacyRoute = new java.util.ArrayList<>();
+            for (RouteWaypoint wp : route) {
+                DeliverySimulator.GeoCoordinate legacyCoord = new DeliverySimulator.GeoCoordinate(
+                    wp.getLocation().getLatitude(),
+                    wp.getLocation().getLongitude(),
+                    wp.getLocation().getName()
+                );
+                legacyRoute.add(new DeliverySimulator.RouteWaypoint(
+                    legacyCoord, wp.getTimestamp(), wp.getTemperature(), wp.getHumidity()
+                ));
+            }
+            
+            deliverySimulator.startSimulation(batchId, farmerId, legacyRoute, updateIntervalMs, effectiveScenario);
+            
+            // Step 5: Update state
             SimulationState state = new SimulationState(batchId, farmerId);
             currentSimulation.set(state);
             running.set(true);
             
+            // Step 5: Start temperature compliance checking
+            logger.info("Step 5: Starting temperature compliance monitoring...");
+            startComplianceChecking(batchId);
+            
             // Notify listeners
             notifyStarted(batchId, farmerId);
             
-            logger.info("Started simulation for batch: {}, farmer: {}", batchId, farmerId);
+            logger.info("=== Simulation Started Successfully ===");
+            logger.info("Batch: {}, Scenario: {}, Waypoints: {}", 
+                       batchId, effectiveScenario.getDisplayName(), route.size());
             
-            // Start progress monitoring (simplified - in real implementation would track actual progress)
+            // Start progress monitoring
             startProgressMonitoring(batchId);
             
         } catch (Exception e) {
             logger.error("Failed to start simulation for batch: {}", batchId, e);
             notifyError(batchId, "Failed to start simulation: " + e.getMessage());
         }
+    }
+    
+    /**
+     * Start periodic temperature compliance checking.
+     * Checks temperature monitoring data and generates alerts for violations.
+     */
+    private void startComplianceChecking(String batchId) {
+        ScheduledFuture<?> complianceTask = complianceCheckExecutor.scheduleAtFixedRate(() -> {
+            try {
+                if (!running.get() || currentSimulation.get() == null || 
+                    !currentSimulation.get().batchId.equals(batchId)) {
+                    return; // Simulation stopped or different batch
+                }
+                
+                TemperatureService.TemperatureMonitoring monitoring = 
+                    temperatureService.getMonitoring(batchId);
+                
+                if (monitoring != null && monitoring.getReadingCount() > 0) {
+                    // Check for temperature violations
+                    if (monitoring.getViolationCount() > 0) {
+                        double violationRate = (double) monitoring.getViolationCount() / 
+                                              monitoring.getReadingCount() * 100.0;
+                        
+                        if (violationRate > VIOLATION_RATE_THRESHOLD) {
+                            String message = String.format(
+                                "Temperature compliance violation: %.1f%% of readings out of range " +
+                                "(min: %.1f°C, max: %.1f°C, avg: %.1f°C)",
+                                violationRate, monitoring.getMinTemp(), 
+                                monitoring.getMaxTemp(), monitoring.getAvgTemp()
+                            );
+                            
+                            Alert.Severity severity = violationRate > CRITICAL_VIOLATION_RATE_THRESHOLD ? 
+                                Alert.Severity.CRITICAL : Alert.Severity.HIGH;
+                            
+                            Alert alert = new Alert(
+                                java.util.UUID.randomUUID().toString(),
+                                batchId,
+                                Alert.AlertType.TEMPERATURE_HIGH,
+                                severity,
+                                message,
+                                monitoring.getAvgTemp(),
+                                TEMPERATURE_MAX_THRESHOLD,
+                                System.currentTimeMillis(),
+                                "Compliance Monitor"
+                            );
+                            
+                            alertService.recordAlert(alert);
+                            logger.warn("Compliance alert generated for batch {}: {}", batchId, message);
+                        }
+                    }
+                    
+                    // Log compliance status
+                    if (monitoring.getReadingCount() % 10 == 0) { // Log every 10 readings
+                        logger.debug("Compliance check - Batch: {}, Violations: {}/{}, Avg Temp: {:.1f}°C",
+                                   batchId, monitoring.getViolationCount(), 
+                                   monitoring.getReadingCount(), monitoring.getAvgTemp());
+                    }
+                }
+            } catch (Exception e) {
+                logger.error("Error in compliance checking for batch: {}", batchId, e);
+            }
+        }, COMPLIANCE_INITIAL_DELAY_SECONDS, COMPLIANCE_CHECK_INTERVAL_SECONDS, TimeUnit.SECONDS);
+        
+        logger.info("Started compliance checking for batch: {}", batchId);
     }
     
     /**
@@ -341,6 +522,20 @@ public class SimulationManager {
         if (running.get()) {
             stopSimulation();
         }
+        
+        // Shutdown compliance check executor
+        if (complianceCheckExecutor != null) {
+            complianceCheckExecutor.shutdown();
+            try {
+                if (!complianceCheckExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
+                    complianceCheckExecutor.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                complianceCheckExecutor.shutdownNow();
+            }
+        }
+        
         listeners.clear();
         logger.info("SimulationManager shutdown complete");
     }
