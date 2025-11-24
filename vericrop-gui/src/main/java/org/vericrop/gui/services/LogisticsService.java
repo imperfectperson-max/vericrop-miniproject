@@ -45,9 +45,8 @@ public class LogisticsService {
         try {
             System.out.println("🚀 Starting map and compliance simulations for batch: " + batchId);
             
-            // Start map simulation
+            // Start map simulation (logs its own success message)
             startMapSimulation(batchId, duration);
-            System.out.println("✅ Map simulation started for batch: " + batchId);
             
             // Start temperature compliance if service is provided
             if (tempService != null) {
