@@ -1120,70 +1120,112 @@ public class ProducerController implements SimulationListener {
                 return;
             }
 
-            // Get farmer ID from field or use default
-            String farmerId = farmerField.getText();
-            if (farmerId == null || farmerId.trim().isEmpty()) {
+            // Get farmer ID from field or use default (make it final for lambda)
+            final String farmerId;
+            String tempFarmerId = farmerField.getText();
+            if (tempFarmerId == null || tempFarmerId.trim().isEmpty()) {
                 farmerId = "Unknown Farmer";
+            } else {
+                farmerId = tempFarmerId;
             }
 
             // Generate sample route: Farm to Warehouse
-            var origin = new org.vericrop.service.DeliverySimulator.GeoCoordinate(
+            final var origin = new org.vericrop.service.DeliverySimulator.GeoCoordinate(
                     42.3601, -71.0589, "Sunny Valley Farm"
             );
-            var destination = new org.vericrop.service.DeliverySimulator.GeoCoordinate(
+            final var destination = new org.vericrop.service.DeliverySimulator.GeoCoordinate(
                     42.3736, -71.1097, "Metro Fresh Warehouse"
             );
 
-            // Extended simulation flow:
-            // 1. Increase simulation duration (from 10 to 20 waypoints for longer simulation)
-            // 2. Start map simulation
-            // 3. Start temperature compliance simulation
-            // 4. Publish batch lifecycle events
+            final Duration simulationDuration = Duration.ofMinutes(30); // Extended duration
+            final String finalBatchId = selectedBatchId; // Make final for lambda
             
-            Duration simulationDuration = Duration.ofMinutes(30); // Extended duration
-            
-            // Publish batch lifecycle event: DISPATCHED
-            if (batchUpdateProducer != null) {
-                BatchUpdateEvent dispatchEvent = new BatchUpdateEvent(
-                    selectedBatchId, "DISPATCHED", "Farm Location", null, 
-                    "Batch dispatched for delivery simulation"
-                );
-                batchUpdateProducer.sendBatchUpdateEvent(dispatchEvent);
-                System.out.println("📦 Published DISPATCHED event for batch: " + selectedBatchId);
-            }
+            // Immediately provide UI feedback - disable Start, enable Stop
+            Platform.runLater(() -> {
+                if (startSimButton != null) {
+                    startSimButton.setDisable(true);
+                }
+                if (stopSimButton != null) {
+                    stopSimButton.setDisable(false);
+                }
+                if (simStatusLabel != null) {
+                    simStatusLabel.setText("⏳ Starting simulation...");
+                    simStatusLabel.setStyle("-fx-text-fill: #F59E0B;");
+                }
+            });
 
-            // Use SimulationManager to start simulation with longer duration (20 waypoints instead of 10)
-            SimulationManager manager = MainApp.getInstance().getApplicationContext().getSimulationManager();
-            manager.startSimulation(selectedBatchId, farmerId, origin, destination, 20, 50.0, 10000);
+            // Run all blocking/long-running operations asynchronously
+            CompletableFuture.runAsync(() -> {
+                try {
+                    // Publish batch lifecycle event: DISPATCHED
+                    if (batchUpdateProducer != null) {
+                        BatchUpdateEvent dispatchEvent = new BatchUpdateEvent(
+                            finalBatchId, "DISPATCHED", "Farm Location", null, 
+                            "Batch dispatched for delivery simulation"
+                        );
+                        batchUpdateProducer.sendBatchUpdateEvent(dispatchEvent);
+                        System.out.println("📦 Published DISPATCHED event for batch: " + finalBatchId);
+                    }
 
-            // Start map simulation in LogisticsService
-            if (logisticsService != null) {
-                logisticsService.startMapSimulation(selectedBatchId, simulationDuration);
-                System.out.println("🗺️ Map simulation started for batch: " + selectedBatchId);
-            }
-            
-            // Start temperature compliance simulation (use scenario-01 as default)
-            if (temperatureComplianceService != null) {
-                temperatureComplianceService.startComplianceSimulation(
-                    selectedBatchId, "example-01", simulationDuration
-                );
-                System.out.println("🌡️ Temperature compliance simulation started for batch: " + selectedBatchId);
-            }
+                    // Use SimulationManager to start simulation with longer duration (20 waypoints instead of 10)
+                    SimulationManager manager = MainApp.getInstance().getApplicationContext().getSimulationManager();
+                    manager.startSimulation(finalBatchId, farmerId, origin, destination, 20, 50.0, 10000);
 
-            // Notify logistics controller about the new simulation
-            notifyLogisticsAboutSimulation(selectedBatchId);
+                    // Start map simulation in LogisticsService
+                    if (logisticsService != null) {
+                        logisticsService.startMapSimulation(finalBatchId, simulationDuration);
+                        System.out.println("🗺️ Map simulation started for batch: " + finalBatchId);
+                    }
+                    
+                    // Start temperature compliance simulation (use scenario-01 as default)
+                    if (temperatureComplianceService != null) {
+                        temperatureComplianceService.startComplianceSimulation(
+                            finalBatchId, "example-01", simulationDuration
+                        );
+                        System.out.println("🌡️ Temperature compliance simulation started for batch: " + finalBatchId);
+                    }
 
-            // UI updates will be handled by SimulationListener callbacks
-            // Create alert
-            var alertService = MainApp.getInstance().getApplicationContext().getAlertService();
-            alertService.info("Simulation Started",
-                    "Extended delivery simulation for " + selectedBatchId + " is now running with " +
-                    "map tracking and temperature compliance monitoring",
-                    "simulator");
+                    // Notify logistics controller about the new simulation
+                    notifyLogisticsAboutSimulation(finalBatchId);
 
-            System.out.println("✅ Extended simulation started for: " + selectedBatchId);
+                    // UI updates will be handled by SimulationListener callbacks
+                    // Create alert on UI thread
+                    Platform.runLater(() -> {
+                        var alertService = MainApp.getInstance().getApplicationContext().getAlertService();
+                        alertService.info("Simulation Started",
+                                "Extended delivery simulation for " + finalBatchId + " is now running with " +
+                                "map tracking and temperature compliance monitoring",
+                                "simulator");
+                    });
+
+                    System.out.println("✅ Extended simulation started for: " + finalBatchId);
+
+                } catch (Exception e) {
+                    // Handle errors and restore button states on UI thread
+                    System.err.println("❌ Failed to start simulation: " + e.getMessage());
+                    e.printStackTrace();
+                    
+                    Platform.runLater(() -> {
+                        // Restore button states
+                        if (startSimButton != null) {
+                            startSimButton.setDisable(false);
+                        }
+                        if (stopSimButton != null) {
+                            stopSimButton.setDisable(true);
+                        }
+                        if (simStatusLabel != null) {
+                            simStatusLabel.setText("❌ Error: " + e.getMessage());
+                            simStatusLabel.setStyle("-fx-text-fill: #DC2626;");
+                        }
+                        
+                        // Show error alert
+                        showError("Failed to start simulation: " + e.getMessage());
+                    });
+                }
+            }, backgroundExecutor);
 
         } catch (Exception e) {
+            // Handle synchronous errors (e.g., batch selection dialog errors)
             Platform.runLater(() -> {
                 if (simStatusLabel != null) {
                     simStatusLabel.setText("❌ Error: " + e.getMessage());
