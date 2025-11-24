@@ -1965,6 +1965,16 @@ If tests fail:
    open htmlcov/index.html
    ```
 
+## Simulation Features
+
+VeriCrop includes a comprehensive simulation system for testing and demonstration purposes. The simulation integrates:
+- Map-based entity tracking (producers, vehicles, warehouses, consumers)
+- Real-time temperature and humidity monitoring
+- Three pre-configured delivery scenarios
+- REST API for programmatic access
+
+For detailed simulation testing procedures, see [TESTING_SIMULATION.md](TESTING_SIMULATION.md).
+
 ## Stopping and Cleaning
 
 Properly stop services and clean up resources when done.
