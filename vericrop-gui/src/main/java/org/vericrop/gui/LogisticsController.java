@@ -63,8 +63,8 @@ public class LogisticsController implements SimulationListener {
     private TemperatureComplianceEventConsumer temperatureComplianceConsumer;
     private ExecutorService kafkaConsumerExecutor;
     
-    // Track temperature chart series by batch ID
-    private Map<String, XYChart.Series<String, Number>> temperatureSeriesMap = new HashMap<>();
+    // Track temperature chart series by batch ID (thread-safe for Kafka consumer access)
+    private Map<String, XYChart.Series<String, Number>> temperatureSeriesMap = new ConcurrentHashMap<>();
     
     // Track latest environmental data by batch ID for shipments table
     private Map<String, ShipmentEnvironmentalData> environmentalDataMap = new ConcurrentHashMap<>();
@@ -95,6 +95,16 @@ public class LogisticsController implements SimulationListener {
     // Temperature chart configuration
     private static final int MAX_CHART_DATA_POINTS = 20;
     private static final int MAX_ALERT_ITEMS = 50;
+    
+    // Simulation progress thresholds (percentage)
+    private static final double PROGRESS_DEPARTING_THRESHOLD = 10.0;
+    private static final double PROGRESS_EN_ROUTE_THRESHOLD = 30.0;
+    private static final double PROGRESS_APPROACHING_THRESHOLD = 70.0;
+    private static final double PROGRESS_AT_WAREHOUSE_THRESHOLD = 90.0;
+    private static final double PROGRESS_COMPLETE = 100.0;
+    
+    // Simulation timing
+    private static final int ESTIMATED_TOTAL_TRIP_MINUTES = 120;
 
     @FXML
     public void initialize() {
@@ -1000,9 +1010,9 @@ public class LogisticsController implements SimulationListener {
                 
                 // Determine which states are completed based on progress
                 boolean createdComplete = true;
-                boolean inTransitComplete = progress >= 10;
-                boolean approachingComplete = progress >= 70;
-                boolean deliveredComplete = progress >= 100;
+                boolean inTransitComplete = progress >= PROGRESS_DEPARTING_THRESHOLD;
+                boolean approachingComplete = progress >= PROGRESS_APPROACHING_THRESHOLD;
+                boolean deliveredComplete = progress >= PROGRESS_COMPLETE;
                 
                 // Add "Created" state
                 addTimelineItem("Created", 
@@ -1016,7 +1026,7 @@ public class LogisticsController implements SimulationListener {
                 
                 // Add "Approaching Warehouse" state
                 addTimelineItem("Approaching", 
-                    progress >= 70 ? "Nearing destination" : "Not yet approaching",
+                    progress >= PROGRESS_APPROACHING_THRESHOLD ? "Nearing destination" : "Not yet approaching",
                     approachingComplete);
                 
                 // Add "At Warehouse / Delivered" state
@@ -1061,9 +1071,9 @@ public class LogisticsController implements SimulationListener {
      * Calculate ETA string based on progress.
      */
     private String calculateETA(double progress) {
-        if (progress >= 100) return "ARRIVED";
+        if (progress >= PROGRESS_COMPLETE) return "ARRIVED";
         double remaining = 1.0 - (progress / 100.0);
-        int etaMinutes = (int) (remaining * 120); // Assuming 2 hour total trip
+        int etaMinutes = (int) (remaining * ESTIMATED_TOTAL_TRIP_MINUTES);
         return etaMinutes + " min";
     }
     
@@ -1104,10 +1114,10 @@ public class LogisticsController implements SimulationListener {
             updateShipmentsTableRow(batchId, progress, currentLocation);
             
             // Update timeline to show current state
-            String status = progress < 30 ? "In Transit - Departing" : 
-                           progress < 70 ? "In Transit - En Route" :
-                           progress < 90 ? "In Transit - Approaching" : 
-                           progress >= 100 ? "Delivered" : "At Warehouse";
+            String status = progress < PROGRESS_EN_ROUTE_THRESHOLD ? "In Transit - Departing" : 
+                           progress < PROGRESS_APPROACHING_THRESHOLD ? "In Transit - En Route" :
+                           progress < PROGRESS_AT_WAREHOUSE_THRESHOLD ? "In Transit - Approaching" : 
+                           progress >= PROGRESS_COMPLETE ? "Delivered" : "At Warehouse";
             updateTimeline(batchId, progress, status);
             
             System.out.println("LogisticsController: Progress update - " + batchId + " at " + progress + "% - " + currentLocation);
@@ -1172,10 +1182,10 @@ public class LogisticsController implements SimulationListener {
         
         try {
             // Determine status based on progress
-            String status = progress < 30 ? "In Transit - Departing" : 
-                           progress < 70 ? "In Transit - En Route" :
-                           progress < 90 ? "In Transit - Approaching" : 
-                           progress >= 100 ? "Delivered" : "At Warehouse";
+            String status = progress < PROGRESS_EN_ROUTE_THRESHOLD ? "In Transit - Departing" : 
+                           progress < PROGRESS_APPROACHING_THRESHOLD ? "In Transit - En Route" :
+                           progress < PROGRESS_AT_WAREHOUSE_THRESHOLD ? "In Transit - Approaching" : 
+                           progress >= PROGRESS_COMPLETE ? "Delivered" : "At Warehouse";
             
             // Find existing shipment by index
             int shipmentIndex = -1;
@@ -1193,7 +1203,7 @@ public class LogisticsController implements SimulationListener {
                 batchId, k -> new ShipmentEnvironmentalData());
             
             // Create updated shipment
-            if (progress < 100) {
+            if (progress < PROGRESS_COMPLETE) {
                 Shipment updatedShipment = new Shipment(
                     batchId,
                     status,
