@@ -102,9 +102,17 @@ curl http://localhost:8080/api/simulation/scenarios/scenario-01
 
 # Get simulation status including map state
 curl http://localhost:8080/api/simulation/status
+
+# Get all active shipments with real-time tracking
+curl http://localhost:8080/api/simulation/active-shipments
+
+# Start a simulation with a specific scenario (via REST API)
+curl -X POST http://localhost:8080/api/simulation/start \
+  -H "Content-Type: application/json" \
+  -d '{"scenario_id": "scenario-02", "batch_id": "BATCH_TEST_001", "farmer_id": "FARMER_A"}'
 ```
 
-**Example Response:**
+**Example Map Snapshot Response:**
 ```json
 {
   "timestamp": 1700000000000,
@@ -135,9 +143,57 @@ curl http://localhost:8080/api/simulation/status
 }
 ```
 
-**Selecting Scenarios in ProducerController:**
+**Example Active Shipments Response:**
+```json
+{
+  "active_shipments": [
+    {
+      "batch_id": "BATCH_001",
+      "running": true,
+      "current_waypoint": 8,
+      "total_waypoints": 20,
+      "progress_percent": 40.0,
+      "current_location": {
+        "name": "Highway Rest Stop",
+        "temperature": 4.5,
+        "humidity": 65.0,
+        "timestamp": 1700000000000
+      },
+      "farmer_id": "FARMER_A",
+      "progress_manager": 40.0,
+      "current_location_name": "Highway Rest Stop"
+    }
+  ],
+  "count": 1,
+  "timestamp": 1700000000000,
+  "simulation_running": true
+}
+```
 
-When starting a simulation through the ProducerController, the system automatically uses the appropriate scenario based on batch parameters. The MapSimulator is initialized with the selected scenario and steps forward in sync with the delivery simulation, updating entity positions each tick.
+**How to Run a Simulation:**
+
+1. **Via GUI Producer Screen:**
+   - Upload a product image for quality assessment
+   - Create a batch with the assessed quality data
+   - Click "Start Simulation" button
+   - Select a batch from the dropdown (or use current batch)
+   - Simulation runs with map tracking and temperature monitoring
+   - View progress in LogisticsController screen
+
+2. **Via REST API:**
+   - Use POST `/api/simulation/start` with scenario selection
+   - Monitor progress via GET `/api/simulation/active-shipments`
+   - Check map state via GET `/api/simulation/map`
+
+**Selecting Scenarios:**
+
+When starting a simulation through the ProducerController, the system defaults to `scenario-01` (Normal). The three available scenarios are:
+
+1. **scenario-01 (Normal Cold-Chain)**: Target 2-5°C, allows one short temperature spike
+2. **scenario-02 (Strict Cold-Chain)**: Target 1-4°C, no spikes allowed, strict compliance
+3. **scenario-03 (High-Risk Delivery)**: Target 0-6°C, multiple temperature events for stress testing
+
+The MapSimulator is initialized with the selected scenario and steps forward in sync with the delivery simulation, updating entity positions each tick. Temperature compliance monitoring generates alerts for violations based on scenario thresholds.
 
 ## Architecture
 
