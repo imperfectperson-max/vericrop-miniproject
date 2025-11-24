@@ -55,24 +55,24 @@ find . -type f -not -path './.git/*' -exec du -h {} + 2>/dev/null | \
         SIZE_NUM=$(echo "$SIZE" | sed 's/[^0-9.]//g')
         SIZE_UNIT=$(echo "$SIZE" | sed 's/[0-9.]//g')
         
-        # Convert to MB for comparison
+        # Convert to MB for comparison using awk
         case "$SIZE_UNIT" in
             K)
-                SIZE_MB=$(echo "scale=2; $SIZE_NUM / 1024" | bc)
+                SIZE_MB=$(awk "BEGIN {printf \"%.2f\", $SIZE_NUM / 1024}")
                 ;;
             M)
                 SIZE_MB=$SIZE_NUM
                 ;;
             G)
-                SIZE_MB=$(echo "scale=2; $SIZE_NUM * 1024" | bc)
+                SIZE_MB=$(awk "BEGIN {printf \"%.2f\", $SIZE_NUM * 1024}")
                 ;;
             *)
                 SIZE_MB=0
                 ;;
         esac
         
-        # Only show files >= MIN_SIZE_MB
-        if (( $(echo "$SIZE_MB >= $MIN_SIZE_MB" | bc -l) )); then
+        # Only show files >= MIN_SIZE_MB using awk
+        if [ "$(awk "BEGIN {print ($SIZE_MB >= $MIN_SIZE_MB)}")" = "1" ]; then
             printf "%-60s %10s\n" "$FILE" "$SIZE"
         fi
     done
@@ -83,15 +83,13 @@ echo ""
 # Calculate total size of large files (>5MB)
 echo "Files larger than 5MB (should be considered for Git LFS or removal):"
 echo "------------------------------------------------------------------------"
-LARGE_COUNT=0
 find . -type f -not -path './.git/*' -size +5M -exec ls -lh {} \; | while read -r line; do
-    LARGE_COUNT=$((LARGE_COUNT + 1))
     SIZE=$(echo "$line" | awk '{print $5}')
     FILE=$(echo "$line" | awk '{print $NF}')
     printf "%-60s %10s\n" "$FILE" "$SIZE"
 done
 
-LARGE_FILE_COUNT=$(find . -type f -not -path './.git/*' -size +5M | wc -l)
+LARGE_FILE_COUNT=$(find . -type f -not -path './.git/*' -size +5M | wc -l | tr -d ' ')
 echo "------------------------------------------------------------------------"
 echo "Total files larger than 5MB: $LARGE_FILE_COUNT"
 echo ""

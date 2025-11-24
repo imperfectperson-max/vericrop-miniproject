@@ -74,21 +74,26 @@ jobs:
       if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
       run: |
         echo "Scanning repository for large files (>5MB)..."
-        MAX_SIZE=5242880  # 5MB in bytes
-        LARGE_FILES_FOUND=0
         
-        # Find all files larger than 5MB
-        find . -type f -not -path './.git/*' -size +5M -exec ls -lh {} \; | while read -r line; do
-          echo "⚠️  Large file found: $line"
-          LARGE_FILES_FOUND=1
-        done
+        # Find all files larger than 5MB and save to temp file
+        find . -type f -not -path './.git/*' -size +5M -exec ls -lh {} \; > large_files.txt
         
-        # Use the find-big-files script if available
+        if [ -s large_files.txt ]; then
+          echo "⚠️  Large files found:"
+          cat large_files.txt
+        else
+          echo "✅ No large files found"
+        fi
+        
+        # Use the find-big-files script if available for detailed report
         if [ -f "scripts/find-big-files.sh" ]; then
           echo ""
           echo "Running find-big-files.sh for detailed report..."
           bash scripts/find-big-files.sh
         fi
+        
+        # Clean up temp file
+        rm -f large_files.txt
         
         # Note: We don't fail on push to main/develop (already merged)
         # This is informational only

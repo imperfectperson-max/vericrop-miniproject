@@ -20,7 +20,7 @@ As of the latest analysis:
    - These PyTorch models for crop quality assessment are binary files
 
 2. **Images** (~1MB+)
-   - `vericrop-gui/src/main/resources/images/vericrop-icon.png.png` (1MB)
+   - `vericrop-gui/src/main/resources/images/vericrop-icon.png` (1MB)
    - Various sample images in `examples/` and `docker/ml-service/tests/data/`
 
 3. **Java JAR files** 

@@ -142,14 +142,6 @@ target/
 *.swo
 *~
 
-# Large files that should use Git LFS
-*.pt
-*.h5
-*.pkl
-*.pickle
-*.model
-
 # Temporary files
 /tmp/
 temp/
-*.tmp
