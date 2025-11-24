@@ -9,6 +9,7 @@ import javafx.scene.layout.Pane;
 import javafx.scene.layout.VBox;
 import javafx.scene.layout.HBox;
 import java.util.Optional;
+import java.util.UUID;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.scene.shape.Circle;
@@ -105,6 +106,9 @@ public class LogisticsController implements SimulationListener {
     // Temperature chart configuration
     private static final int MAX_CHART_DATA_POINTS = 20;
     private static final int MAX_ALERT_ITEMS = 50;
+    
+    // Demo data identifier
+    private static final String DEMO_DATA_SUFFIX = "(demo)";
     
     // Simulation progress thresholds (percentage)
     private static final double PROGRESS_DEPARTING_THRESHOLD = 10.0;
@@ -1013,8 +1017,8 @@ public class LogisticsController implements SimulationListener {
         if (!shipments.isEmpty()) {
             return shipments.get(0).getBatchId();
         }
-        // Default batch ID
-        return "BATCH_DEMO_" + System.currentTimeMillis();
+        // Default batch ID with short UUID suffix
+        return "BATCH_DEMO_" + UUID.randomUUID().toString().substring(0, 8);
     }
 
     @FXML
@@ -1251,7 +1255,7 @@ public class LogisticsController implements SimulationListener {
             if (temperatureSeriesMap.isEmpty() && temperatureChart.getData().size() > 0) {
                 // Check if demo data is present
                 boolean hasDemo = temperatureChart.getData().stream()
-                    .anyMatch(series -> series.getName().contains("(demo)"));
+                    .anyMatch(series -> series.getName().contains(DEMO_DATA_SUFFIX));
                 if (hasDemo) {
                     System.out.println("Clearing demo data from temperature chart");
                     temperatureChart.getData().clear();
@@ -1341,7 +1345,9 @@ public class LogisticsController implements SimulationListener {
             
             // Create smooth animation from current position to new position
             // Duration based on distance traveled (smoother for small movements)
-            double distance = Math.sqrt(Math.pow(newX - currentX, 2) + Math.pow(newY - currentY, 2));
+            double dx = newX - currentX;
+            double dy = newY - currentY;
+            double distance = Math.sqrt(dx * dx + dy * dy);
             double animationDuration = Math.max(500, Math.min(2000, distance * 10)); // 0.5-2 seconds
             
             Timeline timeline = new Timeline(
