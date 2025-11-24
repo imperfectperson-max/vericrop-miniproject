@@ -1,0 +1,21 @@
+{
+  "id": "scenario-03",
+  "description": "High-risk delivery: target 0-6 C, multiple temperature events",
+  "target": {
+    "min": 0.0,
+    "max": 6.0
+  },
+  "duration_minutes": 60,
+  "spikes": [
+    {
+      "at_minute": 15,
+      "duration_minutes": 3,
+      "temperature": 9.0
+    },
+    {
+      "at_minute": 40,
+      "duration_minutes": 5,
+      "temperature": 8.5
+    }
+  ]
+}

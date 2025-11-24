@@ -1,0 +1,16 @@
+{
+  "id": "scenario-01",
+  "description": "Normal cold-chain: target 2-5 C, short spike allowed",
+  "target": {
+    "min": 2.0,
+    "max": 5.0
+  },
+  "duration_minutes": 30,
+  "spikes": [
+    {
+      "at_minute": 12,
+      "duration_minutes": 2,
+      "temperature": 10.0
+    }
+  ]
+}
