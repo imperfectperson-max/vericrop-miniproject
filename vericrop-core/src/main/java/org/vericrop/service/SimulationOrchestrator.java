@@ -12,6 +12,7 @@ import java.util.stream.Collectors;
 /**
  * Orchestrates multiple concurrent delivery simulations.
  * Manages thread pool execution, status monitoring, and event publishing.
+ * Enhanced with Kafka integration for domain-specific event publishing.
  */
 public class SimulationOrchestrator {
     private static final Logger logger = LoggerFactory.getLogger(SimulationOrchestrator.class);
@@ -26,17 +27,25 @@ public class SimulationOrchestrator {
     private final ScheduledExecutorService statusMonitor;
     private final ConcurrentHashMap<String, OrchestrationState> activeOrchestrations;
     
+    // Kafka event publishers (optional, can be null if Kafka is disabled)
+    private Object scenarioEventProducer;
+    private Object temperatureEventProducer;
+    private Object supplierComplianceEventProducer;
+    private Object logisticsEventProducer;
+    
     /**
      * Tracks orchestration state for a multi-scenario execution.
      */
     private static class OrchestrationState {
         final String orchestrationId;
+        final String farmerId;
         final Map<Scenario, String> scenarioBatchIds;
         final long startTime;
         volatile boolean running;
         
-        OrchestrationState(String orchestrationId, Map<Scenario, String> scenarioBatchIds) {
+        OrchestrationState(String orchestrationId, String farmerId, Map<Scenario, String> scenarioBatchIds) {
             this.orchestrationId = orchestrationId;
+            this.farmerId = farmerId;
             this.scenarioBatchIds = new ConcurrentHashMap<>(scenarioBatchIds);
             this.startTime = System.currentTimeMillis();
             this.running = true;
@@ -65,6 +74,44 @@ public class SimulationOrchestrator {
         );
         
         logger.info("SimulationOrchestrator initialized with pool size: {}", ORCHESTRATOR_THREAD_POOL_SIZE);
+    }
+    
+    /**
+     * Set Kafka event producers for domain-specific event publishing.
+     * All parameters are optional and can be null if Kafka is disabled.
+     */
+    public void setKafkaProducers(Object scenarioEventProducer,
+                                 Object temperatureEventProducer,
+                                 Object supplierComplianceEventProducer,
+                                 Object logisticsEventProducer) {
+        this.scenarioEventProducer = scenarioEventProducer;
+        this.temperatureEventProducer = temperatureEventProducer;
+        this.supplierComplianceEventProducer = supplierComplianceEventProducer;
+        this.logisticsEventProducer = logisticsEventProducer;
+        logger.info("Kafka producers configured for orchestrator");
+    }
+    
+    /**
+     * Publish a scenario event to Kafka if producer is configured.
+     */
+    private void publishScenarioEvent(String executionId, String eventType, String scenarioName,
+                                     String farmerId, String batchId) {
+        if (scenarioEventProducer != null) {
+            try {
+                // Use reflection to call sendScenarioEvent method
+                Class<?> eventClass = Class.forName("org.vericrop.kafka.events.ScenarioEvent");
+                Object event = eventClass.getDeclaredConstructor(String.class, String.class, String.class, String.class, String.class)
+                    .newInstance(executionId, eventType, scenarioName, farmerId, batchId);
+                
+                scenarioEventProducer.getClass()
+                    .getMethod("sendScenarioEvent", eventClass)
+                    .invoke(scenarioEventProducer, event);
+                    
+                logger.debug("Published scenario event: {} for batch: {}", eventType, batchId);
+            } catch (Exception e) {
+                logger.warn("Failed to publish scenario event (Kafka may be disabled): {}", e.getMessage());
+            }
+        }
     }
     
     /**
@@ -112,6 +159,9 @@ public class SimulationOrchestrator {
                     logger.info("Starting simulation for scenario: {} (batchId: {})", 
                                scenario.getDisplayName(), batchId);
                     
+                    // Publish scenario started event to Kafka
+                    publishScenarioEvent(orchestrationId, "STARTED", scenario.name(), farmerId, batchId);
+                    
                     // Generate route for this scenario
                     List<DeliverySimulator.RouteWaypoint> route = deliverySimulator.generateRoute(
                         origin, destination, numWaypoints, startTime, avgSpeedKmh, scenario);
@@ -122,9 +172,15 @@ public class SimulationOrchestrator {
                     logger.info("Simulation started successfully for scenario: {} (batchId: {})", 
                                scenario.getDisplayName(), batchId);
                     
+                    // Publish scenario running event to Kafka
+                    publishScenarioEvent(orchestrationId, "RUNNING", scenario.name(), farmerId, batchId);
+                    
                 } catch (Exception e) {
                     logger.error("Failed to start simulation for scenario: {} (batchId: {})", 
                                 scenario.getDisplayName(), batchId, e);
+                    
+                    // Publish scenario failed event to Kafka
+                    publishScenarioEvent(orchestrationId, "FAILED", scenario.name(), farmerId, batchId);
                     
                     publishOrchestrationEvent(orchestrationId, "SIMULATION_FAILED",
                         String.format("Failed to start %s: %s", scenario.getDisplayName(), e.getMessage()));
@@ -135,7 +191,7 @@ public class SimulationOrchestrator {
         }
         
         // Store orchestration state
-        OrchestrationState state = new OrchestrationState(orchestrationId, scenarioBatchIds);
+        OrchestrationState state = new OrchestrationState(orchestrationId, farmerId, scenarioBatchIds);
         activeOrchestrations.put(orchestrationId, state);
         
         // Wait for all simulations to start (non-blocking via separate task)
@@ -234,6 +290,12 @@ public class SimulationOrchestrator {
                     state.running = false;
                     publishOrchestrationEvent(state.orchestrationId, "ORCHESTRATION_COMPLETED",
                         String.format("All %d simulations completed", state.scenarioBatchIds.size()));
+                    
+                    // Publish scenario completed events to Kafka for each batch
+                    for (Map.Entry<Scenario, String> entry : state.scenarioBatchIds.entrySet()) {
+                        publishScenarioEvent(state.orchestrationId, "COMPLETED", 
+                                           entry.getKey().name(), state.farmerId, entry.getValue());
+                    }
                     
                     // Remove from active orchestrations after a delay
                     activeOrchestrations.remove(state.orchestrationId);
