@@ -1212,9 +1212,10 @@ public class LogisticsController implements SimulationListener {
                     approachingComplete);
                 
                 // Add "At Warehouse / Delivered" state
-                addTimelineItem("Delivered", 
-                    deliveredComplete ? "Delivery complete" : "ETA: " + calculateETA(progress),
-                    deliveredComplete);
+                // Fix Bug #3: Only show "Delivered" title when actually delivered (progress >= 100%)
+                String finalStateTitle = deliveredComplete ? "Delivered" : "Pending Delivery";
+                String finalStateDesc = deliveredComplete ? "Delivery complete" : "ETA: " + calculateETA(progress);
+                addTimelineItem(finalStateTitle, finalStateDesc, deliveredComplete);
                 
         } catch (Exception e) {
             System.err.println("Error updating timeline: " + e.getMessage());
