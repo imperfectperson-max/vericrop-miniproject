@@ -6,6 +6,8 @@ import javafx.scene.chart.LineChart;
 import javafx.scene.chart.XYChart;
 import javafx.scene.control.*;
 import javafx.scene.layout.Pane;
+import javafx.scene.layout.VBox;
+import javafx.scene.layout.HBox;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.scene.shape.Circle;
@@ -14,12 +16,20 @@ import javafx.scene.paint.Color;
 import javafx.scene.text.Text;
 import org.vericrop.service.simulation.SimulationListener;
 import org.vericrop.service.simulation.SimulationManager;
+import org.vericrop.dto.MapSimulationEvent;
+import org.vericrop.dto.TemperatureComplianceEvent;
+import org.vericrop.kafka.consumers.MapSimulationEventConsumer;
+import org.vericrop.kafka.consumers.TemperatureComplianceEventConsumer;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ConcurrentHashMap;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 
 public class LogisticsController implements SimulationListener {
 
@@ -31,6 +41,7 @@ public class LogisticsController implements SimulationListener {
     @FXML private TextArea reportArea;
     @FXML private LineChart<String, Number> temperatureChart;
     @FXML private Pane mapContainer;
+    @FXML private VBox timelineContainer;
 
     // Navigation buttons
     @FXML private Button backToProducerButton;
@@ -46,6 +57,32 @@ public class LogisticsController implements SimulationListener {
     private ScheduledExecutorService syncExecutor;
     private Map<String, MapVisualization> activeShipments = new HashMap<>();
     private org.vericrop.service.DeliverySimulator deliverySimulator;
+    
+    // Kafka consumers for real-time events
+    private MapSimulationEventConsumer mapSimulationConsumer;
+    private TemperatureComplianceEventConsumer temperatureComplianceConsumer;
+    private ExecutorService kafkaConsumerExecutor;
+    
+    // Track temperature chart series by batch ID (thread-safe for Kafka consumer access)
+    private Map<String, XYChart.Series<String, Number>> temperatureSeriesMap = new ConcurrentHashMap<>();
+    
+    // Track latest environmental data by batch ID for shipments table
+    private Map<String, ShipmentEnvironmentalData> environmentalDataMap = new ConcurrentHashMap<>();
+    
+    /**
+     * Helper class to track environmental data for a shipment
+     */
+    private static class ShipmentEnvironmentalData {
+        double temperature = 4.0; // Default cold-chain temp
+        double humidity = 65.0; // Default humidity
+        
+        ShipmentEnvironmentalData() {}
+        
+        ShipmentEnvironmentalData(double temp, double humidity) {
+            this.temperature = temp;
+            this.humidity = humidity;
+        }
+    }
 
     // Map visualization constants
     private static final double MAP_WIDTH = 350;
@@ -54,6 +91,20 @@ public class LogisticsController implements SimulationListener {
     private static final double ORIGIN_Y = 100;
     private static final double DESTINATION_X = 300;
     private static final double DESTINATION_Y = 100;
+    
+    // Temperature chart configuration
+    private static final int MAX_CHART_DATA_POINTS = 20;
+    private static final int MAX_ALERT_ITEMS = 50;
+    
+    // Simulation progress thresholds (percentage)
+    private static final double PROGRESS_DEPARTING_THRESHOLD = 10.0;
+    private static final double PROGRESS_EN_ROUTE_THRESHOLD = 30.0;
+    private static final double PROGRESS_APPROACHING_THRESHOLD = 70.0;
+    private static final double PROGRESS_AT_WAREHOUSE_THRESHOLD = 90.0;
+    private static final double PROGRESS_COMPLETE = 100.0;
+    
+    // Simulation timing
+    private static final int ESTIMATED_TOTAL_TRIP_MINUTES = 120;
 
     @FXML
     public void initialize() {
@@ -64,6 +115,9 @@ public class LogisticsController implements SimulationListener {
         setupNavigationButtons();
         setupMapContainer();
         startSyncService();
+        
+        // Initialize Kafka consumers for real-time updates
+        setupKafkaConsumers();
 
         // Get delivery simulator from application context
         try {
@@ -97,6 +151,241 @@ public class LogisticsController implements SimulationListener {
             }
         } catch (Exception e) {
             System.err.println("Warning: Could not register with SimulationManager: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Setup Kafka consumers for real-time map and temperature events.
+     * Runs consumers in background threads and handles events on JavaFX UI thread.
+     */
+    private void setupKafkaConsumers() {
+        try {
+            kafkaConsumerExecutor = Executors.newFixedThreadPool(2);
+            
+            // Create map simulation consumer with event handler
+            mapSimulationConsumer = new MapSimulationEventConsumer(
+                "logistics-ui-group",
+                this::handleMapSimulationEvent
+            );
+            
+            // Create temperature compliance consumer with event handler
+            temperatureComplianceConsumer = new TemperatureComplianceEventConsumer(
+                "logistics-ui-group",
+                this::handleTemperatureComplianceEvent
+            );
+            
+            // Start consumers in background threads
+            kafkaConsumerExecutor.submit(() -> {
+                try {
+                    mapSimulationConsumer.startConsuming();
+                } catch (Exception e) {
+                    System.err.println("Map simulation consumer error: " + e.getMessage());
+                }
+            });
+            
+            kafkaConsumerExecutor.submit(() -> {
+                try {
+                    temperatureComplianceConsumer.startConsuming();
+                } catch (Exception e) {
+                    System.err.println("Temperature compliance consumer error: " + e.getMessage());
+                }
+            });
+            
+            System.out.println("✅ Kafka consumers initialized for logistics monitoring");
+        } catch (Exception e) {
+            System.err.println("⚠️ Failed to initialize Kafka consumers: " + e.getMessage());
+            // Continue without Kafka - fallback to SimulationListener updates
+        }
+    }
+    
+    /**
+     * Handle map simulation event from Kafka.
+     * Updates map visualization with real-time position data and environmental data.
+     */
+    private void handleMapSimulationEvent(MapSimulationEvent event) {
+        Platform.runLater(() -> {
+            try {
+                // Update environmental data tracking from map event
+                ShipmentEnvironmentalData envData = environmentalDataMap.computeIfAbsent(
+                    event.getBatchId(), k -> new ShipmentEnvironmentalData());
+                envData.temperature = event.getTemperature();
+                envData.humidity = event.getHumidity();
+                
+                // Update map marker position based on event data
+                updateMapFromEvent(event);
+                
+                // Update shipments table with new environmental data (if row exists)
+                updateShipmentEnvironmentalData(event.getBatchId());
+                
+                // Log event to alerts
+                String alertMsg = String.format("🗺️ %s: %.0f%% - %s", 
+                    event.getBatchId(), event.getProgress() * 100, event.getLocationName());
+                if (!alerts.contains(alertMsg)) {
+                    alerts.add(0, alertMsg);
+                    if (alerts.size() > MAX_ALERT_ITEMS) {
+                        alerts.remove(alerts.size() - 1);
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("Error handling map simulation event: " + e.getMessage());
+            }
+        });
+    }
+    
+    /**
+     * Handle temperature compliance event from Kafka.
+     * Updates temperature chart with real-time data points.
+     * Note: Humidity is tracked via MapSimulationEvent which includes both temp and humidity.
+     */
+    private void handleTemperatureComplianceEvent(TemperatureComplianceEvent event) {
+        Platform.runLater(() -> {
+            try {
+                // Update environmental data tracking (temperature only)
+                // Humidity comes from MapSimulationEvent
+                ShipmentEnvironmentalData envData = environmentalDataMap.computeIfAbsent(
+                    event.getBatchId(), k -> new ShipmentEnvironmentalData());
+                envData.temperature = event.getTemperature();
+                
+                // Add data point to temperature chart
+                addTemperatureDataPoint(event);
+                
+                // Update shipments table with new temperature (if row exists)
+                updateShipmentEnvironmentalData(event.getBatchId());
+                
+                // Add alert if not compliant
+                if (!event.isCompliant()) {
+                    String alertMsg = String.format("🌡️ ALERT: %s - %.1f°C - %s", 
+                        event.getBatchId(), event.getTemperature(), event.getDetails());
+                    alerts.add(0, alertMsg);
+                    if (alerts.size() > MAX_ALERT_ITEMS) {
+                        alerts.remove(alerts.size() - 1);
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("Error handling temperature compliance event: " + e.getMessage());
+            }
+        });
+    }
+    
+    /**
+     * Update shipment environmental data in the table (temperature/humidity).
+     * Finds existing shipment row and updates it with latest environmental data.
+     * Uses index-based update for efficiency.
+     */
+    private void updateShipmentEnvironmentalData(String batchId) {
+        if (shipmentsTable == null) return;
+        
+        try {
+            ShipmentEnvironmentalData envData = environmentalDataMap.get(batchId);
+            if (envData == null) return;
+            
+            // Find existing shipment by index for efficient update
+            int shipmentIndex = -1;
+            Shipment existingShipment = null;
+            for (int i = 0; i < shipments.size(); i++) {
+                if (shipments.get(i).getBatchId().equals(batchId)) {
+                    shipmentIndex = i;
+                    existingShipment = shipments.get(i);
+                    break;
+                }
+            }
+            
+            if (existingShipment != null && shipmentIndex >= 0) {
+                // Create updated shipment with new environmental data
+                Shipment updatedShipment = new Shipment(
+                    existingShipment.getBatchId(),
+                    existingShipment.getStatus(),
+                    existingShipment.getLocation(),
+                    envData.temperature,
+                    envData.humidity,
+                    existingShipment.getEta(),
+                    existingShipment.getVehicle()
+                );
+                
+                // Replace at same index to maintain order and minimize UI updates
+                shipments.set(shipmentIndex, updatedShipment);
+            }
+        } catch (Exception e) {
+            System.err.println("Error updating shipment environmental data: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Update map visualization based on map simulation event.
+     */
+    private void updateMapFromEvent(MapSimulationEvent event) {
+        if (mapContainer == null) return;
+        
+        try {
+            // Calculate position on map canvas
+            double mapWidth = 350;
+            double mapHeight = 200;
+            double originX = 50;
+            double destinationX = 300;
+            double originY = 100;
+            
+            double progress = event.getProgress();
+            double currentX = originX + (destinationX - originX) * progress;
+            double currentY = originY;
+            
+            MapVisualization visualization = activeShipments.get(event.getBatchId());
+            if (visualization == null) {
+                // Create new marker
+                visualization = new MapVisualization();
+                visualization.shipmentCircle = new Circle(currentX, currentY, 6, Color.ORANGE);
+                visualization.shipmentCircle.setUserData("shipment");
+                
+                String displayId = event.getBatchId().length() > 8 ? 
+                    event.getBatchId().substring(0, 8) : event.getBatchId();
+                visualization.shipmentLabel = new Text(currentX - 15, currentY - 15, "🚚 " + displayId);
+                visualization.shipmentLabel.setUserData("shipment");
+                visualization.shipmentLabel.setFill(Color.DARKBLUE);
+                
+                mapContainer.getChildren().addAll(visualization.shipmentCircle, visualization.shipmentLabel);
+                activeShipments.put(event.getBatchId(), visualization);
+            } else {
+                // Update existing marker
+                visualization.shipmentCircle.setCenterX(currentX);
+                visualization.shipmentCircle.setCenterY(currentY);
+                visualization.shipmentLabel.setX(currentX - 15);
+                visualization.shipmentLabel.setY(currentY - 15);
+            }
+        } catch (Exception e) {
+            System.err.println("Error updating map from event: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Add temperature data point to chart for given batch.
+     */
+    private void addTemperatureDataPoint(TemperatureComplianceEvent event) {
+        if (temperatureChart == null) return;
+        
+        try {
+            // Get or create series for this batch
+            XYChart.Series<String, Number> series = temperatureSeriesMap.get(event.getBatchId());
+            if (series == null) {
+                series = new XYChart.Series<>();
+                series.setName(event.getBatchId());
+                temperatureSeriesMap.put(event.getBatchId(), series);
+                temperatureChart.getData().add(series);
+            }
+            
+            // Format timestamp as time string
+            String timeLabel = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"));
+            
+            // Add data point
+            series.getData().add(new XYChart.Data<>(timeLabel, event.getTemperature()));
+            
+            // Keep chart size reasonable - limit to last N points
+            if (series.getData().size() > MAX_CHART_DATA_POINTS) {
+                series.getData().remove(0);
+            }
+            
+            System.out.println("Added temperature point: " + event.getBatchId() + " = " + 
+                event.getTemperature() + "°C at " + timeLabel);
+        } catch (Exception e) {
+            System.err.println("Error adding temperature data point: " + e.getMessage());
         }
     }
 
@@ -367,7 +656,7 @@ public class LogisticsController implements SimulationListener {
             if (!alerts.contains(fullAlert)) {
                 alerts.add(0, fullAlert);
                 // Keep only recent alerts
-                if (alerts.size() > 50) {
+                if (alerts.size() > MAX_ALERT_ITEMS) {
                     alerts.remove(alerts.size() - 1);
                 }
             }
@@ -640,9 +929,22 @@ public class LogisticsController implements SimulationListener {
             System.err.println("Error unregistering from SimulationManager: " + e.getMessage());
         }
         
+        // Stop Kafka consumers
+        if (mapSimulationConsumer != null) {
+            mapSimulationConsumer.stop();
+        }
+        if (temperatureComplianceConsumer != null) {
+            temperatureComplianceConsumer.stop();
+        }
+        if (kafkaConsumerExecutor != null && !kafkaConsumerExecutor.isShutdown()) {
+            kafkaConsumerExecutor.shutdownNow();
+        }
+        
         if (syncExecutor != null && !syncExecutor.isShutdown()) {
             syncExecutor.shutdownNow();
         }
+        
+        System.out.println("🔴 LogisticsController cleanup complete");
     }
     
     // ========== SimulationListener Implementation ==========
@@ -695,18 +997,108 @@ public class LogisticsController implements SimulationListener {
     }
     
     /**
+     * Update timeline based on current simulation progress.
+     * Shows visual state progression: Created → In Transit → At Warehouse → Delivered
+     * @param progress Progress as percentage (0-100)
+     * NOTE: Caller must ensure this is called on JavaFX Application Thread
+     */
+    private void updateTimeline(String batchId, double progress, String status) {
+        if (timelineContainer == null) return;
+        
+        try {
+            // Clear existing timeline
+            timelineContainer.getChildren().clear();
+                
+                // Determine which states are completed based on progress
+                boolean createdComplete = true;
+                boolean inTransitComplete = progress >= PROGRESS_DEPARTING_THRESHOLD;
+                boolean approachingComplete = progress >= PROGRESS_APPROACHING_THRESHOLD;
+                boolean deliveredComplete = progress >= PROGRESS_COMPLETE;
+                
+                // Add "Created" state
+                addTimelineItem("Created", 
+                    "Batch " + batchId + " created at origin",
+                    createdComplete);
+                
+                // Add "In Transit" state
+                addTimelineItem("In Transit", 
+                    String.format("Delivery progress: %.0f%%", progress),
+                    inTransitComplete);
+                
+                // Add "Approaching Warehouse" state
+                addTimelineItem("Approaching", 
+                    progress >= PROGRESS_APPROACHING_THRESHOLD ? "Nearing destination" : "Not yet approaching",
+                    approachingComplete);
+                
+                // Add "At Warehouse / Delivered" state
+                addTimelineItem("Delivered", 
+                    deliveredComplete ? "Delivery complete" : "ETA: " + calculateETA(progress),
+                    deliveredComplete);
+                
+        } catch (Exception e) {
+            System.err.println("Error updating timeline: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Add a timeline item to the timeline container.
+     */
+    private void addTimelineItem(String title, String description, boolean completed) {
+        HBox timelineItem = new HBox(10);
+        timelineItem.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        timelineItem.getStyleClass().add("timeline-item");
+        
+        // Bullet point (filled if completed, empty if not)
+        Label bullet = new Label(completed ? "●" : "○");
+        bullet.setStyle(completed ? 
+            "-fx-text-fill: #10b981; -fx-font-weight: bold;" : 
+            "-fx-text-fill: #64748b;");
+        
+        // Title and description
+        VBox textBox = new VBox();
+        Label titleLabel = new Label(title);
+        titleLabel.setStyle(completed ? 
+            "-fx-font-weight: bold;" : 
+            "-fx-text-fill: #64748b;");
+        Label descLabel = new Label(description);
+        descLabel.setStyle(completed ? "" : "-fx-text-fill: #64748b;");
+        
+        textBox.getChildren().addAll(titleLabel, descLabel);
+        timelineItem.getChildren().addAll(bullet, textBox);
+        timelineContainer.getChildren().add(timelineItem);
+    }
+    
+    /**
+     * Calculate ETA string based on progress (percentage 0-100).
+     */
+    private String calculateETA(double progress) {
+        if (progress >= PROGRESS_COMPLETE) return "ARRIVED";
+        // Progress is percentage, convert to decimal for calculation
+        double remaining = 1.0 - (progress / 100.0);
+        int etaMinutes = (int) (remaining * ESTIMATED_TOTAL_TRIP_MINUTES);
+        return etaMinutes + " min";
+    }
+    
+    /**
      * Initialize temperature chart series for this batch.
      */
     private void initializeTemperatureChartSeries(String batchId) {
         if (temperatureChart == null) return;
         
         try {
+            // Check if series already exists
+            if (temperatureSeriesMap.containsKey(batchId)) {
+                System.out.println("Temperature chart series already exists for: " + batchId);
+                return;
+            }
+            
             // Create new series for this batch
             XYChart.Series<String, Number> series = new XYChart.Series<>();
             series.setName(batchId);
             
-            // Add to chart
+            // Add to chart and tracking map
             temperatureChart.getData().add(series);
+            temperatureSeriesMap.put(batchId, series);
             
             System.out.println("Initialized temperature chart series for: " + batchId);
         } catch (Exception e) {
@@ -722,6 +1114,13 @@ public class LogisticsController implements SimulationListener {
             
             // Update shipments table if it exists
             updateShipmentsTableRow(batchId, progress, currentLocation);
+            
+            // Update timeline to show current state
+            String status = progress < PROGRESS_EN_ROUTE_THRESHOLD ? "In Transit - Departing" : 
+                           progress < PROGRESS_APPROACHING_THRESHOLD ? "In Transit - En Route" :
+                           progress < PROGRESS_AT_WAREHOUSE_THRESHOLD ? "In Transit - Approaching" : 
+                           progress >= PROGRESS_COMPLETE ? "Delivered" : "At Warehouse";
+            updateTimeline(batchId, progress, status);
             
             System.out.println("LogisticsController: Progress update - " + batchId + " at " + progress + "% - " + currentLocation);
         });
@@ -778,48 +1177,70 @@ public class LogisticsController implements SimulationListener {
     
     /**
      * Update shipments table row for a specific batch.
-     * Since Shipment is immutable, we remove and re-add to update.
+     * Uses index-based update for efficiency.
+     * @param progress Progress as percentage (0-100)
      */
     private void updateShipmentsTableRow(String batchId, double progress, String currentLocation) {
         if (shipmentsTable == null) return;
         
         try {
             // Determine status based on progress
-            String status = progress < 30 ? "In Transit - Departing" : 
-                           progress < 70 ? "In Transit - En Route" :
-                           progress < 90 ? "In Transit - Approaching" : 
-                           progress >= 100 ? "Delivered" : "At Warehouse";
+            String status = progress < PROGRESS_EN_ROUTE_THRESHOLD ? "In Transit - Departing" : 
+                           progress < PROGRESS_APPROACHING_THRESHOLD ? "In Transit - En Route" :
+                           progress < PROGRESS_AT_WAREHOUSE_THRESHOLD ? "In Transit - Approaching" : 
+                           progress >= PROGRESS_COMPLETE ? "Delivered" : "At Warehouse";
             
-            // Find and remove existing shipment
+            // Find existing shipment by index
+            int shipmentIndex = -1;
             Shipment existingShipment = null;
-            for (Shipment shipment : shipments) {
-                if (shipment.getBatchId().equals(batchId)) {
-                    existingShipment = shipment;
+            for (int i = 0; i < shipments.size(); i++) {
+                if (shipments.get(i).getBatchId().equals(batchId)) {
+                    shipmentIndex = i;
+                    existingShipment = shipments.get(i);
                     break;
                 }
             }
             
-            if (existingShipment != null) {
-                shipments.remove(existingShipment);
-            }
+            // Get latest environmental data for this batch
+            ShipmentEnvironmentalData envData = environmentalDataMap.computeIfAbsent(
+                batchId, k -> new ShipmentEnvironmentalData());
             
-            // Create updated shipment (or new if not found)
-            if (progress < 100) {
+            // Create updated shipment
+            if (progress < PROGRESS_COMPLETE) {
                 Shipment updatedShipment = new Shipment(
                     batchId,
                     status,
                     currentLocation != null ? currentLocation : "Unknown",
-                    existingShipment != null ? existingShipment.getTemperature() : 0.0,
-                    existingShipment != null ? existingShipment.getHumidity() : 0.0,
+                    envData.temperature,
+                    envData.humidity,
                     String.format("%.0f%% Complete", progress),
-                    existingShipment != null ? existingShipment.getVehicle() : "TRUCK-" + batchId.hashCode() % 1000
+                    existingShipment != null ? existingShipment.getVehicle() : generateVehicleId(batchId)
                 );
-                shipments.add(updatedShipment);
+                
+                if (shipmentIndex >= 0) {
+                    // Replace existing at same index
+                    shipments.set(shipmentIndex, updatedShipment);
+                } else {
+                    // Add new shipment
+                    shipments.add(updatedShipment);
+                }
+            } else if (shipmentIndex >= 0) {
+                // Remove completed shipment
+                shipments.remove(shipmentIndex);
             }
             
         } catch (Exception e) {
             System.err.println("Error updating shipments table: " + e.getMessage());
         }
+    }
+    
+    /**
+     * Generate a consistent vehicle ID for a batch based on its hash.
+     * @param batchId The batch identifier
+     * @return A vehicle ID like "TRUCK-123"
+     */
+    private String generateVehicleId(String batchId) {
+        return "TRUCK-" + Math.abs(batchId.hashCode() % 1000);
     }
     
     @Override

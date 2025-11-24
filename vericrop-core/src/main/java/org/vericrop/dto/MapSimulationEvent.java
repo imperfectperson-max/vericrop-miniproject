@@ -14,6 +14,8 @@ public class MapSimulationEvent {
     private String locationName;
     private double progress; // 0.0 to 1.0
     private String status;
+    private double temperature; // Environmental data
+    private double humidity; // Environmental data
     
     public MapSimulationEvent() {
         this.timestamp = System.currentTimeMillis();
@@ -28,6 +30,14 @@ public class MapSimulationEvent {
         this.locationName = locationName;
         this.progress = progress;
         this.status = status;
+    }
+    
+    public MapSimulationEvent(String batchId, double latitude, double longitude, 
+                              String locationName, double progress, String status,
+                              double temperature, double humidity) {
+        this(batchId, latitude, longitude, locationName, progress, status);
+        this.temperature = temperature;
+        this.humidity = humidity;
     }
     
     // Getters and setters
@@ -54,10 +64,22 @@ public class MapSimulationEvent {
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
     
+    public double getTemperature() { return temperature; }
+    public void setTemperature(double temperature) { this.temperature = temperature; }
+    
+    public double getHumidity() { return humidity; }
+    public void setHumidity(double humidity) { this.humidity = humidity; }
+    
     @Override
     public String toString() {
-        return String.format("MapSimulationEvent{batchId='%s', location='%s', progress=%.1f%%, status='%s'}",
-                batchId, locationName, progress * 100, status);
+        // Only include environmental data if it appears to be initialized (non-zero)
+        if (temperature != 0.0 || humidity != 0.0) {
+            return String.format("MapSimulationEvent{batchId='%s', location='%s', progress=%.1f%%, status='%s', temp=%.1f°C, humidity=%.1f%%}",
+                    batchId, locationName, progress * 100, status, temperature, humidity);
+        } else {
+            return String.format("MapSimulationEvent{batchId='%s', location='%s', progress=%.1f%%, status='%s'}",
+                    batchId, locationName, progress * 100, status);
+        }
     }
     
     @Override

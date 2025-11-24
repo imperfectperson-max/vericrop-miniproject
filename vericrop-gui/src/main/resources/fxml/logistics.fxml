@@ -78,7 +78,7 @@
                             </Pane>
 
                             <Label text="Timeline" styleClass="subtitle-label"/>
-                            <VBox styleClass="timeline-container" spacing="10">
+                            <VBox fx:id="timelineContainer" styleClass="timeline-container" spacing="10">
                                 <HBox styleClass="timeline-item" spacing="10" alignment="CENTER_LEFT">
                                     <Label text="●" style="-fx-text-fill: #10b981; -fx-font-weight: bold;"/>
                                     <VBox>
