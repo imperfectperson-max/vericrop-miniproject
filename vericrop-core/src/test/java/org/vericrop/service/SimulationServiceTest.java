@@ -242,6 +242,115 @@ public class SimulationServiceTest {
                     "Should have 1 active simulation after stopping one");
     }
     
+    @Test
+    public void testSubscribeToTemperatureUpdates_Success() throws InterruptedException {
+        // Arrange
+        String batchId = "TEST_BATCH_TEMP_001";
+        List<RouteWaypoint> route = createTestRoute(5);
+        
+        CountDownLatch latch = new CountDownLatch(2); // Wait for initial + update
+        List<SimulationEvent> temperatureEvents = new ArrayList<>();
+        
+        // Start simulation
+        simulationService.startSimulation(batchId, "FARMER_001", route, event -> {}, 100L);
+        Thread.sleep(50); // Let simulation start
+        
+        // Act - Subscribe to temperature updates
+        boolean subscribed = simulationService.subscribeToTemperatureUpdates(batchId, event -> {
+            temperatureEvents.add(event);
+            latch.countDown();
+        });
+        
+        // Assert
+        assertTrue(subscribed, "Should successfully subscribe to temperature updates");
+        assertTrue(latch.await(2, TimeUnit.SECONDS), "Should receive temperature events");
+        assertFalse(temperatureEvents.isEmpty(), "Should have received temperature events");
+    }
+    
+    @Test
+    public void testSubscribeToTemperatureUpdates_NonExistentSimulation() {
+        // Arrange
+        String batchId = "NON_EXISTENT_BATCH";
+        
+        // Act
+        boolean subscribed = simulationService.subscribeToTemperatureUpdates(batchId, event -> {});
+        
+        // Assert
+        assertFalse(subscribed, "Should not subscribe to non-existent simulation");
+    }
+    
+    @Test
+    public void testUnsubscribeFromTemperatureUpdates() throws InterruptedException {
+        // Arrange
+        String batchId = "TEST_BATCH_TEMP_002";
+        List<RouteWaypoint> route = createTestRoute(5);
+        
+        AtomicInteger eventCount = new AtomicInteger(0);
+        java.util.function.Consumer<SimulationEvent> listener = event -> eventCount.incrementAndGet();
+        
+        // Start simulation and subscribe
+        simulationService.startSimulation(batchId, "FARMER_002", route, event -> {}, 100L);
+        Thread.sleep(50);
+        simulationService.subscribeToTemperatureUpdates(batchId, listener);
+        
+        // Wait for some events
+        Thread.sleep(200);
+        int countBeforeUnsubscribe = eventCount.get();
+        
+        // Act - Unsubscribe
+        boolean unsubscribed = simulationService.unsubscribeFromTemperatureUpdates(batchId, listener);
+        
+        // Wait and verify no more events
+        Thread.sleep(200);
+        int countAfterUnsubscribe = eventCount.get();
+        
+        // Assert
+        assertTrue(unsubscribed, "Should successfully unsubscribe");
+        assertTrue(countBeforeUnsubscribe > 0, "Should have received events before unsubscribe");
+        assertEquals(countBeforeUnsubscribe, countAfterUnsubscribe, 
+                    "Should not receive events after unsubscribe");
+    }
+    
+    @Test
+    public void testGetHistoricalTemperatureReadings_ActiveSimulation() throws InterruptedException {
+        // Arrange
+        String batchId = "TEST_BATCH_HIST_001";
+        List<RouteWaypoint> route = createTestRoute(10);
+        
+        // Start simulation
+        simulationService.startSimulation(batchId, "FARMER_001", route, event -> {}, 50L);
+        
+        // Wait for some waypoints to be traversed
+        Thread.sleep(300);
+        
+        // Act
+        List<SimulationEvent> historicalReadings = simulationService.getHistoricalTemperatureReadings(batchId);
+        
+        // Assert
+        assertNotNull(historicalReadings, "Historical readings should not be null");
+        assertFalse(historicalReadings.isEmpty(), "Should have historical readings");
+        assertTrue(historicalReadings.size() > 0, "Should have at least one historical reading");
+        
+        // Verify readings are properly formatted
+        SimulationEvent firstReading = historicalReadings.get(0);
+        assertEquals(batchId, firstReading.getBatchId());
+        assertEquals(SimulationEvent.EventType.TEMPERATURE_UPDATE, firstReading.getEventType());
+        assertTrue(firstReading.getTemperature() > 0, "Temperature should be positive");
+    }
+    
+    @Test
+    public void testGetHistoricalTemperatureReadings_NonExistentSimulation() {
+        // Arrange
+        String batchId = "NON_EXISTENT_BATCH";
+        
+        // Act
+        List<SimulationEvent> historicalReadings = simulationService.getHistoricalTemperatureReadings(batchId);
+        
+        // Assert
+        assertNotNull(historicalReadings, "Should return non-null list");
+        assertTrue(historicalReadings.isEmpty(), "Should return empty list for non-existent simulation");
+    }
+    
     /**
      * Helper method to create a test route with specified number of waypoints.
      */

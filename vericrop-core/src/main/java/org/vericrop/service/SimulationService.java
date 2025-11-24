@@ -329,6 +329,119 @@ public class SimulationService {
     }
     
     /**
+     * Subscribe to temperature updates for a specific batch.
+     * Returns an Optional containing the task if simulation is active, empty otherwise.
+     * The listener will be added to receive all future SimulationEvents for this batch.
+     * 
+     * @param batchId Batch identifier
+     * @param temperatureListener Listener that receives temperature events
+     * @return true if subscription was successful, false if simulation not found
+     */
+    public boolean subscribeToTemperatureUpdates(String batchId, Consumer<SimulationEvent> temperatureListener) {
+        SimulationTask task = activeTasks.get(batchId);
+        if (task != null && temperatureListener != null) {
+            task.listeners.add(temperatureListener);
+            logger.debug("Added temperature listener to simulation: {}", batchId);
+            
+            // Immediately send current state if available
+            if (task.currentWaypointIndex < task.route.size()) {
+                try {
+                    RouteWaypoint currentWaypoint = task.route.get(task.currentWaypointIndex);
+                    GeoCoordinate location = currentWaypoint.getLocation();
+                    double progressPercent = (double) task.currentWaypointIndex / task.route.size() * 100.0;
+                    
+                    SimulationEvent currentEvent = new SimulationEvent(
+                        batchId,
+                        System.currentTimeMillis(),
+                        location.getLatitude(),
+                        location.getLongitude(),
+                        location.getName(),
+                        currentWaypoint.getTemperature(),
+                        currentWaypoint.getHumidity(),
+                        "In Transit",
+                        0,
+                        progressPercent,
+                        task.currentWaypointIndex,
+                        task.route.size(),
+                        task.farmerId,
+                        SimulationEvent.EventType.TEMPERATURE_UPDATE
+                    );
+                    
+                    temperatureListener.accept(currentEvent);
+                } catch (Exception e) {
+                    logger.error("Error sending current temperature state", e);
+                }
+            }
+            
+            return true;
+        }
+        return false;
+    }
+    
+    /**
+     * Unsubscribe from temperature updates.
+     * 
+     * @param batchId Batch identifier
+     * @param temperatureListener Listener to remove
+     * @return true if listener was removed, false if not found
+     */
+    public boolean unsubscribeFromTemperatureUpdates(String batchId, Consumer<SimulationEvent> temperatureListener) {
+        SimulationTask task = activeTasks.get(batchId);
+        if (task != null && temperatureListener != null) {
+            boolean removed = task.listeners.remove(temperatureListener);
+            if (removed) {
+                logger.debug("Removed temperature listener from simulation: {}", batchId);
+            }
+            return removed;
+        }
+        return false;
+    }
+    
+    /**
+     * Get historical temperature readings for a batch from the route.
+     * Returns temperature data from waypoints that have already been traversed.
+     * 
+     * @param batchId Batch identifier
+     * @return List of historical temperature readings, empty if simulation not found
+     */
+    public List<SimulationEvent> getHistoricalTemperatureReadings(String batchId) {
+        SimulationTask task = activeTasks.get(batchId);
+        if (task == null) {
+            return java.util.Collections.emptyList();
+        }
+        
+        List<SimulationEvent> readings = new java.util.ArrayList<>();
+        int endIndex = Math.min(task.currentWaypointIndex, task.route.size());
+        
+        for (int i = 0; i < endIndex; i++) {
+            RouteWaypoint waypoint = task.route.get(i);
+            GeoCoordinate location = waypoint.getLocation();
+            double progressPercent = (double) i / task.route.size() * 100.0;
+            
+            SimulationEvent event = new SimulationEvent(
+                batchId,
+                waypoint.getTimestamp(),
+                location.getLatitude(),
+                location.getLongitude(),
+                location.getName(),
+                waypoint.getTemperature(),
+                waypoint.getHumidity(),
+                "Historical",
+                0,
+                progressPercent,
+                i,
+                task.route.size(),
+                task.farmerId,
+                SimulationEvent.EventType.TEMPERATURE_UPDATE
+            );
+            
+            readings.add(event);
+        }
+        
+        return readings;
+    }
+    
+    /**
      * Shutdown the service and cancel all active simulations
      */
     public void shutdown() {
