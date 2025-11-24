@@ -31,6 +31,7 @@ import org.vericrop.kafka.events.QualityAlertEvent;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -225,6 +226,7 @@ public class LogisticsController implements SimulationListener {
     /**
      * Handle map simulation event from Kafka.
      * Updates map visualization with real-time position data and environmental data.
+     * Implements status transition guards to prevent duplicate alerts.
      */
     private void handleMapSimulationEvent(MapSimulationEvent event) {
         if (event == null || event.getBatchId() == null) {
@@ -246,14 +248,28 @@ public class LogisticsController implements SimulationListener {
                 // Update shipments table with new environmental data (if row exists)
                 updateShipmentEnvironmentalData(event.getBatchId());
                 
-                // Log event to alerts
-                String locationName = event.getLocationName() != null ? event.getLocationName() : "Unknown Location";
-                String alertMsg = String.format("🗺️ %s: %.0f%% - %s", 
-                    event.getBatchId(), event.getProgress() * 100, locationName);
-                if (!alerts.contains(alertMsg)) {
-                    alerts.add(0, alertMsg);
-                    if (alerts.size() > MAX_ALERT_ITEMS) {
-                        alerts.remove(alerts.size() - 1);
+                // Determine status based on progress to detect transitions
+                double progressPercent = event.getProgress() * 100;
+                String newStatus = determineStatusFromProgress(progressPercent);
+                
+                // Get visualization to track last status
+                MapVisualization visualization = activeShipments.get(event.getBatchId());
+                if (visualization != null) {
+                    String lastStatus = visualization.lastStatus;
+                    
+                    // Only add alert if status has changed (idempotent status transitions)
+                    if (lastStatus == null || !lastStatus.equals(newStatus)) {
+                        String locationName = event.getLocationName() != null ? event.getLocationName() : "Unknown Location";
+                        String alertMsg = String.format("🗺️ %s: %s - %s", 
+                            event.getBatchId(), newStatus, locationName);
+                        alerts.add(0, alertMsg);
+                        if (alerts.size() > MAX_ALERT_ITEMS) {
+                            alerts.remove(alerts.size() - 1);
+                        }
+                        
+                        // Update last status to prevent duplicates
+                        visualization.lastStatus = newStatus;
+                        System.out.println("Status transition: " + event.getBatchId() + " -> " + newStatus);
                     }
                 }
             } catch (Exception e) {
@@ -261,6 +277,28 @@ public class LogisticsController implements SimulationListener {
                 e.printStackTrace();
             }
         });
+    }
+    
+    /**
+     * Determine status string based on progress percentage.
+     * Used to detect status transitions and prevent duplicate alerts.
+     * @param progressPercent Progress as percentage (0-100)
+     * @return Status string
+     */
+    private String determineStatusFromProgress(double progressPercent) {
+        if (progressPercent >= PROGRESS_COMPLETE) {
+            return "Delivered";
+        } else if (progressPercent >= PROGRESS_AT_WAREHOUSE_THRESHOLD) {
+            return "At Warehouse";
+        } else if (progressPercent >= PROGRESS_APPROACHING_THRESHOLD) {
+            return "Approaching";
+        } else if (progressPercent >= PROGRESS_EN_ROUTE_THRESHOLD) {
+            return "En Route";
+        } else if (progressPercent >= PROGRESS_DEPARTING_THRESHOLD) {
+            return "Departing";
+        } else {
+            return "Created";
+        }
     }
     
     /**
@@ -350,6 +388,7 @@ public class LogisticsController implements SimulationListener {
     
     /**
      * Update map visualization based on map simulation event.
+     * Adds trail points as the shipment moves to show the progressive route.
      */
     private void updateMapFromEvent(MapSimulationEvent event) {
         if (mapContainer == null) {
@@ -393,7 +432,32 @@ public class LogisticsController implements SimulationListener {
                 mapContainer.getChildren().addAll(visualization.shipmentCircle, visualization.shipmentLabel);
                 activeShipments.put(event.getBatchId(), visualization);
             } else {
-                // Update existing marker
+                // Update existing marker position
+                double oldX = visualization.shipmentCircle.getCenterX();
+                double oldY = visualization.shipmentCircle.getCenterY();
+                
+                // Only add trail point if position has changed significantly (avoid stacking)
+                // Use a threshold of 2 pixels to filter out tiny movements
+                double deltaX = Math.abs(currentX - oldX);
+                double deltaY = Math.abs(currentY - oldY);
+                if (deltaX > 2.0 || deltaY > 2.0) {
+                    // Add trail point at previous position
+                    Circle trailPoint = new Circle(oldX, oldY, 3, Color.ORANGE);
+                    trailPoint.setOpacity(0.6);
+                    trailPoint.setUserData("trail");
+                    visualization.trailPoints.add(trailPoint);
+                    
+                    // Add trail point to map (behind the moving marker)
+                    mapContainer.getChildren().add(mapContainer.getChildren().indexOf(visualization.shipmentCircle), trailPoint);
+                    
+                    // Limit trail length to prevent clutter (keep last 20 points)
+                    if (visualization.trailPoints.size() > 20) {
+                        Circle oldestPoint = visualization.trailPoints.remove(0);
+                        mapContainer.getChildren().remove(oldestPoint);
+                    }
+                }
+                
+                // Update marker position
                 visualization.shipmentCircle.setCenterX(currentX);
                 visualization.shipmentCircle.setCenterY(currentY);
                 visualization.shipmentLabel.setX(currentX - 15);
@@ -1147,14 +1211,19 @@ public class LogisticsController implements SimulationListener {
     
     /**
      * Initialize map marker at the origin point.
+     * Clears any existing trail and resets status tracking.
      */
     private void initializeMapMarker(String batchId) {
         if (mapContainer == null) return;
         
         try {
-            // Remove any existing marker for this batch
+            // Remove any existing marker and trail for this batch
             MapVisualization existing = activeShipments.get(batchId);
             if (existing != null) {
+                // Clean up old trail points
+                for (Circle trailPoint : existing.trailPoints) {
+                    mapContainer.getChildren().remove(trailPoint);
+                }
                 mapContainer.getChildren().removeAll(existing.shipmentCircle, existing.shipmentLabel);
             }
             
@@ -1167,6 +1236,9 @@ public class LogisticsController implements SimulationListener {
             visualization.shipmentLabel = new Text(ORIGIN_X - 15, ORIGIN_Y - 15, "🚚 " + displayId);
             visualization.shipmentLabel.setUserData("shipment");
             visualization.shipmentLabel.setFill(Color.DARKBLUE);
+            
+            // Initialize status tracking (starts at Created)
+            visualization.lastStatus = "Created";
             
             mapContainer.getChildren().addAll(visualization.shipmentCircle, visualization.shipmentLabel);
             activeShipments.put(batchId, visualization);
@@ -1585,7 +1657,7 @@ public class LogisticsController implements SimulationListener {
     }
     
     /**
-     * Clean up map marker and remove from active shipments.
+     * Clean up map marker, trail points, and remove from active shipments.
      */
     private void cleanupMapMarker(String batchId) {
         if (mapContainer == null) return;
@@ -1597,8 +1669,16 @@ public class LogisticsController implements SimulationListener {
                 if (visualization.animation != null) {
                     visualization.animation.stop();
                 }
+                
+                // Remove trail points
+                for (Circle trailPoint : visualization.trailPoints) {
+                    mapContainer.getChildren().remove(trailPoint);
+                }
+                visualization.trailPoints.clear();
+                
+                // Remove marker and label
                 mapContainer.getChildren().removeAll(visualization.shipmentCircle, visualization.shipmentLabel);
-                System.out.println("Cleaned up map marker for: " + batchId);
+                System.out.println("Cleaned up map marker and trail for: " + batchId);
             }
         } catch (Exception e) {
             System.err.println("Error cleaning up map marker: " + e.getMessage());
@@ -1618,6 +1698,8 @@ public class LogisticsController implements SimulationListener {
         Circle shipmentCircle;
         Text shipmentLabel;
         Timeline animation; // Track animation for cleanup
+        List<Circle> trailPoints = new java.util.ArrayList<>(); // Orange trail points
+        String lastStatus = null; // Track last status to avoid duplicate alerts
     }
 
     // Data model class
