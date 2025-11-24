@@ -46,6 +46,9 @@ public class ApplicationContext {
     private final MessageService messageService;
     private final DeliverySimulator deliverySimulator;
     private final AlertService alertService;
+    private final org.vericrop.service.MapService mapService;
+    private final org.vericrop.service.TemperatureService temperatureService;
+    private final org.vericrop.service.AlertService coreAlertService;
     private final SimulationManager simulationManager;
     
     // Additional services for demo mode
@@ -80,13 +83,17 @@ public class ApplicationContext {
         
         // Initialize core services
         this.messageService = new MessageService(true); // Enable persistence
-        this.deliverySimulator = new DeliverySimulator(messageService);
+        this.coreAlertService = new org.vericrop.service.AlertService();
+        this.deliverySimulator = new DeliverySimulator(messageService, coreAlertService);
         this.alertService = AlertService.getInstance();
+        this.mapService = new org.vericrop.service.MapService();
+        this.temperatureService = new org.vericrop.service.TemperatureService();
         
-        // Initialize SimulationManager with DeliverySimulator
-        SimulationManager.initialize(this.deliverySimulator);
+        // Initialize SimulationManager with full dependencies
+        SimulationManager.initialize(this.deliverySimulator, this.mapService, 
+                                     this.temperatureService, this.coreAlertService);
         this.simulationManager = SimulationManager.getInstance();
-        logger.info("SimulationManager initialized");
+        logger.info("SimulationManager initialized with integrated services");
         
         // Initialize additional services for demo mode
         this.fileLedgerService = new org.vericrop.service.impl.FileLedgerService();
@@ -198,6 +205,18 @@ public class ApplicationContext {
     
     public SimulationManager getSimulationManager() {
         return simulationManager;
+    }
+    
+    public org.vericrop.service.MapService getMapService() {
+        return mapService;
+    }
+    
+    public org.vericrop.service.TemperatureService getTemperatureService() {
+        return temperatureService;
+    }
+    
+    public org.vericrop.service.AlertService getCoreAlertService() {
+        return coreAlertService;
     }
     
     /**
