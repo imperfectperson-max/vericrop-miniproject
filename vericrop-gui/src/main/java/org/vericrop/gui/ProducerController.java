@@ -1121,9 +1121,7 @@ public class ProducerController implements SimulationListener {
             }
 
             // Get farmer ID from field or use default (make it final for lambda)
-            final String farmerId = (farmerField.getText() != null && !farmerField.getText().trim().isEmpty()) 
-                    ? farmerField.getText().trim() 
-                    : "Unknown Farmer";
+            final String farmerId = getFarmerIdOrDefault();
 
             // Generate sample route: Farm to Warehouse
             final var origin = new org.vericrop.service.DeliverySimulator.GeoCoordinate(
@@ -1138,12 +1136,7 @@ public class ProducerController implements SimulationListener {
             
             // Immediately provide UI feedback - disable Start, enable Stop
             // No Platform.runLater needed since @FXML methods run on JavaFX thread
-            if (startSimButton != null) {
-                startSimButton.setDisable(true);
-            }
-            if (stopSimButton != null) {
-                stopSimButton.setDisable(false);
-            }
+            updateSimulationButtonStates(true);
             if (simStatusLabel != null) {
                 simStatusLabel.setText("⏳ Starting simulation...");
                 simStatusLabel.setStyle("-fx-text-fill: #F59E0B;");
@@ -1217,21 +1210,39 @@ public class ProducerController implements SimulationListener {
      */
     private void handleSimulationError(String errorMessage) {
         Platform.runLater(() -> {
-            // Restore button states
-            if (startSimButton != null) {
-                startSimButton.setDisable(false);
-            }
-            if (stopSimButton != null) {
-                stopSimButton.setDisable(true);
-            }
+            // Restore button states to idle (Start enabled, Stop disabled)
+            updateSimulationButtonStates(false);
             if (simStatusLabel != null) {
                 simStatusLabel.setText("❌ Error: " + errorMessage);
                 simStatusLabel.setStyle("-fx-text-fill: #DC2626;");
             }
         });
         
-        // Show error alert (already uses Platform.runLater internally)
+        // Show error alert - showError() handles Platform.runLater internally
         showError("Failed to start simulation: " + errorMessage);
+    }
+    
+    /**
+     * Update simulation button states.
+     * @param isRunning true if simulation is starting/running (Start disabled, Stop enabled),
+     *                  false if simulation is idle (Start enabled, Stop disabled)
+     */
+    private void updateSimulationButtonStates(boolean isRunning) {
+        if (startSimButton != null) {
+            startSimButton.setDisable(isRunning);
+        }
+        if (stopSimButton != null) {
+            stopSimButton.setDisable(!isRunning);
+        }
+    }
+    
+    /**
+     * Get farmer ID from text field or return default value.
+     * @return farmer ID or "Unknown Farmer" if field is empty/null
+     */
+    private String getFarmerIdOrDefault() {
+        String text = farmerField.getText();
+        return (text != null && !text.trim().isEmpty()) ? text.trim() : "Unknown Farmer";
     }
     private void analyzeImageWithAI(File imageFile) {
         Platform.runLater(() -> {
