@@ -112,7 +112,7 @@ public class ProducerController implements SimulationListener {
     private String currentImagePath;
     private Map<String, Object> currentPrediction;
     private String currentBatchId;
-    private String activeSimulationId;
+    private volatile String activeSimulationId;
     
     // Map to store batch info: batch display name -> batch details (for selection dialog)
     private Map<String, Map<String, Object>> batchInfoMap = new HashMap<>();
