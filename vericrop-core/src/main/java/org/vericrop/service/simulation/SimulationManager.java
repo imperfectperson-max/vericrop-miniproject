@@ -35,6 +35,8 @@ public class SimulationManager {
     private final MapService mapService;
     private final TemperatureService temperatureService;
     private final AlertService alertService;
+    private final MapSimulator mapSimulator;
+    private final ScenarioManager scenarioManager;
     private final List<SimulationListener> listeners;
     private final AtomicReference<SimulationState> currentSimulation;
     private final AtomicBoolean running;
@@ -63,7 +65,7 @@ public class SimulationManager {
      * Private constructor for singleton pattern (legacy - backward compatibility).
      */
     private SimulationManager(DeliverySimulator deliverySimulator) {
-        this(deliverySimulator, null, null, null);
+        this(deliverySimulator, null, null, null, null, null);
     }
     
     /**
@@ -71,16 +73,27 @@ public class SimulationManager {
      */
     private SimulationManager(DeliverySimulator deliverySimulator, MapService mapService,
                              TemperatureService temperatureService, AlertService alertService) {
+        this(deliverySimulator, mapService, temperatureService, alertService, null, null);
+    }
+    
+    /**
+     * Private constructor with all dependencies including map simulation.
+     */
+    private SimulationManager(DeliverySimulator deliverySimulator, MapService mapService,
+                             TemperatureService temperatureService, AlertService alertService,
+                             MapSimulator mapSimulator, ScenarioManager scenarioManager) {
         this.deliverySimulator = deliverySimulator;
         this.mapService = mapService != null ? mapService : new MapService();
         this.temperatureService = temperatureService != null ? temperatureService : new TemperatureService();
         this.alertService = alertService != null ? alertService : new AlertService();
+        this.mapSimulator = mapSimulator != null ? mapSimulator : new MapSimulator();
+        this.scenarioManager = scenarioManager != null ? scenarioManager : new ScenarioManager();
         this.listeners = new CopyOnWriteArrayList<>();
         this.currentSimulation = new AtomicReference<>();
         this.running = new AtomicBoolean(false);
         this.complianceCheckExecutor = Executors.newScheduledThreadPool(1, 
             r -> new Thread(r, "SimulationManager-ComplianceCheck"));
-        logger.info("SimulationManager initialized with integrated services");
+        logger.info("SimulationManager initialized with integrated services including map simulation");
     }
     
     /**
@@ -119,6 +132,27 @@ public class SimulationManager {
         if (instance == null) {
             instance = new SimulationManager(deliverySimulator, mapService, temperatureService, alertService);
             logger.info("SimulationManager singleton created with integrated services");
+        }
+    }
+    
+    /**
+     * Initialize the SimulationManager singleton with all dependencies including map simulation.
+     * Should be called once during application startup.
+     * 
+     * @param deliverySimulator Delivery simulator instance
+     * @param mapService Map service for route generation
+     * @param temperatureService Temperature monitoring service
+     * @param alertService Alert service for compliance violations
+     * @param mapSimulator Map simulator for grid-based visualization
+     * @param scenarioManager Scenario manager for scenario selection
+     */
+    public static synchronized void initialize(DeliverySimulator deliverySimulator, MapService mapService,
+                                              TemperatureService temperatureService, AlertService alertService,
+                                              MapSimulator mapSimulator, ScenarioManager scenarioManager) {
+        if (instance == null) {
+            instance = new SimulationManager(deliverySimulator, mapService, temperatureService, 
+                                           alertService, mapSimulator, scenarioManager);
+            logger.info("SimulationManager singleton created with full services including map simulation");
         }
     }
     
@@ -242,13 +276,17 @@ public class SimulationManager {
             
             deliverySimulator.startSimulation(batchId, farmerId, legacyRoute, updateIntervalMs, effectiveScenario);
             
-            // Step 5: Update state
+            // Step 5: Initialize MapSimulator for this scenario
+            logger.info("Step 5: Initializing map simulation...");
+            mapSimulator.initializeForScenario(effectiveScenario, batchId, route.size());
+            
+            // Step 6: Update state
             SimulationState state = new SimulationState(batchId, farmerId);
             currentSimulation.set(state);
             running.set(true);
             
-            // Step 5: Start temperature compliance checking
-            logger.info("Step 5: Starting temperature compliance monitoring...");
+            // Step 7: Start temperature compliance checking
+            logger.info("Step 6: Starting temperature compliance monitoring...");
             startComplianceChecking(batchId);
             
             // Notify listeners
@@ -445,6 +483,14 @@ public class SimulationManager {
                             break; // Exit monitoring loop
                         }
                         
+                        // Step the map simulation to update entity positions
+                        try {
+                            mapSimulator.step(state.progress);
+                            logger.trace("Map simulation stepped at progress {}%", state.progress);
+                        } catch (Exception e) {
+                            logger.error("Error stepping map simulation", e);
+                        }
+                        
                         // Notify listeners
                         notifyProgress(batchId, state.progress, state.currentLocation);
                     }
@@ -516,6 +562,24 @@ public class SimulationManager {
     }
     
     /**
+     * Get the MapSimulator instance.
+     * 
+     * @return MapSimulator instance
+     */
+    public MapSimulator getMapSimulator() {
+        return mapSimulator;
+    }
+    
+    /**
+     * Get the ScenarioManager instance.
+     * 
+     * @return ScenarioManager instance
+     */
+    public ScenarioManager getScenarioManager() {
+        return scenarioManager;
+    }
+    
+    /**
      * Shutdown the manager and clean up resources.
      */
     public void shutdown() {
@@ -534,6 +598,11 @@ public class SimulationManager {
                 Thread.currentThread().interrupt();
                 complianceCheckExecutor.shutdownNow();
             }
+        }
+        
+        // Reset map simulator
+        if (mapSimulator != null) {
+            mapSimulator.reset();
         }
         
         listeners.clear();
