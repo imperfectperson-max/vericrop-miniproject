@@ -89,11 +89,17 @@ public class ApplicationContext {
         this.mapService = new org.vericrop.service.MapService();
         this.temperatureService = new org.vericrop.service.TemperatureService();
         
-        // Initialize SimulationManager with full dependencies
+        // Initialize MapSimulator and ScenarioManager
+        org.vericrop.service.MapSimulator mapSimulator = new org.vericrop.service.MapSimulator();
+        org.vericrop.service.ScenarioManager scenarioManager = new org.vericrop.service.ScenarioManager();
+        logger.info("MapSimulator and ScenarioManager initialized");
+        
+        // Initialize SimulationManager with full dependencies including map simulation
         SimulationManager.initialize(this.deliverySimulator, this.mapService, 
-                                     this.temperatureService, this.coreAlertService);
+                                     this.temperatureService, this.coreAlertService,
+                                     mapSimulator, scenarioManager);
         this.simulationManager = SimulationManager.getInstance();
-        logger.info("SimulationManager initialized with integrated services");
+        logger.info("SimulationManager initialized with integrated services and map simulation");
         
         // Initialize additional services for demo mode
         this.fileLedgerService = new org.vericrop.service.impl.FileLedgerService();
@@ -217,6 +223,22 @@ public class ApplicationContext {
     
     public org.vericrop.service.AlertService getCoreAlertService() {
         return coreAlertService;
+    }
+    
+    /**
+     * Get MapSimulator from SimulationManager.
+     * @return MapSimulator instance
+     */
+    public org.vericrop.service.MapSimulator getMapSimulator() {
+        return simulationManager.getMapSimulator();
+    }
+    
+    /**
+     * Get ScenarioManager from SimulationManager.
+     * @return ScenarioManager instance
+     */
+    public org.vericrop.service.ScenarioManager getScenarioManager() {
+        return simulationManager.getScenarioManager();
     }
     
     /**
