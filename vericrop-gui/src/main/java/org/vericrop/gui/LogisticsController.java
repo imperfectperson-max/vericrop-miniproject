@@ -91,6 +91,10 @@ public class LogisticsController implements SimulationListener {
     private static final double ORIGIN_Y = 100;
     private static final double DESTINATION_X = 300;
     private static final double DESTINATION_Y = 100;
+    
+    // Temperature chart configuration
+    private static final int MAX_CHART_DATA_POINTS = 20;
+    private static final int MAX_ALERT_ITEMS = 50;
 
     @FXML
     public void initialize() {
@@ -208,7 +212,7 @@ public class LogisticsController implements SimulationListener {
                     event.getBatchId(), event.getProgress() * 100, event.getLocationName());
                 if (!alerts.contains(alertMsg)) {
                     alerts.add(0, alertMsg);
-                    if (alerts.size() > 50) {
+                    if (alerts.size() > MAX_ALERT_ITEMS) {
                         alerts.remove(alerts.size() - 1);
                     }
                 }
@@ -243,7 +247,7 @@ public class LogisticsController implements SimulationListener {
                     String alertMsg = String.format("🌡️ ALERT: %s - %.1f°C - %s", 
                         event.getBatchId(), event.getTemperature(), event.getDetails());
                     alerts.add(0, alertMsg);
-                    if (alerts.size() > 50) {
+                    if (alerts.size() > MAX_ALERT_ITEMS) {
                         alerts.remove(alerts.size() - 1);
                     }
                 }
@@ -256,6 +260,7 @@ public class LogisticsController implements SimulationListener {
     /**
      * Update shipment environmental data in the table (temperature/humidity).
      * Finds existing shipment row and updates it with latest environmental data.
+     * Uses index-based update for efficiency.
      */
     private void updateShipmentEnvironmentalData(String batchId) {
         if (shipmentsTable == null) return;
@@ -264,19 +269,18 @@ public class LogisticsController implements SimulationListener {
             ShipmentEnvironmentalData envData = environmentalDataMap.get(batchId);
             if (envData == null) return;
             
-            // Find and update existing shipment
+            // Find existing shipment by index for efficient update
+            int shipmentIndex = -1;
             Shipment existingShipment = null;
-            for (Shipment shipment : shipments) {
-                if (shipment.getBatchId().equals(batchId)) {
-                    existingShipment = shipment;
+            for (int i = 0; i < shipments.size(); i++) {
+                if (shipments.get(i).getBatchId().equals(batchId)) {
+                    shipmentIndex = i;
+                    existingShipment = shipments.get(i);
                     break;
                 }
             }
             
-            if (existingShipment != null) {
-                // Remove old shipment
-                shipments.remove(existingShipment);
-                
+            if (existingShipment != null && shipmentIndex >= 0) {
                 // Create updated shipment with new environmental data
                 Shipment updatedShipment = new Shipment(
                     existingShipment.getBatchId(),
@@ -288,8 +292,8 @@ public class LogisticsController implements SimulationListener {
                     existingShipment.getVehicle()
                 );
                 
-                // Add updated shipment
-                shipments.add(updatedShipment);
+                // Replace at same index to maintain order and minimize UI updates
+                shipments.set(shipmentIndex, updatedShipment);
             }
         } catch (Exception e) {
             System.err.println("Error updating shipment environmental data: " + e.getMessage());
@@ -363,8 +367,8 @@ public class LogisticsController implements SimulationListener {
             // Add data point
             series.getData().add(new XYChart.Data<>(timeLabel, event.getTemperature()));
             
-            // Keep chart size reasonable - limit to last 20 points
-            if (series.getData().size() > 20) {
+            // Keep chart size reasonable - limit to last N points
+            if (series.getData().size() > MAX_CHART_DATA_POINTS) {
                 series.getData().remove(0);
             }
             
@@ -642,7 +646,7 @@ public class LogisticsController implements SimulationListener {
             if (!alerts.contains(fullAlert)) {
                 alerts.add(0, fullAlert);
                 // Keep only recent alerts
-                if (alerts.size() > 50) {
+                if (alerts.size() > MAX_ALERT_ITEMS) {
                     alerts.remove(alerts.size() - 1);
                 }
             }
@@ -985,14 +989,14 @@ public class LogisticsController implements SimulationListener {
     /**
      * Update timeline based on current simulation progress.
      * Shows visual state progression: Created → In Transit → At Warehouse → Delivered
+     * NOTE: Caller must ensure this is called on JavaFX Application Thread
      */
     private void updateTimeline(String batchId, double progress, String status) {
         if (timelineContainer == null) return;
         
-        Platform.runLater(() -> {
-            try {
-                // Clear existing timeline
-                timelineContainer.getChildren().clear();
+        try {
+            // Clear existing timeline
+            timelineContainer.getChildren().clear();
                 
                 // Determine which states are completed based on progress
                 boolean createdComplete = true;
@@ -1020,10 +1024,9 @@ public class LogisticsController implements SimulationListener {
                     deliveredComplete ? "Delivery complete" : "ETA: " + calculateETA(progress),
                     deliveredComplete);
                 
-            } catch (Exception e) {
-                System.err.println("Error updating timeline: " + e.getMessage());
-            }
-        });
+        } catch (Exception e) {
+            System.err.println("Error updating timeline: " + e.getMessage());
+        }
     }
     
     /**
@@ -1174,24 +1177,22 @@ public class LogisticsController implements SimulationListener {
                            progress < 90 ? "In Transit - Approaching" : 
                            progress >= 100 ? "Delivered" : "At Warehouse";
             
-            // Find and remove existing shipment
+            // Find existing shipment by index
+            int shipmentIndex = -1;
             Shipment existingShipment = null;
-            for (Shipment shipment : shipments) {
-                if (shipment.getBatchId().equals(batchId)) {
-                    existingShipment = shipment;
+            for (int i = 0; i < shipments.size(); i++) {
+                if (shipments.get(i).getBatchId().equals(batchId)) {
+                    shipmentIndex = i;
+                    existingShipment = shipments.get(i);
                     break;
                 }
-            }
-            
-            if (existingShipment != null) {
-                shipments.remove(existingShipment);
             }
             
             // Get latest environmental data for this batch
             ShipmentEnvironmentalData envData = environmentalDataMap.computeIfAbsent(
                 batchId, k -> new ShipmentEnvironmentalData());
             
-            // Create updated shipment (or new if not found)
+            // Create updated shipment
             if (progress < 100) {
                 Shipment updatedShipment = new Shipment(
                     batchId,
@@ -1202,7 +1203,17 @@ public class LogisticsController implements SimulationListener {
                     String.format("%.0f%% Complete", progress),
                     existingShipment != null ? existingShipment.getVehicle() : generateVehicleId(batchId)
                 );
-                shipments.add(updatedShipment);
+                
+                if (shipmentIndex >= 0) {
+                    // Replace existing at same index
+                    shipments.set(shipmentIndex, updatedShipment);
+                } else {
+                    // Add new shipment
+                    shipments.add(updatedShipment);
+                }
+            } else if (shipmentIndex >= 0) {
+                // Remove completed shipment
+                shipments.remove(shipmentIndex);
             }
             
         } catch (Exception e) {
