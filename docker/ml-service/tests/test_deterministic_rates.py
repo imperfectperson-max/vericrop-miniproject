@@ -6,6 +6,7 @@ This test verifies that:
 2. The same batch_id always produces the same rates
 3. Rates are within valid ranges (0.0 to 1.0)
 4. Rates are logically consistent (primeRate + rejectionRate <= 1.0)
+5. Rates match the frontend calculation algorithm (classification-based)
 """
 import os
 import json
@@ -51,6 +52,149 @@ def test_batch_creation_has_deterministic_rates():
         f"prime_rate + rejection_rate ({prime_rate + rejection_rate}) should be <= 1.0"
     
     print(f"✅ Batch created with deterministic rates: prime_rate={prime_rate}, rejection_rate={rejection_rate}")
+
+
+def test_batch_creation_fresh_classification():
+    """
+    Test batch creation with FRESH classification matches frontend algorithm.
+    
+    Frontend algorithm for FRESH:
+    - prime% = 80 + quality% * 20
+    - remainder distributed: 80% low_quality, 20% rejection
+    """
+    base = os.environ.get("BASE_URL", "http://localhost:8000")
+    url = f"{base}/batches"
+    
+    batch_data = {
+        "name": "Test_Fresh_Batch",
+        "farmer": "Test Farmer",
+        "product_type": "Apples",
+        "quantity": 100,
+        "quality_data": {
+            "quality_score": 0.85,
+            "label": "fresh"
+        },
+        "data_hash": "test_hash_fresh"
+    }
+    
+    resp = requests.post(url, json=batch_data, timeout=10)
+    assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
+    
+    result = resp.json()
+    
+    # Expected values based on frontend algorithm:
+    # quality_percent = 85
+    # prime_rate = 80 + (85 * 0.2) = 97%
+    # remainder = 3%
+    # rejection = 3 * 0.2 = 0.6%
+    expected_prime = 0.97
+    expected_rejection = 0.006
+    
+    prime_rate = result["prime_rate"]
+    rejection_rate = result["rejection_rate"]
+    
+    assert abs(prime_rate - expected_prime) < 0.01, \
+        f"FRESH prime_rate {prime_rate} should be ~{expected_prime}"
+    assert abs(rejection_rate - expected_rejection) < 0.01, \
+        f"FRESH rejection_rate {rejection_rate} should be ~{expected_rejection}"
+    
+    print(f"✅ FRESH batch rates match frontend: prime={prime_rate:.4f}, rejection={rejection_rate:.4f}")
+
+
+def test_batch_creation_low_quality_classification():
+    """
+    Test batch creation with LOW_QUALITY classification matches frontend algorithm.
+    
+    Frontend algorithm for LOW_QUALITY:
+    - low_quality% = 80 + quality% * 20
+    - remainder distributed: 80% prime, 20% rejection
+    """
+    base = os.environ.get("BASE_URL", "http://localhost:8000")
+    url = f"{base}/batches"
+    
+    batch_data = {
+        "name": "Test_LowQuality_Batch",
+        "farmer": "Test Farmer",
+        "product_type": "Apples",
+        "quantity": 100,
+        "quality_data": {
+            "quality_score": 0.45,
+            "label": "low_quality"
+        },
+        "data_hash": "test_hash_low_quality"
+    }
+    
+    resp = requests.post(url, json=batch_data, timeout=10)
+    assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
+    
+    result = resp.json()
+    
+    # Expected values based on frontend algorithm:
+    # quality_percent = 45
+    # low_quality_rate = 80 + (45 * 0.2) = 89%
+    # remainder = 11%
+    # prime = 11 * 0.8 = 8.8%
+    # rejection = 11 * 0.2 = 2.2%
+    expected_prime = 0.088
+    expected_rejection = 0.022
+    
+    prime_rate = result["prime_rate"]
+    rejection_rate = result["rejection_rate"]
+    
+    assert abs(prime_rate - expected_prime) < 0.01, \
+        f"LOW_QUALITY prime_rate {prime_rate} should be ~{expected_prime}"
+    assert abs(rejection_rate - expected_rejection) < 0.01, \
+        f"LOW_QUALITY rejection_rate {rejection_rate} should be ~{expected_rejection}"
+    
+    print(f"✅ LOW_QUALITY batch rates match frontend: prime={prime_rate:.4f}, rejection={rejection_rate:.4f}")
+
+
+def test_batch_creation_rotten_classification():
+    """
+    Test batch creation with ROTTEN classification matches frontend algorithm.
+    
+    Frontend algorithm for ROTTEN:
+    - rejection% = 80 + quality% * 20
+    - remainder distributed: 80% low_quality, 20% prime
+    """
+    base = os.environ.get("BASE_URL", "http://localhost:8000")
+    url = f"{base}/batches"
+    
+    batch_data = {
+        "name": "Test_Rotten_Batch",
+        "farmer": "Test Farmer",
+        "product_type": "Apples",
+        "quantity": 100,
+        "quality_data": {
+            "quality_score": 0.20,
+            "label": "rotten"
+        },
+        "data_hash": "test_hash_rotten"
+    }
+    
+    resp = requests.post(url, json=batch_data, timeout=10)
+    assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
+    
+    result = resp.json()
+    
+    # Expected values based on frontend algorithm:
+    # quality_percent = 20
+    # rejection_rate = 80 + (20 * 0.2) = 84%
+    # remainder = 16%
+    # low_quality = 16 * 0.8 = 12.8%
+    # prime = 16 * 0.2 = 3.2%
+    expected_prime = 0.032
+    expected_rejection = 0.84
+    
+    prime_rate = result["prime_rate"]
+    rejection_rate = result["rejection_rate"]
+    
+    assert abs(prime_rate - expected_prime) < 0.01, \
+        f"ROTTEN prime_rate {prime_rate} should be ~{expected_prime}"
+    assert abs(rejection_rate - expected_rejection) < 0.01, \
+        f"ROTTEN rejection_rate {rejection_rate} should be ~{expected_rejection}"
+    
+    print(f"✅ ROTTEN batch rates match frontend: prime={prime_rate:.4f}, rejection={rejection_rate:.4f}")
 
 
 def test_dashboard_uses_per_batch_rates():
