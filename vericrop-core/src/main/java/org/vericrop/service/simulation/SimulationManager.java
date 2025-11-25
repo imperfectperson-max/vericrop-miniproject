@@ -55,32 +55,71 @@ public class SimulationManager {
     
     /**
      * Internal state holder for current simulation.
+     * Uses monotonic progress tracking to prevent restarts.
      */
     private static class SimulationState {
         final String batchId;
         final String farmerId;
         final long startTime;
         final List<RouteWaypoint> route;
-        double progress;
-        String currentLocation;
-        double currentLatitude;
-        double currentLongitude;
-        double currentTemperature;
-        double currentHumidity;
+        volatile double progress;
+        volatile double maxProgress; // Monotonic tracking - never decreases
+        volatile String currentLocation;
+        volatile double currentLatitude;
+        volatile double currentLongitude;
+        volatile double currentTemperature;
+        volatile double currentHumidity;
+        volatile SimulationConfig.SimulationState lifecycleState;
+        volatile double finalQuality; // Final quality score (0-100)
+        volatile boolean finalQualitySet;
+        final SimulationConfig config;
         
         SimulationState(String batchId, String farmerId, List<RouteWaypoint> route) {
+            this(batchId, farmerId, route, SimulationConfig.forDemo());
+        }
+        
+        SimulationState(String batchId, String farmerId, List<RouteWaypoint> route, SimulationConfig config) {
             this.batchId = batchId;
             this.farmerId = farmerId;
             this.startTime = System.currentTimeMillis();
             this.route = route;
             this.progress = 0.0;
+            this.maxProgress = 0.0;
             this.currentLocation = "Starting...";
+            this.lifecycleState = SimulationConfig.SimulationState.AVAILABLE;
+            this.finalQuality = 100.0; // Start with perfect quality
+            this.finalQualitySet = false;
+            this.config = config;
             if (route != null && !route.isEmpty()) {
                 RouteWaypoint first = route.get(0);
                 this.currentLatitude = first.getLocation().getLatitude();
                 this.currentLongitude = first.getLocation().getLongitude();
                 this.currentTemperature = first.getTemperature();
                 this.currentHumidity = first.getHumidity();
+            }
+        }
+        
+        /**
+         * Update progress monotonically - never decreases.
+         * This prevents the ~50% restart bug.
+         */
+        synchronized void updateProgress(double newProgress) {
+            if (newProgress > this.maxProgress) {
+                this.maxProgress = newProgress;
+                this.progress = newProgress;
+                // Update lifecycle state based on progress
+                this.lifecycleState = config.determineState(newProgress);
+            }
+            // Ignore updates that would decrease progress
+        }
+        
+        /**
+         * Set final quality (only once at completion).
+         */
+        void setFinalQuality(double quality) {
+            if (!finalQualitySet) {
+                this.finalQuality = Math.max(0, Math.min(100, quality));
+                this.finalQualitySet = true;
             }
         }
     }
@@ -485,61 +524,122 @@ public class SimulationManager {
     }
     
     /**
-     * Start monitoring progress (simplified implementation).
-     * In a real implementation, this would poll the DeliverySimulator for actual progress.
+     * Get current lifecycle state.
+     */
+    public SimulationConfig.SimulationState getLifecycleState() {
+        SimulationState state = currentSimulation.get();
+        return state != null ? state.lifecycleState : SimulationConfig.SimulationState.STOPPED;
+    }
+    
+    /**
+     * Get final quality score (available after simulation completes).
+     */
+    public double getFinalQuality() {
+        SimulationState state = currentSimulation.get();
+        return state != null ? state.finalQuality : 0.0;
+    }
+    
+    /**
+     * Start monitoring progress using time-scaled simulation.
+     * Uses monotonic progress tracking to prevent restart bugs.
+     * Progress is calculated based on elapsed real time scaled by timeScale.
      */
     private void startProgressMonitoring(String batchId) {
-        // This is a simplified implementation
-        // In production, would poll DeliverySimulator.getSimulationStatus() periodically
         Thread monitorThread = new Thread(() -> {
             try {
+                SimulationState state = currentSimulation.get();
+                if (state == null || !state.batchId.equals(batchId)) {
+                    return;
+                }
+                
+                // Get simulation config for time scaling
+                SimulationConfig config = state.config;
+                long simulationDurationMs = config.getSimulationDurationMs();
+                long updateIntervalMs = config.getProgressUpdateIntervalMs();
+                
+                // Transition to IN_TRANSIT at start
+                state.lifecycleState = SimulationConfig.SimulationState.IN_TRANSIT;
+                
+                // Initialize quality decay tracking
+                QualityDecayService qualityDecayService = new QualityDecayService();
+                double currentQuality = 100.0;
+                
                 while (running.get()) {
-                    SimulationState state = currentSimulation.get();
-                    if (state != null && state.batchId.equals(batchId)) {
-                        // Simulate progress (in real implementation, would get from DeliverySimulator)
-                        state.progress = Math.min(100.0, state.progress + 2.0);
-                        
-                        // Update location based on progress
-                        if (state.progress < 30) {
-                            state.currentLocation = "En route from origin";
-                        } else if (state.progress < 70) {
-                            state.currentLocation = "In transit - midpoint";
-                        } else if (state.progress < 100) {
-                            state.currentLocation = "Approaching destination";
-                        } else if (state.progress >= 100) {
-                            state.currentLocation = "Delivered";
-                            // Auto-stop when complete
-                            // Stop simulation (will notify listeners with completed=true)
-                            running.set(false); // Stop the monitoring loop
-                            String completedBatchId = state.batchId;
-                            currentSimulation.set(null);
-                            
-                            // Stop in DeliverySimulator
-                            try {
-                                deliverySimulator.stopSimulation(completedBatchId);
-                            } catch (Exception e) {
-                                logger.error("Error stopping delivery simulator", e);
-                            }
-                            
-                            // Notify listeners with completed=true
-                            notifyStopped(completedBatchId, true);
-                            logger.info("Simulation completed for batch: {}", completedBatchId);
-                            break; // Exit monitoring loop
-                        }
-                        
-                        // Step the map simulation to update entity positions
-                        try {
-                            mapSimulator.step(state.progress);
-                            logger.trace("Map simulation stepped at progress {}%", state.progress);
-                        } catch (Exception e) {
-                            logger.error("Error stepping map simulation", e);
-                        }
-                        
-                        // Notify listeners
-                        notifyProgress(batchId, state.progress, state.currentLocation);
+                    state = currentSimulation.get();
+                    if (state == null || !state.batchId.equals(batchId)) {
+                        break;
                     }
                     
-                    Thread.sleep(5000); // Update every 5 seconds
+                    // Calculate progress based on elapsed time (scaled)
+                    long elapsedRealTimeMs = System.currentTimeMillis() - state.startTime;
+                    double progressPercent = Math.min(100.0, (elapsedRealTimeMs * 100.0) / simulationDurationMs);
+                    
+                    // Use monotonic update - progress never decreases
+                    state.updateProgress(progressPercent);
+                    
+                    // Calculate quality decay based on temperature and time
+                    double elapsedHours = (elapsedRealTimeMs * config.getTimeScale()) / (1000.0 * 3600.0);
+                    currentQuality = qualityDecayService.calculateQuality(
+                        100.0, state.currentTemperature, state.currentHumidity, elapsedHours);
+                    state.finalQuality = currentQuality;
+                    
+                    // Update location based on lifecycle state
+                    switch (state.lifecycleState) {
+                        case IN_TRANSIT:
+                            if (state.maxProgress < 30) {
+                                state.currentLocation = "En route from origin";
+                            } else if (state.maxProgress < 80) {
+                                state.currentLocation = "In transit - midpoint";
+                            }
+                            break;
+                        case APPROACHING:
+                            state.currentLocation = "Approaching destination";
+                            break;
+                        case COMPLETED:
+                            state.currentLocation = "Delivered";
+                            break;
+                        default:
+                            break;
+                    }
+                    
+                    // Check for completion
+                    if (state.maxProgress >= 100.0) {
+                        // Set final quality before completing
+                        state.setFinalQuality(currentQuality);
+                        state.lifecycleState = SimulationConfig.SimulationState.COMPLETED;
+                        state.currentLocation = "Delivered";
+                        
+                        running.set(false);
+                        String completedBatchId = state.batchId;
+                        
+                        // Stop in DeliverySimulator
+                        try {
+                            deliverySimulator.stopSimulation(completedBatchId);
+                        } catch (Exception e) {
+                            logger.error("Error stopping delivery simulator", e);
+                        }
+                        
+                        // Notify listeners with completed=true and final quality
+                        notifyProgress(completedBatchId, 100.0, "Delivered - Final Quality: " + 
+                            String.format("%.1f%%", state.finalQuality));
+                        notifyStopped(completedBatchId, true);
+                        
+                        logger.info("Simulation completed for batch: {} with final quality: {:.1f}%", 
+                            completedBatchId, state.finalQuality);
+                        break;
+                    }
+                    
+                    // Step the map simulation to update entity positions
+                    try {
+                        mapSimulator.step(state.maxProgress);
+                    } catch (Exception e) {
+                        logger.error("Error stepping map simulation", e);
+                    }
+                    
+                    // Notify listeners with current progress
+                    notifyProgress(batchId, state.maxProgress, state.currentLocation);
+                    
+                    Thread.sleep(updateIntervalMs);
                 }
             } catch (InterruptedException e) {
                 logger.debug("Progress monitoring interrupted for batch: {}", batchId);
@@ -556,6 +656,7 @@ public class SimulationManager {
     /**
      * Handle SimulationEvent from SimulationService and update state/notify listeners.
      * This provides detailed GPS and temperature updates to all listeners.
+     * Uses monotonic progress update to prevent restart bugs.
      */
     private void handleSimulationEvent(SimulationEvent event) {
         SimulationState state = currentSimulation.get();
@@ -563,8 +664,10 @@ public class SimulationManager {
             return;
         }
         
+        // Use monotonic progress update - progress never decreases
+        state.updateProgress(event.getProgressPercent());
+        
         // Update state with current position and environmental data
-        state.progress = event.getProgressPercent();
         state.currentLocation = event.getLocationName();
         state.currentLatitude = event.getLatitude();
         state.currentLongitude = event.getLongitude();
@@ -572,11 +675,9 @@ public class SimulationManager {
         state.currentHumidity = event.getHumidity();
         
         // Publish temperature event to Kafka for live dashboard updates
-        // This is the key fix: bridge simulation temperature data to Kafka stream
         publishTemperatureEvent(event);
         
         // Publish map simulation event to Kafka for live map animation
-        // This is the key fix for Bug #2: map markers not animating
         publishMapSimulationEvent(event);
         
         // Notify progress update to all listeners

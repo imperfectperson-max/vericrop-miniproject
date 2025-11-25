@@ -88,55 +88,56 @@
     </TabPane>
 
     <!-- Product Journey -->
-    <VBox styleClass="dashboard-card" spacing="15">
+    <VBox fx:id="productJourneyCard" styleClass="dashboard-card" spacing="15">
         <Label text="📋 Product Journey" styleClass="subtitle-label"/>
-        <VBox style="-fx-border-color: #e2e8f0; -fx-border-radius: 8; -fx-padding: 15; -fx-spacing: 12;">
+        <VBox fx:id="journeyTimelineContainer" style="-fx-border-color: #e2e8f0; -fx-border-radius: 8; -fx-padding: 15; -fx-spacing: 12;">
+            <!-- Journey timeline items will be populated dynamically -->
             <HBox spacing="15" alignment="CENTER_LEFT">
-                <Label text="✅" style="-fx-font-size: 16;"/>
+                <Label fx:id="step1Icon" text="⏳" style="-fx-font-size: 16;"/>
                 <VBox>
-                    <Label text="MAR 07, 14:30 - Harvested at Sunny Valley Orchards" style="-fx-font-weight: bold;"/>
-                    <Label text="Quality: PRIME (82%) | Certified Organic" style="-fx-text-fill: #64748b;"/>
+                    <Label fx:id="step1Title" text="Awaiting shipment..." style="-fx-font-weight: bold;"/>
+                    <Label fx:id="step1Details" text="Start a simulation to see journey updates" style="-fx-text-fill: #64748b;"/>
                 </VBox>
             </HBox>
             <HBox spacing="15" alignment="CENTER_LEFT">
-                <Label text="✅" style="-fx-font-size: 16;"/>
+                <Label fx:id="step2Icon" text="⏳" style="-fx-font-size: 16;"/>
                 <VBox>
-                    <Label text="MAR 07, 15:45 - Shipped via GlobalLog Transport" style="-fx-font-weight: bold;"/>
-                    <Label text="Avg Temp: 4.2°C | Perfect Transport Conditions" style="-fx-text-fill: #64748b;"/>
+                    <Label fx:id="step2Title" text="In Transit" style="-fx-font-weight: bold;"/>
+                    <Label fx:id="step2Details" text="--" style="-fx-text-fill: #64748b;"/>
                 </VBox>
             </HBox>
             <HBox spacing="15" alignment="CENTER_LEFT">
-                <Label text="✅" style="-fx-font-size: 16;"/>
+                <Label fx:id="step3Icon" text="⏳" style="-fx-font-size: 16;"/>
                 <VBox>
-                    <Label text="MAR 07, 17:30 - Received at Metro Fresh Storage" style="-fx-font-weight: bold;"/>
-                    <Label text="Spoilage Risk: LOW (8%) | Stored in Cell 4B" style="-fx-text-fill: #64748b;"/>
+                    <Label fx:id="step3Title" text="Approaching Destination" style="-fx-font-weight: bold;"/>
+                    <Label fx:id="step3Details" text="--" style="-fx-text-fill: #64748b;"/>
                 </VBox>
             </HBox>
             <HBox spacing="15" alignment="CENTER_LEFT">
-                <Label text="✅" style="-fx-font-size: 16;"/>
+                <Label fx:id="step4Icon" text="⏳" style="-fx-font-size: 16;"/>
                 <VBox>
-                    <Label text="MAR 08, 09:15 - Delivered to FreshMart Downtown" style="-fx-font-weight: bold;"/>
-                    <Label text="Shelf Life: 12 days remaining" style="-fx-text-fill: #64748b;"/>
+                    <Label fx:id="step4Title" text="Delivered" style="-fx-font-weight: bold;"/>
+                    <Label fx:id="step4Details" text="--" style="-fx-text-fill: #64748b;"/>
                 </VBox>
             </HBox>
         </VBox>
     </VBox>
 
     <!-- Quality Metrics -->
-    <VBox styleClass="dashboard-card" spacing="15">
-        <Label text="🎯 Quality Metrics" styleClass="subtitle-label"/>
+    <VBox fx:id="qualityMetricsCard" styleClass="dashboard-card" spacing="15">
+        <Label text="🎯 Final Quality Score" styleClass="subtitle-label"/>
         <HBox spacing="20" alignment="CENTER">
-            <VBox styleClass="metric-card" spacing="5" alignment="CENTER" prefWidth="120">
-                <Label text="92%" styleClass="metric-value" style="-fx-text-fill: #10b981;"/>
-                <Label text="Color Consistency" styleClass="metric-label"/>
+            <VBox styleClass="metric-card" spacing="5" alignment="CENTER" prefWidth="150">
+                <Label fx:id="finalQualityLabel" text="--" styleClass="metric-value" style="-fx-text-fill: #10b981; -fx-font-size: 28px;"/>
+                <Label text="Final Quality" styleClass="metric-label"/>
             </VBox>
             <VBox styleClass="metric-card" spacing="5" alignment="CENTER" prefWidth="120">
-                <Label text="87%" styleClass="metric-value" style="-fx-text-fill: #3b82f6;"/>
-                <Label text="Size Uniformity" styleClass="metric-label"/>
+                <Label fx:id="temperatureLabel" text="--" styleClass="metric-value" style="-fx-text-fill: #3b82f6;"/>
+                <Label text="Avg Temperature" styleClass="metric-label"/>
             </VBox>
             <VBox styleClass="metric-card" spacing="5" alignment="CENTER" prefWidth="120">
-                <Label text="3%" styleClass="metric-value" style="-fx-text-fill: #f59e0b;"/>
-                <Label text="Defect Density" styleClass="metric-label"/>
+                <Label fx:id="statusLabel" text="--" styleClass="metric-value" style="-fx-text-fill: #f59e0b;"/>
+                <Label text="Status" styleClass="metric-label"/>
             </VBox>
         </HBox>
     </VBox>

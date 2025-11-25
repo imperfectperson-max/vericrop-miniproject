@@ -75,6 +75,50 @@ $env:VERICROP_LOAD_DEMO="true"
 
 See [vericrop-gui/README.md](vericrop-gui/README.md) for detailed demo mode documentation.
 
+### Example Simulation Files (3-4 Minute Demo Runs)
+
+VeriCrop includes three pre-configured simulation JSON files for quick demonstration:
+
+| Simulation | Duration | Description |
+|------------|----------|-------------|
+| `example_1_farmer_to_consumer.json` | ~3 min | Complete journey from farm to warehouse to retail store |
+| `example_2_producer_local.json` | ~1.5 min | Short local delivery from organic farm to distribution center |
+| `example_3_long_route.json` | ~3 min | Extended delivery with temperature events testing quality decay |
+
+**Location**: `vericrop-gui/src/main/resources/simulations/`
+
+**Key Features**:
+- **Time Scaling**: Default 10x speed (`timeScale: 10.0`) makes a 30-minute simulated route complete in ~3 minutes real-time
+- **Quality Decay**: Tracks quality degradation based on temperature and time
+- **Lifecycle States**: Progresses through AVAILABLE → IN_TRANSIT → APPROACHING → COMPLETED
+- **Smooth Animation**: Map markers interpolate smoothly along route waypoints
+
+**Loading Simulations**:
+
+Simulations can be loaded programmatically using `SimulationLoader`:
+
+```java
+import org.vericrop.service.simulation.SimulationLoader;
+import org.vericrop.service.simulation.SimulationLoader.SimulationDefinition;
+
+// Load a specific simulation
+SimulationDefinition sim = SimulationLoader.loadFromResource(
+    "/simulations/example_1_farmer_to_consumer.json");
+
+// Get simulation config with time scaling
+SimulationConfig config = sim.toSimulationConfig();
+
+// Generate batch ID
+String batchId = sim.generateBatchId(); // e.g., "APPLES_1700000000000"
+```
+
+**Customizing Time Scale**:
+
+To adjust simulation speed, modify the `timeScale` field in the JSON file:
+- `timeScale: 1.0` = real-time (30-minute route takes 30 minutes)
+- `timeScale: 10.0` = 10x speed (30-minute route completes in 3 minutes) **[Default]**
+- `timeScale: 30.0` = 30x speed (30-minute route completes in 1 minute)
+
 ### Map Simulation and Scenario Management
 
 VeriCrop now includes integrated map simulation that runs alongside delivery simulations, providing a grid-based visualization of entity positions (producers, consumers, warehouses, vehicles, resources) as the simulation progresses.

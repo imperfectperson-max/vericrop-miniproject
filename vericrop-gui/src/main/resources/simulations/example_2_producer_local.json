@@ -1,0 +1,37 @@
+{
+  "id": "example_2_producer_local",
+  "name": "Local Producer Delivery",
+  "description": "Short local delivery from organic farm to nearby distribution center",
+  "durationMinutes": 15,
+  "timeScale": 10.0,
+  "origin": {
+    "name": "Green Fields Organic Farm",
+    "latitude": 42.3501,
+    "longitude": -71.0489
+  },
+  "warehouse": null,
+  "destination": {
+    "name": "City Fresh Distribution",
+    "latitude": 42.3601,
+    "longitude": -71.0689
+  },
+  "productType": "Organic Carrots",
+  "batchPrefix": "CARROTS",
+  "initialQuality": 98.0,
+  "temperature": {
+    "target": 3.5,
+    "minAllowed": 1.0,
+    "maxAllowed": 6.0,
+    "variance": 1.0
+  },
+  "humidity": {
+    "target": 80.0,
+    "minAllowed": 70.0,
+    "maxAllowed": 90.0,
+    "variance": 3.0
+  },
+  "waypointsPerSegment": 10,
+  "speedKmh": 35.0,
+  "scenario": "NORMAL",
+  "notes": "Quick local delivery maintaining strict temperature control"
+}
