@@ -912,22 +912,56 @@ public class ProducerController implements SimulationListener {
                 Map<String, Object> distribution = (Map<String, Object>) dashboardData.get("quality_distribution");
                 List<Map<String, Object>> recentBatches = (List<Map<String, Object>>) dashboardData.get("recent_batches");
 
-                // Calculate cumulative rates using the new algorithm
-                double[] cumulativeRates = calculateCumulativeRates(recentBatches);
-                double primeRate = cumulativeRates[0];
-                double lowQualityRate = cumulativeRates[1];
-                double rejectionRate = cumulativeRates[2];
-
-                // Update UI with calculated rates
-                if (primePercentageLabel != null) {
-                    primePercentageLabel.setText(String.format("%.1f%%", primeRate));
-                }
-                if (rejectionRateLabel != null) {
-                    rejectionRateLabel.setText(String.format("%.1f%%", rejectionRate));
+                // Compute fallback KPIs from recent batches if backend doesn't provide them
+                if ((kpis == null || kpis.isEmpty()) && recentBatches != null && !recentBatches.isEmpty()) {
+                    kpis = computeKpisFromRecentBatches(recentBatches);
                 }
 
+                // Compute fallback distribution from recent batches if backend doesn't provide it
+                if ((distribution == null || distribution.isEmpty()) && recentBatches != null && !recentBatches.isEmpty()) {
+                    distribution = computeDistributionFromRecentBatches(recentBatches);
+                }
+
+                // Get distribution values (either from backend or computed)
+                double primeRate = 0.0;
+                double lowQualityRate = 0.0;
+                double rejectionRate = 0.0;
+
+                if (distribution != null && !distribution.isEmpty()) {
+                    // Use distribution data for pie chart values
+                    Object primeObj = distribution.get("prime");
+                    Object standardObj = distribution.get("standard");
+                    Object subStandardObj = distribution.get("sub_standard");
+
+                    if (primeObj instanceof Number) primeRate = ((Number) primeObj).doubleValue();
+                    if (standardObj instanceof Number) lowQualityRate = ((Number) standardObj).doubleValue();
+                    if (subStandardObj instanceof Number) rejectionRate = ((Number) subStandardObj).doubleValue();
+                } else {
+                    // Fallback to calculateCumulativeRates if no distribution available
+                    double[] cumulativeRates = calculateCumulativeRates(recentBatches);
+                    primeRate = cumulativeRates[0];
+                    lowQualityRate = cumulativeRates[1];
+                    rejectionRate = cumulativeRates[2];
+                }
+
+                // Update UI with KPI values (use computed KPIs if available)
                 if (kpis != null) {
-                    // Use consistent parsing with fallbacks for other KPIs
+                    if (primePercentageLabel != null) {
+                        Object primePct = kpis.get("prime_percentage");
+                        if (primePct != null) {
+                            primePercentageLabel.setText(String.format("%.1f%%", ((Number) primePct).doubleValue()));
+                        } else {
+                            primePercentageLabel.setText(String.format("%.1f%%", primeRate));
+                        }
+                    }
+                    if (rejectionRateLabel != null) {
+                        Object rejRate = kpis.get("rejection_rate");
+                        if (rejRate != null) {
+                            rejectionRateLabel.setText(String.format("%.1f%%", ((Number) rejRate).doubleValue()));
+                        } else {
+                            rejectionRateLabel.setText(String.format("%.1f%%", rejectionRate));
+                        }
+                    }
                     if (totalBatchesLabel != null) {
                         Object totalBatches = kpis.get("total_batches_today");
                         totalBatchesLabel.setText(totalBatches != null ? String.valueOf(totalBatches) : "0");
@@ -935,6 +969,14 @@ public class ProducerController implements SimulationListener {
                     if (avgQualityLabel != null) {
                         Object avgQuality = kpis.get("average_quality");
                         avgQualityLabel.setText(avgQuality != null ? avgQuality + "%" : "0%");
+                    }
+                } else {
+                    // Fallback when no KPIs available at all
+                    if (primePercentageLabel != null) {
+                        primePercentageLabel.setText(String.format("%.1f%%", primeRate));
+                    }
+                    if (rejectionRateLabel != null) {
+                        rejectionRateLabel.setText(String.format("%.1f%%", rejectionRate));
                     }
                 }
 
