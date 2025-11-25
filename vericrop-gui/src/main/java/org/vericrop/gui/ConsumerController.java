@@ -3,6 +3,7 @@ package org.vericrop.gui;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
+import javafx.scene.layout.VBox;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.stage.FileChooser;
@@ -11,7 +12,10 @@ import java.util.Set;
 import java.util.HashSet;
 import java.io.File;
 import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import org.vericrop.gui.util.QRDecoder;
+import org.vericrop.service.simulation.SimulationConfig;
 import org.vericrop.service.simulation.SimulationListener;
 import org.vericrop.service.simulation.SimulationManager;
 import com.google.zxing.NotFoundException;
@@ -22,15 +26,62 @@ public class ConsumerController implements SimulationListener {
     @FXML private ListView<String> verificationHistoryList;
     @FXML private Button backToProducerButton;
     @FXML private Button logisticsButton;
+    
+    // Product Journey UI elements
+    @FXML private VBox productJourneyCard;
+    @FXML private VBox journeyTimelineContainer;
+    @FXML private Label step1Icon;
+    @FXML private Label step1Title;
+    @FXML private Label step1Details;
+    @FXML private Label step2Icon;
+    @FXML private Label step2Title;
+    @FXML private Label step2Details;
+    @FXML private Label step3Icon;
+    @FXML private Label step3Title;
+    @FXML private Label step3Details;
+    @FXML private Label step4Icon;
+    @FXML private Label step4Title;
+    @FXML private Label step4Details;
+    
+    // Quality metrics UI elements
+    @FXML private VBox qualityMetricsCard;
+    @FXML private Label finalQualityLabel;
+    @FXML private Label temperatureLabel;
+    @FXML private Label statusLabel;
 
     private ObservableList<String> verificationHistory = FXCollections.observableArrayList();
     private Set<String> knownBatchIds = new HashSet<>();
+    
+    // Track current simulation for journey display
+    private String currentBatchId = null;
+    private double lastProgress = 0.0;
+    
+    /** Default final quality used when SimulationManager data is unavailable */
+    private static final double DEFAULT_FINAL_QUALITY = 95.0;
 
     @FXML
     public void initialize() {
         setupVerificationHistory();
         setupNavigationButtons();
         registerWithSimulationManager();
+        initializeJourneyDisplay();
+    }
+    
+    /**
+     * Initialize the journey display with default values.
+     */
+    private void initializeJourneyDisplay() {
+        Platform.runLater(() -> {
+            if (finalQualityLabel != null) finalQualityLabel.setText("--");
+            if (temperatureLabel != null) temperatureLabel.setText("--");
+            if (statusLabel != null) statusLabel.setText("Waiting");
+            
+            // Reset journey steps
+            updateJourneyStep(1, "⏳", "Awaiting shipment...", "Start a simulation to see journey updates");
+            updateJourneyStep(2, "⏳", "In Transit", "--");
+            updateJourneyStep(3, "⏳", "Approaching Destination", "--");
+            updateJourneyStep(4, "⏳", "Delivered", "--");
+        });
     }
     
     /**
@@ -42,11 +93,15 @@ public class ConsumerController implements SimulationListener {
                 SimulationManager manager = SimulationManager.getInstance();
                 manager.registerListener(this);
                 
-                // If simulation is already running, add note to verification history
+                // If simulation is already running, update journey display
                 if (manager.isRunning()) {
-                    String batchId = manager.getSimulationId();
+                    currentBatchId = manager.getSimulationId();
+                    double progress = manager.getProgress();
+                    String location = manager.getCurrentLocation();
+                    
                     Platform.runLater(() -> {
-                        verificationHistory.add(0, "📦 Batch in transit: " + batchId + " - Track in Logistics tab");
+                        verificationHistory.add(0, "📦 Batch in transit: " + currentBatchId + " - Track in Logistics tab");
+                        updateJourneyFromProgress(currentBatchId, progress, location);
                     });
                 }
             }
@@ -317,44 +372,188 @@ public class ConsumerController implements SimulationListener {
         }
     }
     
+    // ========== Journey Display Helpers ==========
+    
+    /**
+     * Update a single journey step with icon, title, and details.
+     */
+    private void updateJourneyStep(int step, String icon, String title, String details) {
+        switch (step) {
+            case 1:
+                if (step1Icon != null) step1Icon.setText(icon);
+                if (step1Title != null) step1Title.setText(title);
+                if (step1Details != null) step1Details.setText(details);
+                break;
+            case 2:
+                if (step2Icon != null) step2Icon.setText(icon);
+                if (step2Title != null) step2Title.setText(title);
+                if (step2Details != null) step2Details.setText(details);
+                break;
+            case 3:
+                if (step3Icon != null) step3Icon.setText(icon);
+                if (step3Title != null) step3Title.setText(title);
+                if (step3Details != null) step3Details.setText(details);
+                break;
+            case 4:
+                if (step4Icon != null) step4Icon.setText(icon);
+                if (step4Title != null) step4Title.setText(title);
+                if (step4Details != null) step4Details.setText(details);
+                break;
+        }
+    }
+    
+    /**
+     * Update the journey display based on current progress.
+     */
+    private void updateJourneyFromProgress(String batchId, double progress, String location) {
+        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"));
+        
+        // Step 1: Created/Started
+        if (progress >= 0) {
+            updateJourneyStep(1, "✅", "Batch Created - " + batchId, 
+                "Started at " + timestamp + " | Initial Quality: 100%");
+        }
+        
+        // Step 2: In Transit
+        if (progress > 0 && progress < 80) {
+            updateJourneyStep(2, "🚚", "In Transit - " + String.format("%.0f%%", progress), 
+                location != null ? location : "En route...");
+            if (statusLabel != null) statusLabel.setText("In Transit");
+        } else if (progress >= 80) {
+            updateJourneyStep(2, "✅", "In Transit - Complete", 
+                "Transit phase completed");
+        }
+        
+        // Step 3: Approaching
+        if (progress >= 80 && progress < 100) {
+            updateJourneyStep(3, "🎯", "Approaching - " + String.format("%.0f%%", progress),
+                location != null ? location : "Near destination");
+            if (statusLabel != null) statusLabel.setText("Approaching");
+        } else if (progress >= 100) {
+            updateJourneyStep(3, "✅", "Approaching - Complete", 
+                "Reached destination area");
+        }
+        
+        // Step 4: Delivered (only when complete)
+        if (progress >= 100) {
+            updateJourneyStep(4, "✅", "Delivered", 
+                "Delivery completed at " + timestamp);
+            if (statusLabel != null) statusLabel.setText("Delivered");
+        }
+    }
+    
+    /**
+     * Display final quality score when simulation completes.
+     */
+    private void displayFinalQuality(String batchId, double finalQuality) {
+        if (finalQualityLabel != null) {
+            finalQualityLabel.setText(String.format("%.1f%%", finalQuality));
+            
+            // Color based on quality level
+            if (finalQuality >= 80) {
+                finalQualityLabel.setStyle("-fx-text-fill: #10b981; -fx-font-size: 28px;"); // Green
+            } else if (finalQuality >= 60) {
+                finalQualityLabel.setStyle("-fx-text-fill: #f59e0b; -fx-font-size: 28px;"); // Yellow
+            } else {
+                finalQualityLabel.setStyle("-fx-text-fill: #dc2626; -fx-font-size: 28px;"); // Red
+            }
+        }
+        
+        // Update step 4 with final quality
+        updateJourneyStep(4, "✅", "Delivered - Final Quality: " + String.format("%.1f%%", finalQuality),
+            "Quality score based on temperature and time");
+    }
+    
     // ========== SimulationListener Implementation ==========
     
     @Override
     public void onSimulationStarted(String batchId, String farmerId) {
         Platform.runLater(() -> {
-            String timestamp = java.time.LocalDateTime.now().format(
-                    java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            currentBatchId = batchId;
+            lastProgress = 0.0;
+            
+            String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
             String message = timestamp + ": 🚚 Batch " + batchId + " is now in transit from " + farmerId;
             verificationHistory.add(0, message);
+            
+            // Reset and start journey display
+            initializeJourneyDisplay();
+            updateJourneyStep(1, "✅", "Batch Created - " + batchId, 
+                "Started at " + timestamp + " | From: " + farmerId);
+            updateJourneyStep(2, "🚚", "In Transit", "Starting delivery...");
+            
+            if (statusLabel != null) statusLabel.setText("Started");
+            if (temperatureLabel != null) temperatureLabel.setText("Monitoring...");
+            
             System.out.println("ConsumerController: Simulation started - " + batchId + " from " + farmerId);
         });
     }
     
     @Override
     public void onProgressUpdate(String batchId, double progress, String currentLocation) {
-        // Add journey milestone updates for significant progress points
-        // Only update at key milestones to avoid cluttering the history
-        if (progress == 25.0 || progress == 50.0 || progress == 75.0) {
-            Platform.runLater(() -> {
-                String timestamp = java.time.LocalDateTime.now().format(
-                        java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        Platform.runLater(() -> {
+            // Skip if not tracking this batch
+            if (currentBatchId != null && !currentBatchId.equals(batchId)) {
+                return;
+            }
+            
+            // Update journey display
+            updateJourneyFromProgress(batchId, progress, currentLocation);
+            
+            // Add milestone entries to history at key points
+            boolean isMilestone = (progress >= 25 && lastProgress < 25) ||
+                                 (progress >= 50 && lastProgress < 50) ||
+                                 (progress >= 75 && lastProgress < 75) ||
+                                 (progress >= 100 && lastProgress < 100);
+            
+            if (isMilestone) {
+                String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
                 String message = String.format("%s: 📍 Batch %s - %.0f%% complete - %s", 
                                              timestamp, batchId, progress, currentLocation);
                 verificationHistory.add(0, message);
                 System.out.println("ConsumerController: Journey milestone - " + batchId + " at " + progress + "%");
-            });
-        }
+            }
+            
+            lastProgress = progress;
+        });
     }
     
     @Override
     public void onSimulationStopped(String batchId, boolean completed) {
         Platform.runLater(() -> {
-            String timestamp = java.time.LocalDateTime.now().format(
-                    java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-            String message = completed ? 
-                timestamp + ": ✅ Batch " + batchId + " delivered successfully - Ready for verification" : 
-                timestamp + ": ⏹ Delivery stopped for batch " + batchId;
+            String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            String message;
+            
+            if (completed) {
+                message = timestamp + ": ✅ Batch " + batchId + " delivered successfully - Ready for verification";
+                
+                // Get final quality from SimulationManager
+                double finalQuality = DEFAULT_FINAL_QUALITY;
+                try {
+                    if (SimulationManager.isInitialized()) {
+                        finalQuality = SimulationManager.getInstance().getFinalQuality();
+                    }
+                } catch (Exception e) {
+                    System.err.println("Could not get final quality: " + e.getMessage());
+                }
+                
+                // Display final quality
+                displayFinalQuality(batchId, finalQuality);
+                
+                // Update all journey steps to complete
+                updateJourneyFromProgress(batchId, 100.0, "Delivered");
+                
+            } else {
+                message = timestamp + ": ⏹ Delivery stopped for batch " + batchId;
+                if (statusLabel != null) statusLabel.setText("Stopped");
+            }
+            
             verificationHistory.add(0, message);
+            
+            // Reset tracking
+            currentBatchId = null;
+            lastProgress = 0.0;
+            
             System.out.println("ConsumerController: " + (completed ? "Delivery completed" : "Delivery stopped") + " - " + batchId);
         });
     }
@@ -362,8 +561,7 @@ public class ConsumerController implements SimulationListener {
     @Override
     public void onSimulationError(String batchId, String error) {
         Platform.runLater(() -> {
-            String timestamp = java.time.LocalDateTime.now().format(
-                    java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
             String message = timestamp + ": ❌ Delivery issue for batch " + batchId + " - " + error;
             verificationHistory.add(0, message);
             System.err.println("ConsumerController: Simulation error - " + error + " for batch " + batchId);
