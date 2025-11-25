@@ -1,0 +1,55 @@
+{
+  "id": "example_3_long_route",
+  "name": "Cross-Region Long Haul",
+  "description": "Extended delivery with multiple environmental events testing quality decay",
+  "durationMinutes": 45,
+  "timeScale": 15.0,
+  "origin": {
+    "name": "Valley View Farms",
+    "latitude": 42.4001,
+    "longitude": -71.1089
+  },
+  "warehouse": {
+    "name": "Regional Cold Storage Hub",
+    "latitude": 42.3801,
+    "longitude": -71.0789
+  },
+  "destination": {
+    "name": "Premium Grocers East",
+    "latitude": 42.3501,
+    "longitude": -71.0289
+  },
+  "productType": "Mixed Vegetables",
+  "batchPrefix": "VEGGIES",
+  "initialQuality": 92.0,
+  "temperature": {
+    "target": 5.0,
+    "minAllowed": 2.0,
+    "maxAllowed": 8.0,
+    "variance": 2.5
+  },
+  "humidity": {
+    "target": 78.0,
+    "minAllowed": 60.0,
+    "maxAllowed": 90.0,
+    "variance": 8.0
+  },
+  "waypointsPerSegment": 25,
+  "speedKmh": 55.0,
+  "scenario": "TEMPERATURE_SPIKE",
+  "temperatureEvents": [
+    {
+      "atMinute": 15,
+      "durationMinutes": 3,
+      "temperature": 12.0,
+      "description": "Refrigeration unit maintenance stop"
+    },
+    {
+      "atMinute": 35,
+      "durationMinutes": 2,
+      "temperature": 9.5,
+      "description": "Loading dock exposure"
+    }
+  ],
+  "notes": "Tests quality decay with temperature excursions - demonstrates final quality calculation"
+}

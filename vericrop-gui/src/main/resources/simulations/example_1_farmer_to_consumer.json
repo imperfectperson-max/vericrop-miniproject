@@ -1,0 +1,41 @@
+{
+  "id": "example_1_farmer_to_consumer",
+  "name": "Farm to Consumer Direct",
+  "description": "Complete journey from Sunny Valley Farm directly to Metro Fresh retail store with warehouse stop",
+  "durationMinutes": 30,
+  "timeScale": 10.0,
+  "origin": {
+    "name": "Sunny Valley Farm",
+    "latitude": 42.3601,
+    "longitude": -71.0589
+  },
+  "warehouse": {
+    "name": "Metro Fresh Warehouse",
+    "latitude": 42.3668,
+    "longitude": -71.0843
+  },
+  "destination": {
+    "name": "FreshMart Downtown",
+    "latitude": 42.3736,
+    "longitude": -71.1097
+  },
+  "productType": "Summer Apples",
+  "batchPrefix": "APPLES",
+  "initialQuality": 95.0,
+  "temperature": {
+    "target": 4.0,
+    "minAllowed": 2.0,
+    "maxAllowed": 8.0,
+    "variance": 1.5
+  },
+  "humidity": {
+    "target": 75.0,
+    "minAllowed": 65.0,
+    "maxAllowed": 85.0,
+    "variance": 5.0
+  },
+  "waypointsPerSegment": 15,
+  "speedKmh": 45.0,
+  "scenario": "NORMAL",
+  "notes": "Standard cold chain delivery with optimal conditions"
+}
