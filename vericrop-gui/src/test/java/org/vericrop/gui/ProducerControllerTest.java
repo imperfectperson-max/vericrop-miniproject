@@ -5,6 +5,7 @@ import org.junit.jupiter.api.BeforeEach;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.lang.reflect.Method;
+import java.util.*;
 
 /**
  * Test suite for ProducerController rate calculation helper.
@@ -19,6 +20,8 @@ public class ProducerControllerTest {
     
     private ProducerController controller;
     private Method calculateRatesMethod;
+    private Method computeKpisFromRecentBatchesMethod;
+    private Method computeDistributionFromRecentBatchesMethod;
     
     @BeforeEach
     public void setUp() throws Exception {
@@ -28,6 +31,16 @@ public class ProducerControllerTest {
         calculateRatesMethod = ProducerController.class.getDeclaredMethod(
             "calculateRates", int.class, int.class);
         calculateRatesMethod.setAccessible(true);
+        
+        // Access the private computeKpisFromRecentBatches method using reflection
+        computeKpisFromRecentBatchesMethod = ProducerController.class.getDeclaredMethod(
+            "computeKpisFromRecentBatches", List.class);
+        computeKpisFromRecentBatchesMethod.setAccessible(true);
+        
+        // Access the private computeDistributionFromRecentBatches method using reflection
+        computeDistributionFromRecentBatchesMethod = ProducerController.class.getDeclaredMethod(
+            "computeDistributionFromRecentBatches", List.class);
+        computeDistributionFromRecentBatchesMethod.setAccessible(true);
     }
     
     @Test
@@ -125,5 +138,173 @@ public class ProducerControllerTest {
                 String.format("Rates should sum to 100%% for prime=%d, rejected=%d", 
                     testCase[0], testCase[1]));
         }
+    }
+    
+    // ========== Tests for computeKpisFromRecentBatches ==========
+    
+    @Test
+    @SuppressWarnings("unchecked")
+    public void testComputeKpisFromRecentBatches_WithBatches() throws Exception {
+        // Create test batches with different quality scores
+        List<Map<String, Object>> recentBatches = new ArrayList<>();
+        
+        // 3 prime batches (quality_score > 0.8)
+        Map<String, Object> batch1 = new HashMap<>();
+        batch1.put("quality_score", 0.95);
+        recentBatches.add(batch1);
+        
+        Map<String, Object> batch2 = new HashMap<>();
+        batch2.put("quality_score", 0.85);
+        recentBatches.add(batch2);
+        
+        Map<String, Object> batch3 = new HashMap<>();
+        batch3.put("quality_score", 0.82);
+        recentBatches.add(batch3);
+        
+        // 1 standard batch (quality_score > 0.6 and quality_score <= 0.8)
+        Map<String, Object> batch4 = new HashMap<>();
+        batch4.put("quality_score", 0.75);
+        recentBatches.add(batch4);
+        
+        // 1 sub-standard batch (quality_score <= 0.6)
+        Map<String, Object> batch5 = new HashMap<>();
+        batch5.put("quality_score", 0.50);
+        recentBatches.add(batch5);
+        
+        Map<String, Object> kpis = (Map<String, Object>) computeKpisFromRecentBatchesMethod.invoke(controller, recentBatches);
+        
+        // Verify total batches
+        assertEquals(5, kpis.get("total_batches_today"), "Total batches should be 5");
+        
+        // Verify average quality: (95 + 85 + 82 + 75 + 50) / 5 = 77.4%
+        Object avgQuality = kpis.get("average_quality");
+        assertNotNull(avgQuality, "Average quality should not be null");
+        assertEquals(77.4, ((Number) avgQuality).doubleValue(), 0.1, "Average quality should be ~77.4%");
+        
+        // Verify prime percentage: 3/5 = 60%
+        Object primePct = kpis.get("prime_percentage");
+        assertNotNull(primePct, "Prime percentage should not be null");
+        assertEquals(60.0, ((Number) primePct).doubleValue(), 0.1, "Prime percentage should be 60%");
+        
+        // Verify rejection rate: 1/5 = 20%
+        Object rejRate = kpis.get("rejection_rate");
+        assertNotNull(rejRate, "Rejection rate should not be null");
+        assertEquals(20.0, ((Number) rejRate).doubleValue(), 0.1, "Rejection rate should be 20%");
+    }
+    
+    @Test
+    @SuppressWarnings("unchecked")
+    public void testComputeKpisFromRecentBatches_EmptyList() throws Exception {
+        List<Map<String, Object>> recentBatches = new ArrayList<>();
+        
+        Map<String, Object> kpis = (Map<String, Object>) computeKpisFromRecentBatchesMethod.invoke(controller, recentBatches);
+        
+        assertEquals(0, kpis.get("total_batches_today"), "Total batches should be 0 for empty list");
+        assertEquals(0, kpis.get("average_quality"), "Average quality should be 0 for empty list");
+        assertEquals(0, kpis.get("prime_percentage"), "Prime percentage should be 0 for empty list");
+        assertEquals(0, kpis.get("rejection_rate"), "Rejection rate should be 0 for empty list");
+    }
+    
+    @Test
+    @SuppressWarnings("unchecked")
+    public void testComputeKpisFromRecentBatches_NullList() throws Exception {
+        Map<String, Object> kpis = (Map<String, Object>) computeKpisFromRecentBatchesMethod.invoke(controller, (Object) null);
+        
+        assertEquals(0, kpis.get("total_batches_today"), "Total batches should be 0 for null list");
+        assertEquals(0, kpis.get("average_quality"), "Average quality should be 0 for null list");
+        assertEquals(0, kpis.get("prime_percentage"), "Prime percentage should be 0 for null list");
+        assertEquals(0, kpis.get("rejection_rate"), "Rejection rate should be 0 for null list");
+    }
+    
+    // ========== Tests for computeDistributionFromRecentBatches ==========
+    
+    @Test
+    @SuppressWarnings("unchecked")
+    public void testComputeDistributionFromRecentBatches_WithBatches() throws Exception {
+        // Create test batches with different quality scores
+        List<Map<String, Object>> recentBatches = new ArrayList<>();
+        
+        // 2 prime batches (quality_score > 0.8)
+        Map<String, Object> batch1 = new HashMap<>();
+        batch1.put("quality_score", 0.95);
+        recentBatches.add(batch1);
+        
+        Map<String, Object> batch2 = new HashMap<>();
+        batch2.put("quality_score", 0.85);
+        recentBatches.add(batch2);
+        
+        // 2 standard batches (quality_score > 0.6 and quality_score <= 0.8)
+        Map<String, Object> batch3 = new HashMap<>();
+        batch3.put("quality_score", 0.75);
+        recentBatches.add(batch3);
+        
+        Map<String, Object> batch4 = new HashMap<>();
+        batch4.put("quality_score", 0.65);
+        recentBatches.add(batch4);
+        
+        // 1 sub-standard batch (quality_score <= 0.6)
+        Map<String, Object> batch5 = new HashMap<>();
+        batch5.put("quality_score", 0.50);
+        recentBatches.add(batch5);
+        
+        Map<String, Object> distribution = (Map<String, Object>) computeDistributionFromRecentBatchesMethod.invoke(controller, recentBatches);
+        
+        // Verify prime distribution: 2/5 = 40%
+        Object prime = distribution.get("prime");
+        assertNotNull(prime, "Prime should not be null");
+        assertEquals(40.0, ((Number) prime).doubleValue(), 0.1, "Prime should be 40%");
+        
+        // Verify standard distribution: 2/5 = 40%
+        Object standard = distribution.get("standard");
+        assertNotNull(standard, "Standard should not be null");
+        assertEquals(40.0, ((Number) standard).doubleValue(), 0.1, "Standard should be 40%");
+        
+        // Verify sub_standard distribution: 1/5 = 20%
+        Object subStandard = distribution.get("sub_standard");
+        assertNotNull(subStandard, "Sub-standard should not be null");
+        assertEquals(20.0, ((Number) subStandard).doubleValue(), 0.1, "Sub-standard should be 20%");
+    }
+    
+    @Test
+    @SuppressWarnings("unchecked")
+    public void testComputeDistributionFromRecentBatches_EmptyList() throws Exception {
+        List<Map<String, Object>> recentBatches = new ArrayList<>();
+        
+        Map<String, Object> distribution = (Map<String, Object>) computeDistributionFromRecentBatchesMethod.invoke(controller, recentBatches);
+        
+        assertEquals(0.0, distribution.get("prime"), "Prime should be 0 for empty list");
+        assertEquals(0.0, distribution.get("standard"), "Standard should be 0 for empty list");
+        assertEquals(0.0, distribution.get("sub_standard"), "Sub-standard should be 0 for empty list");
+    }
+    
+    @Test
+    @SuppressWarnings("unchecked")
+    public void testComputeDistributionFromRecentBatches_NullList() throws Exception {
+        Map<String, Object> distribution = (Map<String, Object>) computeDistributionFromRecentBatchesMethod.invoke(controller, (Object) null);
+        
+        assertEquals(0.0, distribution.get("prime"), "Prime should be 0 for null list");
+        assertEquals(0.0, distribution.get("standard"), "Standard should be 0 for null list");
+        assertEquals(0.0, distribution.get("sub_standard"), "Sub-standard should be 0 for null list");
+    }
+    
+    @Test
+    @SuppressWarnings("unchecked")
+    public void testComputeDistributionFromRecentBatches_DistributionSumsTo100() throws Exception {
+        // Create test batches
+        List<Map<String, Object>> recentBatches = new ArrayList<>();
+        
+        for (int i = 0; i < 10; i++) {
+            Map<String, Object> batch = new HashMap<>();
+            batch.put("quality_score", 0.1 + (i * 0.09)); // Scores from 0.1 to 0.91
+            recentBatches.add(batch);
+        }
+        
+        Map<String, Object> distribution = (Map<String, Object>) computeDistributionFromRecentBatchesMethod.invoke(controller, recentBatches);
+        
+        double sum = ((Number) distribution.get("prime")).doubleValue() +
+                     ((Number) distribution.get("standard")).doubleValue() +
+                     ((Number) distribution.get("sub_standard")).doubleValue();
+        
+        assertEquals(100.0, sum, 0.1, "Distribution should sum to 100%");
     }
 }
