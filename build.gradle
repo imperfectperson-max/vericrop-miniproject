@@ -167,7 +167,7 @@ project(':vericrop-gui') {
         applicationDefaultJvmArgs = [
                 '--add-opens=javafx.controls/javafx.scene.control=ALL-UNNAMED',
                 '--add-opens=javafx.graphics/javafx.scene=ALL-UNNAMED',
-                '--add-modules=javafx.controls,javafx.fxml,javafx.web,javafx.graphics,javafx.charts'
+                '--add-modules=javafx.controls,javafx.fxml,javafx.web,javafx.graphics'
         ]
     }
 }
