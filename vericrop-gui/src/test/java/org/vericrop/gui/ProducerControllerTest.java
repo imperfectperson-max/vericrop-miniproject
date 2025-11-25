@@ -148,7 +148,7 @@ public class ProducerControllerTest {
         // Create test batches with different quality scores
         List<Map<String, Object>> recentBatches = new ArrayList<>();
         
-        // 3 prime batches (quality > 0.8)
+        // 3 prime batches (quality_score > 0.8)
         Map<String, Object> batch1 = new HashMap<>();
         batch1.put("quality_score", 0.95);
         recentBatches.add(batch1);
@@ -161,12 +161,12 @@ public class ProducerControllerTest {
         batch3.put("quality_score", 0.82);
         recentBatches.add(batch3);
         
-        // 1 standard batch (0.6 < quality <= 0.8)
+        // 1 standard batch (quality_score > 0.6 and quality_score <= 0.8)
         Map<String, Object> batch4 = new HashMap<>();
         batch4.put("quality_score", 0.75);
         recentBatches.add(batch4);
         
-        // 1 sub-standard batch (quality <= 0.6)
+        // 1 sub-standard batch (quality_score <= 0.6)
         Map<String, Object> batch5 = new HashMap<>();
         batch5.put("quality_score", 0.50);
         recentBatches.add(batch5);
@@ -224,7 +224,7 @@ public class ProducerControllerTest {
         // Create test batches with different quality scores
         List<Map<String, Object>> recentBatches = new ArrayList<>();
         
-        // 2 prime batches (quality > 0.8)
+        // 2 prime batches (quality_score > 0.8)
         Map<String, Object> batch1 = new HashMap<>();
         batch1.put("quality_score", 0.95);
         recentBatches.add(batch1);
@@ -233,7 +233,7 @@ public class ProducerControllerTest {
         batch2.put("quality_score", 0.85);
         recentBatches.add(batch2);
         
-        // 2 standard batches (0.6 < quality <= 0.8)
+        // 2 standard batches (quality_score > 0.6 and quality_score <= 0.8)
         Map<String, Object> batch3 = new HashMap<>();
         batch3.put("quality_score", 0.75);
         recentBatches.add(batch3);
@@ -242,7 +242,7 @@ public class ProducerControllerTest {
         batch4.put("quality_score", 0.65);
         recentBatches.add(batch4);
         
-        // 1 sub-standard batch (quality <= 0.6)
+        // 1 sub-standard batch (quality_score <= 0.6)
         Map<String, Object> batch5 = new HashMap<>();
         batch5.put("quality_score", 0.50);
         recentBatches.add(batch5);
