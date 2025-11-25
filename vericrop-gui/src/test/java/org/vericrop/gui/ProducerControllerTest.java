@@ -5,7 +5,10 @@ import org.junit.jupiter.api.BeforeEach;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.lang.reflect.Method;
+import java.lang.reflect.InvocationTargetException;
 import java.util.*;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
 
 /**
  * Test suite for ProducerController rate calculation helper.
@@ -114,6 +117,115 @@ public class ProducerControllerTest {
         RuntimeException ex = new RuntimeException("java.util.concurrent.CompletionException: Task failed");
         String result = (String) extractUserFriendlyErrorMessageMethod.invoke(controller, ex);
         assertEquals("Task failed", result, "Should strip CompletionException prefix");
+    }
+    
+    // ========== New tests for improved exception unwrapping ==========
+    
+    @Test
+    public void testExtractUserFriendlyErrorMessage_WrappedCompletionException() throws Exception {
+        // Test actual CompletionException wrapping another exception
+        RuntimeException cause = new RuntimeException("Backend service unavailable");
+        CompletionException ex = new CompletionException(cause);
+        String result = (String) extractUserFriendlyErrorMessageMethod.invoke(controller, ex);
+        assertEquals("Backend service unavailable", result, "Should unwrap CompletionException to get root cause message");
+    }
+    
+    @Test
+    public void testExtractUserFriendlyErrorMessage_WrappedExecutionException() throws Exception {
+        // Test actual ExecutionException wrapping another exception
+        RuntimeException cause = new RuntimeException("Database connection failed");
+        ExecutionException ex = new ExecutionException(cause);
+        String result = (String) extractUserFriendlyErrorMessageMethod.invoke(controller, ex);
+        assertEquals("Database connection failed", result, "Should unwrap ExecutionException to get root cause message");
+    }
+    
+    @Test
+    public void testExtractUserFriendlyErrorMessage_NestedWrapperExceptions() throws Exception {
+        // Test deeply nested wrapper exceptions
+        RuntimeException rootCause = new RuntimeException("Cannot connect to backend service");
+        ExecutionException executionException = new ExecutionException(rootCause);
+        CompletionException completionException = new CompletionException(executionException);
+        String result = (String) extractUserFriendlyErrorMessageMethod.invoke(controller, completionException);
+        assertEquals("Cannot connect to backend service", result, "Should unwrap nested exceptions to get root cause");
+    }
+    
+    @Test
+    public void testExtractUserFriendlyErrorMessage_InnerClassException() throws Exception {
+        // Test exception with inner class dollar sign in name (simulated via message)
+        RuntimeException ex = new RuntimeException("org.vericrop.gui.ProducerController$BatchCreationException: Batch name is required");
+        String result = (String) extractUserFriendlyErrorMessageMethod.invoke(controller, ex);
+        assertEquals("Batch name is required", result, "Should strip inner class exception prefix with $ sign");
+    }
+    
+    @Test
+    public void testExtractUserFriendlyErrorMessage_MultipleExceptionPrefixes() throws Exception {
+        // Test message with multiple nested exception prefixes
+        RuntimeException ex = new RuntimeException(
+            "java.util.concurrent.CompletionException: java.lang.RuntimeException: Connection refused");
+        String result = (String) extractUserFriendlyErrorMessageMethod.invoke(controller, ex);
+        assertEquals("Connection refused", result, "Should strip all nested exception prefixes");
+    }
+    
+    @Test
+    public void testExtractUserFriendlyErrorMessage_ExceptionWithNoMessageButCause() throws Exception {
+        // Test exception with null message but has cause with message
+        RuntimeException cause = new RuntimeException("Detailed error from cause");
+        RuntimeException ex = new RuntimeException((String) null, cause);
+        String result = (String) extractUserFriendlyErrorMessageMethod.invoke(controller, ex);
+        assertEquals("Detailed error from cause", result, "Should get message from cause when main exception has null message");
+    }
+    
+    @Test
+    public void testExtractUserFriendlyErrorMessage_ExceptionOnlyClassName() throws Exception {
+        // Test exception with no message at all (should fall back to class name)
+        RuntimeException ex = new RuntimeException((String) null);
+        String result = (String) extractUserFriendlyErrorMessageMethod.invoke(controller, ex);
+        // Should return either the simple class name or a default message
+        assertNotNull(result, "Should return non-null message");
+        assertFalse(result.contains("java.lang"), "Should not contain fully qualified class name");
+    }
+    
+    @Test
+    public void testExtractUserFriendlyErrorMessage_InvocationTargetException() throws Exception {
+        // Test InvocationTargetException unwrapping
+        RuntimeException cause = new RuntimeException("Target method threw an error");
+        InvocationTargetException ex = new InvocationTargetException(cause);
+        String result = (String) extractUserFriendlyErrorMessageMethod.invoke(controller, ex);
+        assertEquals("Target method threw an error", result, "Should unwrap InvocationTargetException to get cause message");
+    }
+    
+    @Test
+    public void testExtractUserFriendlyErrorMessage_WhitespaceOnlyMessage() throws Exception {
+        // Test exception with whitespace-only message
+        RuntimeException ex = new RuntimeException("   ");
+        String result = (String) extractUserFriendlyErrorMessageMethod.invoke(controller, ex);
+        // Should handle whitespace message as empty and return default
+        assertNotNull(result, "Should return non-null message");
+        assertFalse(result.trim().isEmpty(), "Should not return empty message");
+    }
+    
+    @Test
+    public void testExtractUserFriendlyErrorMessage_ComplexInnerClassName() throws Exception {
+        // Test complex inner class names like SomeClass$InnerClass$DeeperException
+        RuntimeException ex = new RuntimeException("com.example.Outer$Inner$DeepException: Deep error message");
+        String result = (String) extractUserFriendlyErrorMessageMethod.invoke(controller, ex);
+        assertEquals("Deep error message", result, "Should handle multiple $ in class names");
+    }
+    
+    @Test
+    public void testExtractUserFriendlyErrorMessage_ErrorClass() throws Exception {
+        // Test Error class handling (e.g., OutOfMemoryError, StackOverflowError)
+        RuntimeException ex = new RuntimeException("java.lang.OutOfMemoryError: Java heap space");
+        String result = (String) extractUserFriendlyErrorMessageMethod.invoke(controller, ex);
+        assertEquals("Java heap space", result, "Should strip Error class prefixes");
+    }
+    
+    @Test
+    public void testExtractUserFriendlyErrorMessage_SimpleErrorClass() throws Exception {
+        // Test simple Error class name without package prefix
+        RuntimeException ex = new RuntimeException("OutOfMemoryError: GC overhead limit exceeded");
+        String result = (String) extractUserFriendlyErrorMessageMethod.invoke(controller, ex);
+        assertEquals("GC overhead limit exceeded", result, "Should strip simple Error class prefix");
     }
     
     @Test
