@@ -5,9 +5,9 @@ These tests verify that the ML service calculation logic matches the frontend
 calculation logic in ProducerController.calculateQualityMetrics().
 
 The algorithm uses the classification label to determine the dominant rate:
-- FRESH: prime% = 80 + quality% * 20, remainder distributed
-- LOW_QUALITY: low_quality% = 80 + quality% * 20, remainder distributed
-- ROTTEN: rejection% = 80 + quality% * 20, remainder distributed
+- FRESH: prime% = 80 + quality% * 20, remainder distributed (80% low_quality, 20% rejection)
+- LOW_QUALITY: low_quality% = 80 + quality% * 20, remainder distributed (80% prime, 20% rejection)
+- ROTTEN: rejection% = 80 + quality% * 20, remainder distributed (80% low_quality, 20% prime)
 
 Reference: vericrop-gui/src/main/java/org/vericrop/gui/ProducerController.java
 """

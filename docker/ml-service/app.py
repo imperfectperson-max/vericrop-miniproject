@@ -18,6 +18,9 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 BATCHES_FILE = "batches_data.json"
 
+# Constants
+NORMALIZATION_TOLERANCE = 0.001  # Tolerance for floating point comparison in normalization
+
 app = FastAPI(
     title="VeriCrop ML Service",
     description="Fruit Quality Classification for Supply Chain",
@@ -73,11 +76,16 @@ def compute_quality_metrics(classification: str, quality_score: float) -> dict:
     - ROTTEN: rejection% = 80 + quality% * 20, remainder distributed (80% low_quality, 20% prime)
     
     Args:
-        classification: Quality classification label (fresh, low_quality, rotten)
+        classification: Quality classification label (fresh, low_quality, rotten).
+                       If None or empty, defaults to "FRESH" for backward compatibility.
         quality_score: Quality score from prediction (0.0 to 1.0)
     
     Returns:
         dict with keys: prime_rate, low_quality_rate, rejection_rate (all 0.0 to 1.0)
+    
+    Note:
+        When classification is None or empty, the function defaults to FRESH behavior
+        for backward compatibility with older batch data that may lack classification.
     
     Reference:
         Frontend source: vericrop-gui/src/main/java/org/vericrop/gui/ProducerController.java
@@ -87,6 +95,7 @@ def compute_quality_metrics(classification: str, quality_score: float) -> dict:
     
     # Convert quality score to percentage (0-100)
     quality_percent = quality_score * 100.0
+    # Default to FRESH for None/empty classification for backward compatibility
     classification_upper = classification.upper() if classification else "FRESH"
     
     if classification_upper == "FRESH":
@@ -139,10 +148,13 @@ def normalize_metrics(metrics: dict) -> dict:
     
     Returns:
         dict with normalized rate values
+    
+    Note:
+        Uses NORMALIZATION_TOLERANCE constant for floating point comparison.
     """
     total = sum(metrics.values())
     
-    if total > 0 and abs(total - 1.0) > 0.001:
+    if total > 0 and abs(total - 1.0) > NORMALIZATION_TOLERANCE:
         factor = 1.0 / total
         metrics = {k: v * factor for k, v in metrics.items()}
     
