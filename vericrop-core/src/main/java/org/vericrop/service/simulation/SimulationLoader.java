@@ -107,10 +107,12 @@ public class SimulationLoader {
         
         /**
          * Generate a unique batch ID for this simulation.
+         * Uses UUID to prevent collisions from rapid batch creation.
          */
         public String generateBatchId() {
             String prefix = batchPrefix != null ? batchPrefix : "BATCH";
-            return prefix + "_" + System.currentTimeMillis();
+            String uniqueId = java.util.UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+            return prefix + "_" + uniqueId;
         }
         
         /**

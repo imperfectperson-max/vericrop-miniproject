@@ -55,6 +55,9 @@ public class ConsumerController implements SimulationListener {
     // Track current simulation for journey display
     private String currentBatchId = null;
     private double lastProgress = 0.0;
+    
+    /** Default final quality used when SimulationManager data is unavailable */
+    private static final double DEFAULT_FINAL_QUALITY = 95.0;
 
     @FXML
     public void initialize() {
@@ -525,7 +528,7 @@ public class ConsumerController implements SimulationListener {
                 message = timestamp + ": ✅ Batch " + batchId + " delivered successfully - Ready for verification";
                 
                 // Get final quality from SimulationManager
-                double finalQuality = 95.0; // Default
+                double finalQuality = DEFAULT_FINAL_QUALITY;
                 try {
                     if (SimulationManager.isInitialized()) {
                         finalQuality = SimulationManager.getInstance().getFinalQuality();

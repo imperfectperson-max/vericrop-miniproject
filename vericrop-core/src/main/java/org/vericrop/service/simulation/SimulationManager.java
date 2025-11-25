@@ -70,15 +70,24 @@ public class SimulationManager {
         volatile double currentTemperature;
         volatile double currentHumidity;
         volatile SimulationConfig.SimulationState lifecycleState;
+        volatile double initialQuality; // Starting quality score (0-100)
         volatile double finalQuality; // Final quality score (0-100)
         volatile boolean finalQualitySet;
         final SimulationConfig config;
+        
+        /** Default initial quality for simulations */
+        private static final double DEFAULT_INITIAL_QUALITY = 95.0;
         
         SimulationState(String batchId, String farmerId, List<RouteWaypoint> route) {
             this(batchId, farmerId, route, SimulationConfig.forDemo());
         }
         
         SimulationState(String batchId, String farmerId, List<RouteWaypoint> route, SimulationConfig config) {
+            this(batchId, farmerId, route, config, DEFAULT_INITIAL_QUALITY);
+        }
+        
+        SimulationState(String batchId, String farmerId, List<RouteWaypoint> route, 
+                       SimulationConfig config, double initialQuality) {
             this.batchId = batchId;
             this.farmerId = farmerId;
             this.startTime = System.currentTimeMillis();
@@ -87,7 +96,8 @@ public class SimulationManager {
             this.maxProgress = 0.0;
             this.currentLocation = "Starting...";
             this.lifecycleState = SimulationConfig.SimulationState.AVAILABLE;
-            this.finalQuality = 100.0; // Start with perfect quality
+            this.initialQuality = initialQuality;
+            this.finalQuality = initialQuality; // Start with initial quality
             this.finalQualitySet = false;
             this.config = config;
             if (route != null && !route.isEmpty()) {
@@ -578,9 +588,10 @@ public class SimulationManager {
                     state.updateProgress(progressPercent);
                     
                     // Calculate quality decay based on temperature and time
+                    // Uses the actual initial quality from the simulation state
                     double elapsedHours = (elapsedRealTimeMs * config.getTimeScale()) / (1000.0 * 3600.0);
                     currentQuality = qualityDecayService.calculateQuality(
-                        100.0, state.currentTemperature, state.currentHumidity, elapsedHours);
+                        state.initialQuality, state.currentTemperature, state.currentHumidity, elapsedHours);
                     state.finalQuality = currentQuality;
                     
                     // Update location based on lifecycle state
