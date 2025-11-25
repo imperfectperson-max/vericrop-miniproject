@@ -1702,6 +1702,193 @@ For detailed implementation, inspect:
 - **Java Client**: `vericrop-gui/src/main/java/org/vericrop/gui/clients/MLClientService.java`
 - **Model Logic**: `docker/ml-service/app.py` (prediction functions and ONNX model integration)
 
+## Producer API (Blockchain Record Creation)
+
+The Producer API provides REST endpoints for creating and managing blockchain records for agricultural products.
+
+### Base URL
+
+```
+http://localhost:8080/producer
+```
+
+### Endpoints
+
+#### Create Blockchain Record
+
+Create a new immutable blockchain record for a producer's batch/crop registration.
+
+```bash
+POST /producer/blockchain-record
+Content-Type: application/json
+
+# Request
+{
+  "producerId": "FARMER_001",
+  "batchName": "Apple Batch 2024-01",
+  "productType": "Apple",
+  "quantity": 500,
+  "qualityScore": 0.92,
+  "location": "Sunny Valley Farm",
+  "additionalData": {
+    "variety": "Honeycrisp",
+    "harvestDate": "2024-01-15"
+  }
+}
+
+# Response (HTTP 201 Created)
+{
+  "success": true,
+  "record_id": "BATCH_1700000000001",
+  "block_index": 5,
+  "block_hash": "a1b2c3d4e5f6...",
+  "previous_hash": "f6e5d4c3b2a1...",
+  "data_hash": "sha256_of_payload...",
+  "timestamp": 1700000000001,
+  "ledger_id": "SHIP_1700000000001",
+  "message": "Blockchain record created successfully"
+}
+```
+
+**Required Fields:**
+- `producerId`: Producer/farmer identifier
+- `batchName`: Name/description of the batch
+- `productType`: Type of product (e.g., Apple, Banana)
+
+**Optional Fields:**
+- `batchId`: Custom batch ID (auto-generated if not provided)
+- `quantity`: Quantity in units
+- `qualityScore`: Quality score from 0.0 to 1.0
+- `location`: Location/origin of the batch
+- `additionalData`: Additional metadata as key-value pairs
+
+#### Get Blockchain Status
+
+```bash
+GET /producer/blockchain?limit=10
+
+# Response
+{
+  "success": true,
+  "total_blocks": 15,
+  "chain_valid": true,
+  "recent_blocks": [
+    {
+      "index": 14,
+      "hash": "a1b2c3d4e5f6...",
+      "previous_hash": "f6e5d4c3b2a1...",
+      "timestamp": 1700000000001,
+      "transaction_count": 1,
+      "participant": "FARMER_001"
+    }
+  ],
+  "timestamp": 1700000000001
+}
+```
+
+#### Validate Blockchain Integrity
+
+```bash
+GET /producer/blockchain/validate
+
+# Response
+{
+  "success": true,
+  "valid": true,
+  "block_count": 15,
+  "message": "Blockchain is valid and tamper-free",
+  "timestamp": 1700000000001
+}
+```
+
+#### Get Batch Transactions
+
+```bash
+GET /producer/batch/{batchId}
+
+# Response
+{
+  "success": true,
+  "batch_id": "BATCH_001",
+  "transaction_count": 1,
+  "transactions": [
+    {
+      "type": "CREATE_BATCH",
+      "from": "FARMER_001",
+      "to": "blockchain",
+      "batch_id": "BATCH_001",
+      "data": "{...}"
+    }
+  ]
+}
+```
+
+#### Health Check
+
+```bash
+GET /producer/health
+
+# Response
+{
+  "status": "UP",
+  "service": "producer-api",
+  "blockchain_blocks": 15,
+  "blockchain_valid": true,
+  "kafka_enabled": true,
+  "timestamp": 1700000000001
+}
+```
+
+### Example: Create Blockchain Record with curl
+
+```bash
+# Create a blockchain record for a new batch
+curl -X POST http://localhost:8080/producer/blockchain-record \
+  -H "Content-Type: application/json" \
+  -d '{
+    "producerId": "FARMER_001",
+    "batchName": "Organic Apple Batch",
+    "productType": "Apple",
+    "quantity": 1000,
+    "qualityScore": 0.95,
+    "location": "Sunny Valley Farm"
+  }'
+
+# Validate the blockchain
+curl http://localhost:8080/producer/blockchain/validate
+
+# Get blockchain status
+curl http://localhost:8080/producer/blockchain?limit=5
+```
+
+### Error Responses
+
+```json
+// HTTP 400 - Validation Error
+{
+  "success": false,
+  "error": "Validation failed",
+  "details": "producerId is required",
+  "timestamp": 1700000000001
+}
+
+// HTTP 500 - Internal Server Error
+{
+  "success": false,
+  "error": "Internal server error",
+  "details": "An unexpected error occurred",
+  "timestamp": 1700000000001
+}
+
+// HTTP 504 - Gateway Timeout
+{
+  "success": false,
+  "error": "Blockchain operation timed out",
+  "details": "The blockchain operation took too long. Please try again.",
+  "timestamp": 1700000000001
+}
+```
+
 ## Running Tests
 
 VeriCrop includes comprehensive test suites for Java and Python components. Always run tests before committing changes.
