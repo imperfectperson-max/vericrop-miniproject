@@ -100,9 +100,9 @@ scene.getRoot().getStyleClass().add("compact");
 - **Recommended**: 1280x720 or 1366x768
 - **Optimal**: 1440x900 or higher
 
-## Time Compression Factor
+## Time Scale Factor
 
-The `timeCompressionFactor` controls how fast simulations run:
+The `timeScale` controls how fast simulations run:
 
 | Factor | 30min Journey | 60min Journey |
 |--------|--------------|---------------|

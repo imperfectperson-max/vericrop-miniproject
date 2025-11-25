@@ -3,7 +3,7 @@
   "name": "Standard Demo - 4 Minutes",
   "description": "Balanced demonstration with temperature variation events. Shows quality decay and alerts in 4 minutes.",
   "durationMinutes": 4,
-  "timeCompressionFactor": 12.0,
+  "timeScale": 12.0,
   "simulatedDurationMinutes": 48,
   "origin": {
     "name": "Green Fields Organic Farm",

@@ -3,7 +3,7 @@
   "name": "Quick Demo - 3 Minutes",
   "description": "Fast demonstration showing complete delivery journey in 3 minutes. Perfect for quick demos and presentations.",
   "durationMinutes": 3,
-  "timeCompressionFactor": 10.0,
+  "timeScale": 10.0,
   "simulatedDurationMinutes": 30,
   "origin": {
     "name": "Sunny Valley Farm",

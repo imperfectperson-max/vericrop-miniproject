@@ -3,7 +3,7 @@
   "name": "Full Journey Demo - 4 Minutes",
   "description": "Complete producer-to-consumer journey with quality decay events, alerts, and comprehensive lifecycle demonstration.",
   "durationMinutes": 4,
-  "timeCompressionFactor": 15.0,
+  "timeScale": 15.0,
   "simulatedDurationMinutes": 60,
   "origin": {
     "name": "Valley View Farms",
