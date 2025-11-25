@@ -21,6 +21,9 @@ import static org.junit.jupiter.api.Assertions.*;
 @DisplayName("Simulation Integration Tests")
 class SimulationIntegrationTest {
     
+    /** Tolerance for floating-point comparisons in quality checks */
+    private static final double QUALITY_TOLERANCE = 0.01;
+    
     private EnhancedDeliverySimulator simulator;
     
     @BeforeEach
@@ -236,9 +239,9 @@ class SimulationIntegrationTest {
         assertTrue(lastQuality < firstQuality, 
             "Quality should decrease (first: " + firstQuality + ", last: " + lastQuality + ")");
         
-        // Verify quality readings are monotonically decreasing (or stable)
+        // Verify quality readings are monotonically decreasing (or stable within tolerance)
         for (int i = 1; i < qualityReadings.size(); i++) {
-            assertTrue(qualityReadings.get(i) <= qualityReadings.get(i - 1) + 0.01,
+            assertTrue(qualityReadings.get(i) <= qualityReadings.get(i - 1) + QUALITY_TOLERANCE,
                 "Quality should not increase: " + qualityReadings.get(i - 1) + " -> " + qualityReadings.get(i));
         }
     }

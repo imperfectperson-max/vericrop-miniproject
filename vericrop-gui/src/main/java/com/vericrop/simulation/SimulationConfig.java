@@ -16,7 +16,14 @@ public class SimulationConfig {
     private static final int DEMO_UPDATE_INTERVAL_MS = 1000;       // 1 second between updates
     private static final double DEMO_SPEED_FACTOR = 10.0;          // 10x speed
     private static final int DEMO_WAYPOINT_COUNT = 20;             // Fewer waypoints
-    private static final double DEMO_DECAY_RATE = 0.002;           // Moderate decay for visibility (5-15% drop in 3-4 min)
+    
+    /**
+     * Demo mode decay rate - public constant for use by other components.
+     * Rate: 0.002/sec results in ~30% quality drop over 3 minutes.
+     */
+    public static final double DEMO_MODE_DECAY_RATE = 0.002;
+    
+    private static final double DEMO_DECAY_RATE = DEMO_MODE_DECAY_RATE;
     
     private final boolean demoMode;
     private final double speedFactor;

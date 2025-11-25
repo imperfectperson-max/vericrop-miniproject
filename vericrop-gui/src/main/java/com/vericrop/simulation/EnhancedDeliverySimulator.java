@@ -278,12 +278,6 @@ public class EnhancedDeliverySimulator {
                 emitEvent(instance, progressEvent);
             }
             
-            // Check for completion - only needed if state didn't transition to COMPLETED above
-            // This handles the case where progress hits 100% but state was already COMPLETED (edge case)
-            if (progressPercent >= 100.0 && instance.currentState != DeliveryState.COMPLETED) {
-                completeSimulation(instance, data);
-            }
-            
             instance.lastUpdateTime = currentTime;
             
         } catch (Exception e) {

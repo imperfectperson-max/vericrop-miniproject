@@ -20,6 +20,7 @@ import org.vericrop.gui.util.QRDecoder;
 import org.vericrop.service.simulation.SimulationListener;
 import org.vericrop.service.simulation.SimulationManager;
 import com.google.zxing.NotFoundException;
+import com.vericrop.simulation.SimulationConfig;
 
 public class ConsumerController implements SimulationListener {
 
@@ -599,8 +600,8 @@ public class ConsumerController implements SimulationListener {
                 if (completed && journey.finalQuality < 0) {
                     long elapsedMs = System.currentTimeMillis() - journey.startTime;
                     double elapsedSeconds = elapsedMs / 1000.0;
-                    // Use demo decay rate for estimation
-                    journey.finalQuality = 100.0 * Math.exp(-0.002 * elapsedSeconds);
+                    // Use demo decay rate constant from SimulationConfig
+                    journey.finalQuality = 100.0 * Math.exp(-SimulationConfig.DEMO_MODE_DECAY_RATE * elapsedSeconds);
                 }
                 
                 updateProductJourneyDisplay(batchId);
