@@ -1,0 +1,74 @@
+{
+  "id": "demo_medium_4min",
+  "name": "Standard Demo - 4 Minutes",
+  "description": "Balanced demonstration with temperature variation events. Shows quality decay and alerts in 4 minutes.",
+  "durationMinutes": 4,
+  "timeScale": 12.0,
+  "simulatedDurationMinutes": 48,
+  "origin": {
+    "name": "Green Fields Organic Farm",
+    "latitude": 42.3501,
+    "longitude": -71.0389,
+    "description": "Certified organic vegetable farm"
+  },
+  "warehouse": {
+    "name": "Regional Cold Storage Hub",
+    "latitude": 42.3601,
+    "longitude": -71.0689,
+    "description": "Main distribution warehouse with temperature monitoring"
+  },
+  "destination": {
+    "name": "Premium Grocers West",
+    "latitude": 42.3736,
+    "longitude": -71.1097,
+    "description": "Premium grocery retail location"
+  },
+  "waypoints": [
+    {"name": "Farm Loading Area", "lat": 42.3501, "lng": -71.0389, "minuteFromStart": 0, "temperature": 4.0, "humidity": 78},
+    {"name": "Farm Exit Gate", "lat": 42.3515, "lng": -71.0420, "minuteFromStart": 2, "temperature": 4.1, "humidity": 77},
+    {"name": "Rural Highway On-Ramp", "lat": 42.3535, "lng": -71.0480, "minuteFromStart": 5, "temperature": 4.3, "humidity": 76},
+    {"name": "Highway Mile Marker 10", "lat": 42.3555, "lng": -71.0540, "minuteFromStart": 10, "temperature": 4.5, "humidity": 75},
+    {"name": "Highway Mile Marker 20", "lat": 42.3575, "lng": -71.0600, "minuteFromStart": 15, "temperature": 5.2, "humidity": 73},
+    {"name": "Warehouse Off-Ramp", "lat": 42.3590, "lng": -71.0650, "minuteFromStart": 18, "temperature": 5.5, "humidity": 72},
+    {"name": "Warehouse Entrance", "lat": 42.3601, "lng": -71.0689, "minuteFromStart": 20, "temperature": 4.0, "humidity": 70},
+    {"name": "Warehouse Loading Complete", "lat": 42.3610, "lng": -71.0720, "minuteFromStart": 24, "temperature": 3.5, "humidity": 72},
+    {"name": "City Highway Entrance", "lat": 42.3640, "lng": -71.0800, "minuteFromStart": 28, "temperature": 4.0, "humidity": 74},
+    {"name": "Downtown Exit", "lat": 42.3680, "lng": -71.0900, "minuteFromStart": 35, "temperature": 4.5, "humidity": 75},
+    {"name": "City Streets", "lat": 42.3710, "lng": -71.1000, "minuteFromStart": 42, "temperature": 5.0, "humidity": 76},
+    {"name": "Delivery Dock Approach", "lat": 42.3725, "lng": -71.1050, "minuteFromStart": 45, "temperature": 4.8, "humidity": 75},
+    {"name": "Premium Grocers Receiving", "lat": 42.3736, "lng": -71.1097, "minuteFromStart": 48, "temperature": 4.0, "humidity": 75}
+  ],
+  "productType": "Organic Carrots & Vegetables",
+  "batchPrefix": "ORGANIC",
+  "initialQuality": 98.0,
+  "temperature": {
+    "target": 4.0,
+    "minAllowed": 2.0,
+    "maxAllowed": 8.0,
+    "variance": 2.0
+  },
+  "humidity": {
+    "target": 75.0,
+    "minAllowed": 65.0,
+    "maxAllowed": 85.0,
+    "variance": 6.0
+  },
+  "temperatureEvents": [
+    {
+      "atMinute": 15,
+      "durationMinutes": 3,
+      "temperature": 6.5,
+      "description": "Highway congestion - brief temperature rise"
+    }
+  ],
+  "stageTransitions": {
+    "available": {"progressStart": 0, "progressEnd": 3},
+    "inTransit": {"progressStart": 3, "progressEnd": 75},
+    "approaching": {"progressStart": 75, "progressEnd": 95},
+    "completed": {"progressStart": 95, "progressEnd": 100}
+  },
+  "waypointsPerSegment": 20,
+  "speedKmh": 50.0,
+  "scenario": "NORMAL",
+  "notes": "4-minute demo with realistic temperature variation. Shows warehouse stop, quality decay calculation, and all lifecycle stages. Good for detailed demonstrations."
+}
