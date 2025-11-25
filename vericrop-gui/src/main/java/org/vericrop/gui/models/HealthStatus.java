@@ -2,12 +2,16 @@ package org.vericrop.gui.models;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 /**
  * Data Transfer Object for Health Check Status.
  * Represents the response from the ML service /health endpoint.
+ * Uses @JsonIgnoreProperties to silently ignore unknown fields from the ML service
+ * (e.g., "mode" field) to avoid Jackson deserialization warnings.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class HealthStatus {
     
     @JsonProperty("status")

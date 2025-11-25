@@ -1,5 +1,7 @@
 package org.vericrop.service;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -29,11 +31,16 @@ public class ScenarioLoader {
     
     /**
      * Scenario definition loaded from JSON.
+     * Uses @JsonIgnoreProperties to silently ignore unknown fields from scenario JSON files
+     * (e.g., "spikes" array) to avoid Jackson deserialization warnings.
      */
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class ScenarioDefinition {
         private String id;
         private String description;
         private TemperatureRange target;
+        
+        @JsonProperty("duration_minutes")
         private int durationMinutes;
         
         public String getId() { return id; }
@@ -51,7 +58,9 @@ public class ScenarioLoader {
     
     /**
      * Temperature range definition.
+     * Uses @JsonIgnoreProperties to silently ignore unknown fields to avoid Jackson warnings.
      */
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class TemperatureRange {
         private double min;
         private double max;
