@@ -23,10 +23,13 @@ import java.io.File;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.lang.reflect.InvocationTargetException;
 
 // Kafka imports
 import org.vericrop.kafka.KafkaServiceManager;
@@ -50,12 +53,12 @@ public class ProducerController implements SimulationListener {
     private static final int SHIPMENT_UPDATE_INTERVAL_MS = 2000;
     
     // Pre-compiled patterns for error message cleaning (performance optimization)
-    private static final Pattern JAVA_EXCEPTION_PREFIX_PATTERN = 
-        Pattern.compile("^(java\\.\\w+\\.)*\\w+Exception:\\s*");
-    private static final Pattern COMPLETION_EXCEPTION_PREFIX_PATTERN = 
-        Pattern.compile("^java\\.util\\.concurrent\\.CompletionException:\\s*");
-    private static final Pattern RUNTIME_EXCEPTION_COLON_PATTERN = 
-        Pattern.compile("\\bRuntimeException:\\s*");
+    // Pattern to match fully-qualified exception class names including inner classes (e.g., "org.vericrop.gui.ProducerController$BatchCreationException: ")
+    private static final Pattern FULLY_QUALIFIED_EXCEPTION_PATTERN = 
+        Pattern.compile("^([a-zA-Z_][a-zA-Z0-9_]*\\.)+[a-zA-Z_][a-zA-Z0-9_$]*Exception:\\s*");
+    // Pattern to match simple exception class names with colon (e.g., "RuntimeException: ", "BatchCreationException: ")
+    private static final Pattern SIMPLE_EXCEPTION_COLON_PATTERN = 
+        Pattern.compile("^[A-Z][a-zA-Z0-9_$]*Exception:\\s*");
 
     private Blockchain blockchain;
     private BlockchainService blockchainService;
@@ -864,7 +867,16 @@ public class ProducerController implements SimulationListener {
     }
 
     /**
-     * Extract a user-friendly error message from a throwable, removing Java exception class names.
+     * Extract a user-friendly error message from a throwable.
+     * 
+     * This method:
+     * 1. Unwraps nested exceptions (CompletionException, ExecutionException, InvocationTargetException)
+     *    to find the root cause
+     * 2. Extracts the first non-empty message found from the cause chain
+     * 3. Falls back to the root cause's toString() or simple class name if no message is available
+     * 4. Strips fully-qualified exception class prefixes (including inner-class dollar signs)
+     * 5. Returns a friendly default message if nothing useful is found
+     * 
      * @param throwable The exception to extract message from
      * @return A clean, user-friendly error message
      */
@@ -873,29 +885,125 @@ public class ProducerController implements SimulationListener {
             return "An unknown error occurred";
         }
 
-        String message = throwable.getMessage();
-        if (message == null || message.isEmpty()) {
-            // Try to get message from the cause
-            if (throwable.getCause() != null) {
-                message = throwable.getCause().getMessage();
-            }
-            if (message == null || message.isEmpty()) {
-                message = "An unexpected error occurred";
+        // Log the original exception for debugging
+        System.err.println("[extractUserFriendlyErrorMessage] Processing: " + throwable.getClass().getName() + 
+                           " - " + throwable.getMessage());
+
+        // Find the root cause by unwrapping wrapper exceptions
+        Throwable rootCause = unwrapException(throwable);
+        
+        // Log the root cause for debugging
+        if (rootCause != throwable) {
+            System.err.println("[extractUserFriendlyErrorMessage] Root cause: " + rootCause.getClass().getName() + 
+                               " - " + rootCause.getMessage());
+        }
+
+        // Try to get a meaningful message from the root cause
+        String message = rootCause.getMessage();
+        
+        // If the root cause has no message, try to find any message in the cause chain
+        if (message == null || message.trim().isEmpty()) {
+            message = findFirstNonEmptyMessage(throwable);
+        }
+        
+        // If still no message, fall back to toString() or simple class name
+        if (message == null || message.trim().isEmpty()) {
+            String rootCauseString = rootCause.toString();
+            // Use toString() if it provides more info than just the class name
+            if (rootCauseString != null && !rootCauseString.equals(rootCause.getClass().getName())) {
+                message = rootCauseString;
+            } else {
+                message = rootCause.getClass().getSimpleName();
             }
         }
 
-        // Remove Java exception class prefixes (e.g., "java.lang.RuntimeException: ")
-        // Using pre-compiled patterns for performance
-        message = JAVA_EXCEPTION_PREFIX_PATTERN.matcher(message).replaceAll("");
+        // Clean up the message by removing exception class prefixes
+        message = cleanExceptionMessage(message);
         
-        // Remove CompletableFuture-related wrapper messages
-        message = COMPLETION_EXCEPTION_PREFIX_PATTERN.matcher(message).replaceAll("");
-        
-        // Remove "RuntimeException: " with word boundary check to avoid false positives
-        // e.g., "RuntimeException: error" -> "error", but "RuntimeExceptionHandler" stays unchanged
-        message = RUNTIME_EXCEPTION_COLON_PATTERN.matcher(message).replaceAll("");
+        // Final fallback if message is still empty after cleaning
+        if (message == null || message.trim().isEmpty()) {
+            return "An unexpected error occurred";
+        }
 
-        return message;
+        return message.trim();
+    }
+
+    /**
+     * Unwrap nested exceptions to find the root cause.
+     * Handles CompletionException, ExecutionException, InvocationTargetException, and similar wrappers.
+     */
+    private Throwable unwrapException(Throwable throwable) {
+        Throwable current = throwable;
+        Set<Throwable> seen = new HashSet<>(); // Prevent infinite loops from circular causes
+        
+        while (current != null && !seen.contains(current)) {
+            seen.add(current);
+            
+            // Check if this is a wrapper exception that should be unwrapped
+            boolean isWrapper = (current instanceof CompletionException) ||
+                               (current instanceof ExecutionException) ||
+                               (current instanceof InvocationTargetException);
+            
+            Throwable cause = current.getCause();
+            
+            // If it's a wrapper with a cause, unwrap it
+            if (isWrapper && cause != null) {
+                current = cause;
+            } else if (cause != null && (current.getMessage() == null || current.getMessage().isEmpty())) {
+                // Also unwrap if current has no message but cause does
+                current = cause;
+            } else {
+                // Found the root cause
+                break;
+            }
+        }
+        
+        return current != null ? current : throwable;
+    }
+
+    /**
+     * Find the first non-empty message in the exception cause chain.
+     */
+    private String findFirstNonEmptyMessage(Throwable throwable) {
+        Throwable current = throwable;
+        Set<Throwable> seen = new HashSet<>(); // Prevent infinite loops
+        
+        while (current != null && !seen.contains(current)) {
+            seen.add(current);
+            String msg = current.getMessage();
+            if (msg != null && !msg.trim().isEmpty()) {
+                return msg;
+            }
+            current = current.getCause();
+        }
+        
+        return null;
+    }
+
+    /**
+     * Clean an exception message by removing fully-qualified class name prefixes
+     * and common exception boilerplate.
+     */
+    private String cleanExceptionMessage(String message) {
+        if (message == null) {
+            return null;
+        }
+        
+        String cleaned = message;
+        
+        // Iteratively remove exception class prefixes (handles nested prefixes)
+        // e.g., "java.util.concurrent.CompletionException: java.lang.RuntimeException: error"
+        // -> "java.lang.RuntimeException: error" -> "error"
+        String previous;
+        do {
+            previous = cleaned;
+            // Remove fully-qualified exception class prefixes (including inner classes with $)
+            cleaned = FULLY_QUALIFIED_EXCEPTION_PATTERN.matcher(cleaned).replaceFirst("");
+            // Remove simple exception class prefixes
+            cleaned = SIMPLE_EXCEPTION_COLON_PATTERN.matcher(cleaned).replaceFirst("");
+        } while (!cleaned.equals(previous));
+        
+        return cleaned.trim();
     }
 
     private boolean validateBatchInputs() {
