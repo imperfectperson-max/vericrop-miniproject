@@ -169,23 +169,69 @@ def compute_quality_based_rates(quality_score: float, classification: str = "fre
 # Update the create_batch endpoint to save data
 @app.post("/batches")
 async def create_batch(batch_data: dict = None):
-    """Create a new batch with proper quality score storage and quality-based rates"""
+    """
+    Create a new batch with proper quality score storage and quality-based rates.
+    
+    The calculation logic mirrors the frontend algorithm in ProducerController.calculateQualityMetrics().
+    This ensures consistency between backend and frontend rate calculations.
+    
+    Request body:
+        batch_data: dict containing:
+            - name: str (optional, defaults to 'Unnamed_Batch')
+            - farmer: str (optional, defaults to 'Unknown_Farmer')
+            - product_type: str (optional, defaults to 'Unknown_Product')
+            - quantity: int (optional, defaults to 1)
+            - quality_data: dict with:
+                - quality_score: float (0.0-1.0, optional, defaults to 0.8)
+                - label: str (fresh/low_quality/rotten, optional, defaults to 'fresh')
+            - data_hash: str (optional)
+    
+    Returns:
+        dict with batch_id, status, timestamp, message, quality_score, prime_rate, 
+        rejection_rate, quality_label, and data_hash
+    """
     try:
+        # Log incoming request for debugging
+        logger.info(f"📥 Batch creation request received: {batch_data}")
+        
+        # Validate batch_data presence
+        if batch_data is None:
+            logger.warning("⚠️ No batch data provided, using defaults")
+            batch_data = {}
+        
         batch_id = f"BATCH_{int(time.time())}_{int(time.time() * 1000) % 10000}"
 
         # Extract quality data from the request or use defaults
-        quality_data = batch_data.get('quality_data', {}) if batch_data else {}
+        quality_data = batch_data.get('quality_data', {})
+        if not isinstance(quality_data, dict):
+            logger.warning(f"⚠️ Invalid quality_data type: {type(quality_data)}, using defaults")
+            quality_data = {}
 
-        # Get quality score from request or use default
+        # Get and validate quality score
         quality_score = quality_data.get('quality_score', 0.8)
         if not isinstance(quality_score, (int, float)):
-            quality_score = 0.8  # Default fallback
+            logger.warning(f"⚠️ Invalid quality_score type: {type(quality_score)}, using default 0.8")
+            quality_score = 0.8
+        
+        # Clamp quality score to valid range
+        quality_score = max(0.0, min(1.0, float(quality_score)))
 
+        # Get and validate quality label
         quality_label = quality_data.get('label', 'fresh')
+        if not isinstance(quality_label, str) or not quality_label.strip():
+            logger.warning(f"⚠️ Invalid quality_label: {quality_label}, using default 'fresh'")
+            quality_label = 'fresh'
+        quality_label = quality_label.strip().lower()
 
         # Compute rates based on classification and quality score
         # This mirrors the frontend calculation logic in ProducerController.calculateQualityMetrics()
+        logger.debug(f"📊 Computing rates for classification='{quality_label}', quality_score={quality_score:.3f}")
         prime_rate, rejection_rate = compute_quality_based_rates(quality_score, quality_label)
+        
+        # Validate computed rates
+        if not (0.0 <= prime_rate <= 1.0) or not (0.0 <= rejection_rate <= 1.0):
+            logger.error(f"❌ Invalid computed rates: prime_rate={prime_rate}, rejection_rate={rejection_rate}")
+            raise ValueError(f"Computed rates out of valid range: prime_rate={prime_rate}, rejection_rate={rejection_rate}")
 
         # Create batch record with proper quality data and quality-based rates
         batch_record = {
@@ -199,7 +245,7 @@ async def create_batch(batch_data: dict = None):
             "timestamp": datetime.now().isoformat(),
             "status": "created",
             "data_hash": batch_data.get('data_hash', '') if batch_data else '',
-            # Quality-based rates derived from actual quality score
+            # Quality-based rates derived from classification and quality score
             "prime_rate": round(prime_rate, 4),
             "rejection_rate": round(rejection_rate, 4)
         }
@@ -210,7 +256,9 @@ async def create_batch(batch_data: dict = None):
         # Save to file for persistence
         save_batches_to_file()
 
-        logger.info(f"✅ Batch created: {batch_record['name']} (ID: {batch_id}, Quality: {quality_score:.3f}, PrimeRate: {prime_rate:.3f}, RejectionRate: {rejection_rate:.3f})")
+        logger.info(f"✅ Batch created: {batch_record['name']} (ID: {batch_id}, "
+                   f"Classification: {quality_label}, Quality: {quality_score:.3f}, "
+                   f"PrimeRate: {prime_rate:.4f}, RejectionRate: {rejection_rate:.4f})")
 
         # Return ALL required fields including quality_score, prime_rate, and rejection_rate
         return {
@@ -226,8 +274,13 @@ async def create_batch(batch_data: dict = None):
             "data_hash": batch_data.get('data_hash', '') if batch_data else ''
         }
 
+    except ValueError as e:
+        # Handle validation errors with 400 Bad Request
+        logger.error(f"❌ Validation error creating batch: {e}")
+        raise HTTPException(status_code=400, detail=f"Invalid batch data: {e}")
     except Exception as e:
-        logger.error(f"❌ Error creating batch: {e}")
+        # Handle unexpected errors with 500 Internal Server Error
+        logger.error(f"❌ Error creating batch: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error creating batch: {e}")
 
 # Load batches on startup
