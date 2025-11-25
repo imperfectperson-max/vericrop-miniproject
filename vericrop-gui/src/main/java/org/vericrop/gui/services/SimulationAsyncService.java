@@ -282,18 +282,17 @@ public class SimulationAsyncService {
      */
     public int cleanupOldTasks(long maxAgeMs) {
         long cutoffTime = System.currentTimeMillis() - maxAgeMs;
-        int removed = 0;
         
-        for (Map.Entry<String, SimulationTaskStatus> entry : taskStatuses.entrySet()) {
+        // Use removeIf to safely modify ConcurrentHashMap during iteration
+        int initialSize = taskStatuses.size();
+        taskStatuses.entrySet().removeIf(entry -> {
             SimulationTaskStatus status = entry.getValue();
             // Only remove completed or failed tasks that are old
-            if ((status.getStatus() == SimulationStatus.COMPLETED || 
-                 status.getStatus() == SimulationStatus.FAILED) &&
-                status.getLastUpdateTime() < cutoffTime) {
-                taskStatuses.remove(entry.getKey());
-                removed++;
-            }
-        }
+            return (status.getStatus() == SimulationStatus.COMPLETED || 
+                    status.getStatus() == SimulationStatus.FAILED) &&
+                   status.getLastUpdateTime() < cutoffTime;
+        });
+        int removed = initialSize - taskStatuses.size();
         
         if (removed > 0) {
             logger.info("Cleaned up {} old simulation tasks", removed);
