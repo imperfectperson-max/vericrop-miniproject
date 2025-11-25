@@ -2,13 +2,18 @@ package org.vericrop.gui;
 
 import javafx.application.Platform;
 import javafx.fxml.FXML;
+import javafx.geometry.Pos;
 import javafx.scene.control.*;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.VBox;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import java.util.Set;
 import java.util.HashSet;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.io.File;
 import java.io.IOException;
 import org.vericrop.gui.util.QRDecoder;
@@ -22,15 +27,198 @@ public class ConsumerController implements SimulationListener {
     @FXML private ListView<String> verificationHistoryList;
     @FXML private Button backToProducerButton;
     @FXML private Button logisticsButton;
+    @FXML private VBox productJourneyContainer;
+    @FXML private HBox qualityMetricsContainer;
+    @FXML private Label finalQualityLabel;
+    @FXML private Label deliveryStatusLabel;
+    @FXML private Label deliveryTimeLabel;
 
     private ObservableList<String> verificationHistory = FXCollections.observableArrayList();
     private Set<String> knownBatchIds = new HashSet<>();
+    
+    // Track active deliveries and their journey data
+    private Map<String, DeliveryJourney> activeJourneys = new ConcurrentHashMap<>();
+    
+    /**
+     * Tracks journey state for a delivery.
+     */
+    private static class DeliveryJourney {
+        final String batchId;
+        final String farmerId;
+        final long startTime;
+        volatile String currentStatus;
+        volatile double currentProgress;
+        volatile String currentLocation;
+        volatile double finalQuality = -1;
+        
+        DeliveryJourney(String batchId, String farmerId) {
+            this.batchId = batchId;
+            this.farmerId = farmerId;
+            this.startTime = System.currentTimeMillis();
+            this.currentStatus = "Started";
+            this.currentProgress = 0;
+            this.currentLocation = "Origin";
+        }
+    }
 
     @FXML
     public void initialize() {
         setupVerificationHistory();
         setupNavigationButtons();
         registerWithSimulationManager();
+        initializeProductJourney();
+    }
+    
+    /**
+     * Initialize the Product Journey section.
+     */
+    private void initializeProductJourney() {
+        if (productJourneyContainer == null) {
+            System.err.println("Warning: productJourneyContainer is null");
+            return;
+        }
+        
+        // If demo mode, show demo journey data
+        if (shouldLoadDemoData()) {
+            showDemoJourneyData();
+        }
+    }
+    
+    /**
+     * Show demo journey data in the Product Journey section.
+     */
+    private void showDemoJourneyData() {
+        if (productJourneyContainer == null) return;
+        
+        productJourneyContainer.getChildren().clear();
+        
+        addJourneyItem("✅", "MAR 07, 14:30 - Harvested at Sunny Valley Orchards",
+                      "Quality: PRIME (82%) | Certified Organic", true);
+        addJourneyItem("✅", "MAR 07, 15:45 - Shipped via GlobalLog Transport",
+                      "Avg Temp: 4.2°C | Perfect Transport Conditions", true);
+        addJourneyItem("✅", "MAR 07, 17:30 - Received at Metro Fresh Storage",
+                      "Spoilage Risk: LOW (8%) | Stored in Cell 4B", true);
+        addJourneyItem("✅", "MAR 08, 09:15 - Delivered to FreshMart Downtown",
+                      "Shelf Life: 12 days remaining | Final Quality: 92%", true);
+        
+        // Update quality metrics for demo
+        if (finalQualityLabel != null) {
+            finalQualityLabel.setText("92%");
+        }
+        if (deliveryStatusLabel != null) {
+            deliveryStatusLabel.setText("Delivered");
+        }
+        if (deliveryTimeLabel != null) {
+            deliveryTimeLabel.setText("18h 45m");
+        }
+    }
+    
+    /**
+     * Add a journey item to the Product Journey container.
+     */
+    private void addJourneyItem(String icon, String title, String details, boolean completed) {
+        if (productJourneyContainer == null) return;
+        
+        HBox item = new HBox(15);
+        item.setAlignment(Pos.CENTER_LEFT);
+        
+        Label iconLabel = new Label(icon);
+        iconLabel.setStyle("-fx-font-size: 16;");
+        
+        VBox textBox = new VBox();
+        Label titleLabel = new Label(title);
+        titleLabel.setStyle(completed ? "-fx-font-weight: bold;" : "-fx-font-weight: bold; -fx-text-fill: #64748b;");
+        Label detailsLabel = new Label(details);
+        detailsLabel.setStyle("-fx-text-fill: #64748b;");
+        textBox.getChildren().addAll(titleLabel, detailsLabel);
+        
+        item.getChildren().addAll(iconLabel, textBox);
+        productJourneyContainer.getChildren().add(item);
+    }
+    
+    /**
+     * Update the Product Journey display for an active delivery.
+     */
+    private void updateProductJourneyDisplay(String batchId) {
+        DeliveryJourney journey = activeJourneys.get(batchId);
+        if (journey == null || productJourneyContainer == null) return;
+        
+        Platform.runLater(() -> {
+            productJourneyContainer.getChildren().clear();
+            
+            String timestamp = java.time.LocalDateTime.now().format(
+                    java.time.format.DateTimeFormatter.ofPattern("MMM dd, HH:mm"));
+            
+            // Show started state
+            boolean hasStarted = journey.currentProgress >= 0;
+            addJourneyItem(hasStarted ? "✅" : "⏳", 
+                          timestamp + " - Batch created at " + journey.farmerId,
+                          "Initial Quality: 100% | Ready for transport", hasStarted);
+            
+            // Show in transit state
+            boolean inTransit = journey.currentProgress >= 10;
+            if (inTransit) {
+                addJourneyItem(journey.currentProgress >= 70 ? "✅" : "🚚",
+                              timestamp + " - In transit via cold-chain transport",
+                              String.format("Progress: %.0f%% | %s", journey.currentProgress, journey.currentLocation),
+                              journey.currentProgress >= 70);
+            } else {
+                addJourneyItem("⏳", "In Transit",
+                              "Waiting for transport...", false);
+            }
+            
+            // Show approaching state
+            boolean approaching = journey.currentProgress >= 70;
+            if (approaching) {
+                addJourneyItem(journey.currentProgress >= 95 ? "✅" : "📍",
+                              timestamp + " - Approaching destination",
+                              "Nearing delivery point", journey.currentProgress >= 95);
+            } else {
+                addJourneyItem("⏳", "Approaching Destination",
+                              "Not yet approaching", false);
+            }
+            
+            // Show completed state
+            boolean completed = journey.currentProgress >= 95;
+            if (completed && journey.finalQuality > 0) {
+                addJourneyItem("✅", timestamp + " - Delivered successfully",
+                              String.format("Final Quality: %.1f%% | Delivery complete", journey.finalQuality), true);
+            } else {
+                addJourneyItem("⏳", "Delivery Complete",
+                              "Pending delivery...", false);
+            }
+            
+            // Update quality metrics
+            updateQualityMetrics(journey);
+        });
+    }
+    
+    /**
+     * Update quality metrics display.
+     */
+    private void updateQualityMetrics(DeliveryJourney journey) {
+        if (finalQualityLabel != null) {
+            if (journey.finalQuality > 0) {
+                finalQualityLabel.setText(String.format("%.1f%%", journey.finalQuality));
+                // Color based on quality level
+                String color = journey.finalQuality >= 90 ? "#10b981" : 
+                              journey.finalQuality >= 70 ? "#f59e0b" : "#ef4444";
+                finalQualityLabel.setStyle("-fx-text-fill: " + color + ";");
+            } else {
+                finalQualityLabel.setText("--");
+            }
+        }
+        
+        if (deliveryStatusLabel != null) {
+            deliveryStatusLabel.setText(journey.currentStatus);
+        }
+        
+        if (deliveryTimeLabel != null) {
+            long elapsedMs = System.currentTimeMillis() - journey.startTime;
+            long minutes = elapsedMs / 60000;
+            long seconds = (elapsedMs % 60000) / 1000;
+            deliveryTimeLabel.setText(String.format("%dm %ds", minutes, seconds));
+        }
     }
     
     /**
@@ -307,6 +495,9 @@ public class ConsumerController implements SimulationListener {
     }
     
     public void cleanup() {
+        // Clear active journeys
+        activeJourneys.clear();
+        
         // Unregister from SimulationManager
         try {
             if (SimulationManager.isInitialized()) {
@@ -321,20 +512,52 @@ public class ConsumerController implements SimulationListener {
     
     @Override
     public void onSimulationStarted(String batchId, String farmerId) {
+        // Create new journey tracking
+        DeliveryJourney journey = new DeliveryJourney(batchId, farmerId);
+        journey.currentStatus = "Started";
+        activeJourneys.put(batchId, journey);
+        
         Platform.runLater(() -> {
             String timestamp = java.time.LocalDateTime.now().format(
                     java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
             String message = timestamp + ": 🚚 Batch " + batchId + " is now in transit from " + farmerId;
             verificationHistory.add(0, message);
+            
+            // Update Product Journey display
+            updateProductJourneyDisplay(batchId);
+            
             System.out.println("ConsumerController: Simulation started - " + batchId + " from " + farmerId);
         });
     }
     
     @Override
     public void onProgressUpdate(String batchId, double progress, String currentLocation) {
+        // Update journey tracking
+        DeliveryJourney journey = activeJourneys.get(batchId);
+        if (journey != null) {
+            journey.currentProgress = progress;
+            journey.currentLocation = currentLocation != null ? currentLocation : "In Transit";
+            
+            // Update status based on progress
+            if (progress >= 95) {
+                journey.currentStatus = "Completing";
+            } else if (progress >= 70) {
+                journey.currentStatus = "Approaching";
+            } else if (progress >= 10) {
+                journey.currentStatus = "In Transit";
+            }
+            
+            // Update display on significant progress points
+            if (shouldUpdateDisplay(progress)) {
+                Platform.runLater(() -> {
+                    updateProductJourneyDisplay(batchId);
+                });
+            }
+        }
+        
         // Add journey milestone updates for significant progress points
-        // Only update at key milestones to avoid cluttering the history
-        if (progress == 25.0 || progress == 50.0 || progress == 75.0) {
+        // Only update history at key milestones to avoid cluttering
+        if (Math.abs(progress - 25.0) < 1.0 || Math.abs(progress - 50.0) < 1.0 || Math.abs(progress - 75.0) < 1.0) {
             Platform.runLater(() -> {
                 String timestamp = java.time.LocalDateTime.now().format(
                         java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
@@ -346,14 +569,53 @@ public class ConsumerController implements SimulationListener {
         }
     }
     
+    /**
+     * Determine if display should be updated at this progress point.
+     */
+    private boolean shouldUpdateDisplay(double progress) {
+        // Update at key thresholds that correspond to state changes
+        return progress < 1 ||
+               (progress >= 10 && progress < 11) ||
+               (progress >= 25 && progress < 26) ||
+               (progress >= 50 && progress < 51) ||
+               (progress >= 70 && progress < 71) ||
+               (progress >= 95 && progress < 96);
+    }
+    
     @Override
     public void onSimulationStopped(String batchId, boolean completed) {
+        DeliveryJourney journey = activeJourneys.get(batchId);
+        
         Platform.runLater(() -> {
             String timestamp = java.time.LocalDateTime.now().format(
                     java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-            String message = completed ? 
-                timestamp + ": ✅ Batch " + batchId + " delivered successfully - Ready for verification" : 
-                timestamp + ": ⏹ Delivery stopped for batch " + batchId;
+            
+            if (journey != null) {
+                journey.currentStatus = completed ? "Delivered" : "Stopped";
+                journey.currentProgress = completed ? 100 : journey.currentProgress;
+                
+                // For completed deliveries, estimate final quality based on transit time
+                // In real implementation, this would come from the simulator
+                if (completed && journey.finalQuality < 0) {
+                    long elapsedMs = System.currentTimeMillis() - journey.startTime;
+                    double elapsedSeconds = elapsedMs / 1000.0;
+                    // Use demo decay rate for estimation
+                    journey.finalQuality = 100.0 * Math.exp(-0.002 * elapsedSeconds);
+                }
+                
+                updateProductJourneyDisplay(batchId);
+            }
+            
+            String message;
+            if (completed && journey != null && journey.finalQuality > 0) {
+                message = String.format("%s: ✅ Batch %s delivered - Final Quality: %.1f%% - Ready for verification",
+                                       timestamp, batchId, journey.finalQuality);
+            } else if (completed) {
+                message = timestamp + ": ✅ Batch " + batchId + " delivered successfully - Ready for verification";
+            } else {
+                message = timestamp + ": ⏹ Delivery stopped for batch " + batchId;
+            }
+            
             verificationHistory.add(0, message);
             System.out.println("ConsumerController: " + (completed ? "Delivery completed" : "Delivery stopped") + " - " + batchId);
         });
@@ -361,6 +623,11 @@ public class ConsumerController implements SimulationListener {
     
     @Override
     public void onSimulationError(String batchId, String error) {
+        DeliveryJourney journey = activeJourneys.get(batchId);
+        if (journey != null) {
+            journey.currentStatus = "Error";
+        }
+        
         Platform.runLater(() -> {
             String timestamp = java.time.LocalDateTime.now().format(
                     java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
@@ -368,5 +635,20 @@ public class ConsumerController implements SimulationListener {
             verificationHistory.add(0, message);
             System.err.println("ConsumerController: Simulation error - " + error + " for batch " + batchId);
         });
+    }
+    
+    /**
+     * Set the final quality for a delivery (called from enhanced simulator).
+     * @param batchId Batch identifier
+     * @param finalQuality Final quality score (0-100)
+     */
+    public void setFinalQuality(String batchId, double finalQuality) {
+        DeliveryJourney journey = activeJourneys.get(batchId);
+        if (journey != null) {
+            journey.finalQuality = finalQuality;
+            Platform.runLater(() -> {
+                updateProductJourneyDisplay(batchId);
+            });
+        }
     }
 }
