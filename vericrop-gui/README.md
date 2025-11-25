@@ -174,6 +174,115 @@ Real-time delivery simulation for testing supply chain tracking:
 - Waypoints: 10 (configurable in code)
 - Average Speed: 50 km/h
 
+### Async Simulation API (REST)
+
+The simulation can also be started via REST API with asynchronous (non-blocking) behavior.
+This allows the client to receive an immediate HTTP 202 Accepted response and poll for status.
+
+**Endpoints:**
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/simulation/start-async` | Start simulation asynchronously (returns 202) |
+| GET | `/api/simulation/{id}/status` | Poll simulation status |
+
+**Start Async Simulation:**
+
+```bash
+curl -X POST http://localhost:8080/api/simulation/start-async \
+  -H "Content-Type: application/json" \
+  -d '{
+    "batch_id": "BATCH_001",
+    "farmer_id": "FARMER_001",
+    "origin_lat": 42.3601,
+    "origin_lon": -71.0589,
+    "origin_name": "Sunny Valley Farm",
+    "dest_lat": 42.3736,
+    "dest_lon": -71.1097,
+    "dest_name": "Metro Fresh Warehouse",
+    "num_waypoints": 20,
+    "avg_speed_kmh": 50.0,
+    "update_interval_ms": 10000
+  }'
+```
+
+**Response (HTTP 202 Accepted):**
+
+```json
+{
+  "accepted": true,
+  "simulation_id": "SIM_1732558500000_abc12345",
+  "batch_id": "BATCH_001",
+  "farmer_id": "FARMER_001",
+  "message": "Simulation creation started. Poll /api/simulation/SIM_1732558500000_abc12345/status for progress.",
+  "status_url": "/api/simulation/SIM_1732558500000_abc12345/status",
+  "timestamp": 1732558500000
+}
+```
+
+**Poll Status:**
+
+```bash
+curl http://localhost:8080/api/simulation/SIM_1732558500000_abc12345/status
+```
+
+**Status Response:**
+
+```json
+{
+  "simulation_id": "SIM_1732558500000_abc12345",
+  "status": "RUNNING",
+  "status_description": "Simulation is running",
+  "message": "Simulation started successfully",
+  "progress": 45.5,
+  "current_location": "In transit - midpoint",
+  "start_time": 1732558500000,
+  "last_update_time": 1732558545500,
+  "elapsed_ms": 45500
+}
+```
+
+**Status Values:**
+- `CREATING` - Simulation is being set up in background
+- `RUNNING` - Simulation started and is in progress
+- `COMPLETED` - Simulation finished successfully
+- `FAILED` - Simulation creation or execution failed
+
+**Client-Side Polling Pattern:**
+
+```javascript
+// Example JavaScript client-side polling
+async function startAndPollSimulation(params) {
+  // 1. Start async simulation
+  const startResponse = await fetch('/api/simulation/start-async', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params)
+  });
+  
+  if (startResponse.status !== 202) {
+    throw new Error('Failed to start simulation');
+  }
+  
+  const { simulation_id, status_url } = await startResponse.json();
+  
+  // 2. Poll for status
+  while (true) {
+    const statusResponse = await fetch(status_url);
+    const status = await statusResponse.json();
+    
+    console.log(`Progress: ${status.progress}% - ${status.current_location}`);
+    
+    if (status.status === 'COMPLETED' || status.status === 'FAILED') {
+      return status;
+    }
+    
+    // Wait before next poll (e.g., 2 seconds)
+    await new Promise(resolve => setTimeout(resolve, 2000));
+  }
+}
+```
+
 ### Reports Generation
 
 Generate CSV and JSON reports for quality, journey, and analytics data:
