@@ -380,4 +380,107 @@ public class ProducerControllerTest {
         
         assertEquals(100.0, sum, 0.1, "Distribution should sum to 100%");
     }
+    
+    // ========== Tests for calculateQualityMetrics ==========
+    // These tests verify parity with the ML service calculation logic in
+    // docker/ml-service/app.py compute_quality_metrics()
+    
+    private Method calculateQualityMetricsMethod;
+    
+    private void setupCalculateQualityMetricsMethod() throws Exception {
+        if (calculateQualityMetricsMethod == null) {
+            calculateQualityMetricsMethod = ProducerController.class.getDeclaredMethod(
+                "calculateQualityMetrics", String.class, double.class);
+            calculateQualityMetricsMethod.setAccessible(true);
+        }
+    }
+    
+    @Test
+    @SuppressWarnings("unchecked")
+    public void testCalculateQualityMetrics_FreshHighQuality() throws Exception {
+        setupCalculateQualityMetricsMethod();
+        
+        // Test FRESH classification with quality score 0.85
+        // quality_percent = 85
+        // prime_rate = 80 + (85 * 0.2) = 97%
+        // remainder = 3%
+        // low_quality = 3 * 0.8 = 2.4%
+        // rejection = 3 * 0.2 = 0.6%
+        Map<String, Double> metrics = (Map<String, Double>) calculateQualityMetricsMethod.invoke(
+            controller, "FRESH", 0.85);
+        
+        assertEquals(0.97, metrics.get("prime_rate"), 0.01, "Prime rate should be ~97%");
+        assertEquals(0.024, metrics.get("low_quality_rate"), 0.01, "Low quality rate should be ~2.4%");
+        assertEquals(0.006, metrics.get("rejection_rate"), 0.01, "Rejection rate should be ~0.6%");
+        
+        // Verify sum is 1.0
+        double total = metrics.values().stream().mapToDouble(Double::doubleValue).sum();
+        assertEquals(1.0, total, 0.001, "Rates should sum to 1.0");
+    }
+    
+    @Test
+    @SuppressWarnings("unchecked")
+    public void testCalculateQualityMetrics_LowQualityClassification() throws Exception {
+        setupCalculateQualityMetricsMethod();
+        
+        // Test LOW_QUALITY classification with quality score 0.60
+        // quality_percent = 60
+        // low_quality_rate = 80 + (60 * 0.2) = 92%
+        // remainder = 8%
+        // prime = 8 * 0.8 = 6.4%
+        // rejection = 8 * 0.2 = 1.6%
+        Map<String, Double> metrics = (Map<String, Double>) calculateQualityMetricsMethod.invoke(
+            controller, "LOW_QUALITY", 0.60);
+        
+        assertEquals(0.92, metrics.get("low_quality_rate"), 0.01, "Low quality rate should be ~92%");
+        assertEquals(0.064, metrics.get("prime_rate"), 0.01, "Prime rate should be ~6.4%");
+        assertEquals(0.016, metrics.get("rejection_rate"), 0.01, "Rejection rate should be ~1.6%");
+    }
+    
+    @Test
+    @SuppressWarnings("unchecked")
+    public void testCalculateQualityMetrics_RottenClassification() throws Exception {
+        setupCalculateQualityMetricsMethod();
+        
+        // Test ROTTEN classification with quality score 0.30
+        // quality_percent = 30
+        // rejection_rate = 80 + (30 * 0.2) = 86%
+        // remainder = 14%
+        // low_quality = 14 * 0.8 = 11.2%
+        // prime = 14 * 0.2 = 2.8%
+        Map<String, Double> metrics = (Map<String, Double>) calculateQualityMetricsMethod.invoke(
+            controller, "ROTTEN", 0.30);
+        
+        assertEquals(0.86, metrics.get("rejection_rate"), 0.01, "Rejection rate should be ~86%");
+        assertEquals(0.112, metrics.get("low_quality_rate"), 0.01, "Low quality rate should be ~11.2%");
+        assertEquals(0.028, metrics.get("prime_rate"), 0.01, "Prime rate should be ~2.8%");
+    }
+    
+    @Test
+    @SuppressWarnings("unchecked")
+    public void testCalculateQualityMetrics_RatesSumToOne() throws Exception {
+        setupCalculateQualityMetricsMethod();
+        
+        // Test various inputs to ensure rates always sum to 1.0
+        String[][] testCases = {
+            {"FRESH", "0.0"},
+            {"FRESH", "0.5"},
+            {"FRESH", "1.0"},
+            {"LOW_QUALITY", "0.3"},
+            {"ROTTEN", "0.2"},
+            {"UNKNOWN", "0.75"},
+        };
+        
+        for (String[] testCase : testCases) {
+            String classification = testCase[0];
+            double qualityScore = Double.parseDouble(testCase[1]);
+            
+            Map<String, Double> metrics = (Map<String, Double>) calculateQualityMetricsMethod.invoke(
+                controller, classification, qualityScore);
+            
+            double total = metrics.values().stream().mapToDouble(Double::doubleValue).sum();
+            assertEquals(1.0, total, 0.001, 
+                String.format("Rates should sum to 1.0 for %s/%.1f", classification, qualityScore));
+        }
+    }
 }

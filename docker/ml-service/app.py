@@ -61,43 +61,110 @@ def save_batches_to_file():
     except Exception as e:
         logger.error(f"❌ Error saving batches to file: {e}")
 
-def compute_quality_based_rates(quality_score: float) -> tuple[float, float]:
+def compute_quality_metrics(classification: str, quality_score: float) -> dict:
     """
-    Compute primeRate and rejectionRate based on actual quality score.
+    Compute prime_rate, low_quality_rate, and rejection_rate based on classification and quality score.
+    
+    This mirrors the frontend calculation logic in ProducerController.calculateQualityMetrics().
+    The algorithm uses the classification label to determine the dominant rate:
+    
+    - FRESH: prime% = 80 + quality% * 20, remainder distributed (80% low_quality, 20% rejection)
+    - LOW_QUALITY: low_quality% = 80 + quality% * 20, remainder distributed (80% prime, 20% rejection)  
+    - ROTTEN: rejection% = 80 + quality% * 20, remainder distributed (80% low_quality, 20% prime)
+    
+    Args:
+        classification: Quality classification label (fresh, low_quality, rotten)
+        quality_score: Quality score from prediction (0.0 to 1.0)
+    
+    Returns:
+        dict with keys: prime_rate, low_quality_rate, rejection_rate (all 0.0 to 1.0)
+    
+    Reference:
+        Frontend source: vericrop-gui/src/main/java/org/vericrop/gui/ProducerController.java
+        Method: calculateQualityMetrics()
+    """
+    metrics = {}
+    
+    # Convert quality score to percentage (0-100)
+    quality_percent = quality_score * 100.0
+    classification_upper = classification.upper() if classification else "FRESH"
+    
+    if classification_upper == "FRESH":
+        # prime% = 80 + quality% * 20
+        prime_rate = 80.0 + (quality_percent * 0.2)
+        prime_rate = min(prime_rate, 100.0)  # Cap at 100%
+        remainder = 100.0 - prime_rate
+        
+        metrics["prime_rate"] = prime_rate / 100.0
+        metrics["low_quality_rate"] = (remainder * 0.8) / 100.0
+        metrics["rejection_rate"] = (remainder * 0.2) / 100.0
+        
+    elif classification_upper == "LOW_QUALITY":
+        # low_quality% = 80 + quality% * 20
+        low_quality_rate = 80.0 + (quality_percent * 0.2)
+        low_quality_rate = min(low_quality_rate, 100.0)
+        remainder = 100.0 - low_quality_rate
+        
+        metrics["low_quality_rate"] = low_quality_rate / 100.0
+        metrics["prime_rate"] = (remainder * 0.8) / 100.0
+        metrics["rejection_rate"] = (remainder * 0.2) / 100.0
+        
+    elif classification_upper == "ROTTEN":
+        # rejection% = 80 + quality% * 20
+        rejection_rate = 80.0 + (quality_percent * 0.2)
+        rejection_rate = min(rejection_rate, 100.0)
+        remainder = 100.0 - rejection_rate
+        
+        metrics["rejection_rate"] = rejection_rate / 100.0
+        metrics["low_quality_rate"] = (remainder * 0.8) / 100.0
+        metrics["prime_rate"] = (remainder * 0.2) / 100.0
+        
+    else:
+        # Fallback for unknown classifications (e.g., good, ripe, damaged)
+        # Use quality score as prime rate with remainder distributed
+        metrics["prime_rate"] = quality_score
+        metrics["low_quality_rate"] = (1.0 - quality_score) * 0.7
+        metrics["rejection_rate"] = (1.0 - quality_score) * 0.3
+    
+    # Normalize to ensure exact 100% total
+    return normalize_metrics(metrics)
+
+
+def normalize_metrics(metrics: dict) -> dict:
+    """
+    Normalize metrics to ensure they sum to 1.0 (100%).
+    
+    Args:
+        metrics: dict with rate values
+    
+    Returns:
+        dict with normalized rate values
+    """
+    total = sum(metrics.values())
+    
+    if total > 0 and abs(total - 1.0) > 0.001:
+        factor = 1.0 / total
+        metrics = {k: v * factor for k, v in metrics.items()}
+    
+    return metrics
+
+
+def compute_quality_based_rates(quality_score: float, classification: str = "fresh") -> tuple[float, float]:
+    """
+    Compute primeRate and rejectionRate based on classification and quality score.
+    
+    This is a convenience wrapper around compute_quality_metrics() that returns
+    just the prime_rate and rejection_rate tuple for backward compatibility.
 
     Args:
         quality_score: The actual quality score from prediction (0.0 to 1.0)
+        classification: Quality classification label (fresh, low_quality, rotten)
 
     Returns:
         tuple of (primeRate, rejectionRate) both in range [0.0, 1.0]
-
-    Logic:
-        - Higher quality scores result in higher prime rates and lower rejection rates
-        - Quality score directly influences the rates
     """
-    # Prime rate: quality score with a slight boost for high quality items
-    if quality_score >= 0.8:
-        prime_rate = quality_score * 0.95  # 76-95% for high quality
-    elif quality_score >= 0.6:
-        prime_rate = quality_score * 0.85  # 51-68% for medium quality
-    else:
-        prime_rate = quality_score * 0.7   # 0-42% for low quality
-
-    # Rejection rate: inverse of quality score
-    rejection_rate = (1.0 - quality_score) * 0.6  # 0-60% based on quality
-
-    # Ensure logical consistency: primeRate + rejectionRate <= 1.0
-    total = prime_rate + rejection_rate
-    if total > 1.0:
-        scale = 0.95 / total
-        prime_rate *= scale
-        rejection_rate *= scale
-
-    # Clamp to valid ranges [0.0, 1.0]
-    prime_rate = max(0.0, min(1.0, prime_rate))
-    rejection_rate = max(0.0, min(1.0, rejection_rate))
-
-    return prime_rate, rejection_rate
+    metrics = compute_quality_metrics(classification, quality_score)
+    return metrics["prime_rate"], metrics["rejection_rate"]
 
 # Update the create_batch endpoint to save data
 @app.post("/batches")
@@ -116,8 +183,9 @@ async def create_batch(batch_data: dict = None):
 
         quality_label = quality_data.get('label', 'fresh')
 
-        # Compute rates based on actual quality score
-        prime_rate, rejection_rate = compute_quality_based_rates(quality_score)
+        # Compute rates based on classification and quality score
+        # This mirrors the frontend calculation logic in ProducerController.calculateQualityMetrics()
+        prime_rate, rejection_rate = compute_quality_based_rates(quality_score, quality_label)
 
         # Create batch record with proper quality data and quality-based rates
         batch_record = {
@@ -418,7 +486,7 @@ async def get_farm_dashboard():
                 # Default fallback if invalid
                 quality_scores.append(0.8)
 
-            # Extract quality-based rates (computed from actual quality score)
+            # Extract quality-based rates (computed from classification and quality score)
             # If batch doesn't have rates yet (old data), compute them now
             if 'prime_rate' in batch and 'rejection_rate' in batch:
                 prime_rates.append(float(batch['prime_rate']))
@@ -426,7 +494,8 @@ async def get_farm_dashboard():
             else:
                 # Fallback: compute quality-based rates for old batches without stored rates
                 quality_score = batch.get('quality_score', 0.8)
-                prime_rate, rejection_rate = compute_quality_based_rates(quality_score)
+                quality_label = batch.get('quality_label', 'fresh')
+                prime_rate, rejection_rate = compute_quality_based_rates(quality_score, quality_label)
                 prime_rates.append(prime_rate)
                 rejection_rates.append(rejection_rate)
                 # Update the batch with computed rates for future use
