@@ -22,6 +22,7 @@ public class ProducerControllerTest {
     private Method calculateRatesMethod;
     private Method computeKpisFromRecentBatchesMethod;
     private Method computeDistributionFromRecentBatchesMethod;
+    private Method extractUserFriendlyErrorMessageMethod;
     
     @BeforeEach
     public void setUp() throws Exception {
@@ -41,6 +42,78 @@ public class ProducerControllerTest {
         computeDistributionFromRecentBatchesMethod = ProducerController.class.getDeclaredMethod(
             "computeDistributionFromRecentBatches", List.class);
         computeDistributionFromRecentBatchesMethod.setAccessible(true);
+        
+        // Access the private extractUserFriendlyErrorMessage method using reflection
+        extractUserFriendlyErrorMessageMethod = ProducerController.class.getDeclaredMethod(
+            "extractUserFriendlyErrorMessage", Throwable.class);
+        extractUserFriendlyErrorMessageMethod.setAccessible(true);
+    }
+    
+    // ========== Tests for extractUserFriendlyErrorMessage ==========
+    
+    @Test
+    public void testExtractUserFriendlyErrorMessage_NullThrowable() throws Exception {
+        String result = (String) extractUserFriendlyErrorMessageMethod.invoke(controller, (Throwable) null);
+        assertEquals("An unknown error occurred", result, "Should return default message for null throwable");
+    }
+    
+    @Test
+    public void testExtractUserFriendlyErrorMessage_SimpleMessage() throws Exception {
+        RuntimeException ex = new RuntimeException("Connection refused");
+        String result = (String) extractUserFriendlyErrorMessageMethod.invoke(controller, ex);
+        assertEquals("Connection refused", result, "Should return the simple message as-is");
+    }
+    
+    @Test
+    public void testExtractUserFriendlyErrorMessage_WithJavaExceptionPrefix() throws Exception {
+        RuntimeException ex = new RuntimeException("java.lang.RuntimeException: Connection failed");
+        String result = (String) extractUserFriendlyErrorMessageMethod.invoke(controller, ex);
+        assertEquals("Connection failed", result, "Should strip java.lang.RuntimeException prefix");
+    }
+    
+    @Test
+    public void testExtractUserFriendlyErrorMessage_WithIOExceptionPrefix() throws Exception {
+        RuntimeException ex = new RuntimeException("java.io.IOException: Network unreachable");
+        String result = (String) extractUserFriendlyErrorMessageMethod.invoke(controller, ex);
+        assertEquals("Network unreachable", result, "Should strip java.io.IOException prefix");
+    }
+    
+    @Test
+    public void testExtractUserFriendlyErrorMessage_EmptyMessage() throws Exception {
+        RuntimeException ex = new RuntimeException("");
+        String result = (String) extractUserFriendlyErrorMessageMethod.invoke(controller, ex);
+        assertEquals("An unexpected error occurred", result, "Should return default message for empty message");
+    }
+    
+    @Test
+    public void testExtractUserFriendlyErrorMessage_WithCause() throws Exception {
+        Exception cause = new Exception("Root cause message");
+        RuntimeException ex = new RuntimeException(null, cause);
+        String result = (String) extractUserFriendlyErrorMessageMethod.invoke(controller, ex);
+        assertEquals("Root cause message", result, "Should extract message from cause when main message is null");
+    }
+    
+    @Test
+    public void testExtractUserFriendlyErrorMessage_StripsRuntimeException() throws Exception {
+        RuntimeException ex = new RuntimeException("RuntimeException: Something went wrong");
+        String result = (String) extractUserFriendlyErrorMessageMethod.invoke(controller, ex);
+        assertFalse(result.contains("RuntimeException:"), "Should strip RuntimeException: from message");
+        assertTrue(result.contains("Something went wrong"), "Should keep the actual error message");
+    }
+    
+    @Test
+    public void testExtractUserFriendlyErrorMessage_PreservesRuntimeExceptionInClassName() throws Exception {
+        // Ensure class names like "RuntimeExceptionHandler" are not mangled
+        RuntimeException ex = new RuntimeException("RuntimeExceptionHandler failed");
+        String result = (String) extractUserFriendlyErrorMessageMethod.invoke(controller, ex);
+        assertEquals("RuntimeExceptionHandler failed", result, "Should preserve class names containing RuntimeException");
+    }
+    
+    @Test
+    public void testExtractUserFriendlyErrorMessage_CompletionException() throws Exception {
+        RuntimeException ex = new RuntimeException("java.util.concurrent.CompletionException: Task failed");
+        String result = (String) extractUserFriendlyErrorMessageMethod.invoke(controller, ex);
+        assertEquals("Task failed", result, "Should strip CompletionException prefix");
     }
     
     @Test

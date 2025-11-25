@@ -44,9 +44,18 @@ import org.vericrop.gui.services.LogisticsService;
 import org.vericrop.kafka.producers.BatchUpdateEventProducer;
 import org.vericrop.dto.BatchUpdateEvent;
 import java.time.Duration;
+import java.util.regex.Pattern;
 
 public class ProducerController implements SimulationListener {
     private static final int SHIPMENT_UPDATE_INTERVAL_MS = 2000;
+    
+    // Pre-compiled patterns for error message cleaning (performance optimization)
+    private static final Pattern JAVA_EXCEPTION_PREFIX_PATTERN = 
+        Pattern.compile("^(java\\.\\w+\\.)*\\w+Exception:\\s*");
+    private static final Pattern COMPLETION_EXCEPTION_PREFIX_PATTERN = 
+        Pattern.compile("^java\\.util\\.concurrent\\.CompletionException:\\s*");
+    private static final Pattern RUNTIME_EXCEPTION_COLON_PATTERN = 
+        Pattern.compile("\\bRuntimeException:\\s*");
 
     private Blockchain blockchain;
     private BlockchainService blockchainService;
@@ -512,6 +521,15 @@ public class ProducerController implements SimulationListener {
             try {
                 Platform.runLater(() -> updateStatus("📡 Sending to backend..."));
 
+                // Validate batch data before sending
+                if (batchData == null) {
+                    throw new BatchCreationException("Batch data is missing");
+                }
+                String batchName = (String) batchData.get("name");
+                if (batchName == null || batchName.trim().isEmpty()) {
+                    throw new BatchCreationException("Batch name is required");
+                }
+
                 String json = mapper.writeValueAsString(batchData);
                 RequestBody body = RequestBody.create(json, MediaType.parse("application/json"));
                 Request request = new Request.Builder()
@@ -522,7 +540,7 @@ public class ProducerController implements SimulationListener {
                 try (Response response = httpClient.newCall(request).execute()) {
                     ResponseBody responseBody = response.body();
                     if (responseBody == null) {
-                        throw new IOException("Response body is null");
+                        throw new BatchCreationException("Backend returned empty response");
                     }
 
                     String responseBodyString = responseBody.string();
@@ -544,26 +562,73 @@ public class ProducerController implements SimulationListener {
 
                         return result;
                     } else {
-                        throw new IOException("Backend error: " + response.code() + " - " + responseBodyString);
+                        // Extract error message from backend response if available
+                        String errorDetail = extractErrorFromResponse(responseBodyString, response.code());
+                        throw new BatchCreationException(errorDetail);
                     }
                 }
+            } catch (BatchCreationException e) {
+                // Re-throw our custom exceptions as-is
+                throw e;
+            } catch (java.net.ConnectException e) {
+                throw new BatchCreationException("Cannot connect to backend service. Please ensure the ML service is running on port 8000.");
+            } catch (java.net.SocketTimeoutException e) {
+                throw new BatchCreationException("Backend service request timed out. Please try again.");
+            } catch (java.io.IOException e) {
+                throw new BatchCreationException("Network error communicating with backend: " + e.getMessage());
             } catch (Exception e) {
-                throw new RuntimeException("Backend communication failed: " + e.getMessage(), e);
+                throw new BatchCreationException("Unexpected error: " + e.getMessage());
             }
         }, backgroundExecutor);
+    }
+
+    /**
+     * Extract a user-friendly error message from backend error response.
+     */
+    private String extractErrorFromResponse(String responseBody, int statusCode) {
+        try {
+            if (responseBody != null && !responseBody.trim().isEmpty()) {
+                Map<String, Object> errorResponse = mapper.readValue(responseBody, Map.class);
+                if (errorResponse.containsKey("detail")) {
+                    return "Backend error: " + errorResponse.get("detail");
+                }
+                if (errorResponse.containsKey("message")) {
+                    return "Backend error: " + errorResponse.get("message");
+                }
+            }
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            // Response is not valid JSON, fall through to default message
+            System.err.println("Warning: Could not parse backend error response as JSON: " + e.getMessage());
+        } catch (Exception e) {
+            // Unexpected error parsing response
+            System.err.println("Warning: Error parsing backend response: " + e.getMessage());
+        }
+        return "Backend returned error " + statusCode + (responseBody != null && !responseBody.isEmpty() ? ": " + responseBody : "");
+    }
+
+    /**
+     * Custom exception for batch creation errors with user-friendly messages.
+     */
+    private static class BatchCreationException extends RuntimeException {
+        public BatchCreationException(String message) {
+            super(message);
+        }
     }
 
     private CompletableFuture<Map<String, Object>> validateBlockchainReadiness(Map<String, Object> result) {
         return CompletableFuture.supplyAsync(() -> {
             if (!blockchainReady) {
-                throw new RuntimeException("Blockchain not ready - cannot create immutable record");
+                throw new BatchCreationException("Blockchain is not ready. Please wait for initialization to complete.");
             }
 
             // Validate that we have required data for blockchain
             Map<String, Object> batchData = (Map<String, Object>) result.get("batch_data");
+            if (batchData == null) {
+                throw new BatchCreationException("Batch data is missing from the response.");
+            }
             String dataHash = (String) batchData.get("data_hash");
             if (dataHash == null || dataHash.trim().isEmpty()) {
-                throw new RuntimeException("Invalid data hash - cannot create blockchain record");
+                throw new BatchCreationException("Data hash is missing. Please upload an image first.");
             }
 
             return result;
@@ -590,7 +655,7 @@ public class ProducerController implements SimulationListener {
                 Block newBlock = blockchain.addBlock(transactions, dataHash, farmer);
 
                 if (newBlock == null) {
-                    throw new RuntimeException("Blockchain operation failed - no block created");
+                    throw new BatchCreationException("Failed to create blockchain record. Please try again.");
                 }
 
                 result.put("blockchain_block", newBlock);
@@ -599,8 +664,10 @@ public class ProducerController implements SimulationListener {
                 createShipmentRecord(batchId, batchData, result);
 
                 return result;
+            } catch (BatchCreationException e) {
+                throw e;
             } catch (Exception e) {
-                throw new RuntimeException("Blockchain operation failed: " + e.getMessage(), e);
+                throw new BatchCreationException("Blockchain operation failed: " + e.getMessage());
             }
         }, backgroundExecutor);
     }
@@ -759,7 +826,9 @@ public class ProducerController implements SimulationListener {
     private Void handleBatchError(Throwable throwable) {
         System.err.println("❌ Batch creation failed: " + throwable.getMessage());
 
-        String errorMessage = throwable.getMessage();
+        // Extract the user-friendly error message, stripping Java exception class names
+        String errorMessage = extractUserFriendlyErrorMessage(throwable);
+        
         boolean blockchainFailed = errorMessage != null &&
                 (errorMessage.contains("Blockchain") || errorMessage.contains("blockchain") ||
                         errorMessage.contains("timeout") || errorMessage.contains("Timeout"));
@@ -772,7 +841,7 @@ public class ProducerController implements SimulationListener {
                 alert.setHeaderText("Blockchain record could not be created");
                 alert.setContentText("The batch was created successfully but the blockchain record failed.\n\n" +
                         "Do you want to continue without blockchain immutability?\n" +
-                        "Error: " + throwable.getMessage());
+                        "Error: " + errorMessage);
 
                 Optional<ButtonType> result = alert.showAndWait();
                 if (result.isPresent() && result.get() == ButtonType.OK) {
@@ -781,10 +850,10 @@ public class ProducerController implements SimulationListener {
                     loadDashboardData();
                     resetForm();
                 } else {
-                    showError("Batch creation cancelled due to blockchain failure: " + throwable.getMessage());
+                    showError("Batch creation cancelled due to blockchain failure:\n" + errorMessage);
                 }
             } else {
-                showError("Error creating batch: " + throwable.getMessage());
+                showError("Error creating batch:\n" + errorMessage);
             }
 
             progressIndicator.setVisible(false);
@@ -792,6 +861,41 @@ public class ProducerController implements SimulationListener {
         });
 
         return null;
+    }
+
+    /**
+     * Extract a user-friendly error message from a throwable, removing Java exception class names.
+     * @param throwable The exception to extract message from
+     * @return A clean, user-friendly error message
+     */
+    private String extractUserFriendlyErrorMessage(Throwable throwable) {
+        if (throwable == null) {
+            return "An unknown error occurred";
+        }
+
+        String message = throwable.getMessage();
+        if (message == null || message.isEmpty()) {
+            // Try to get message from the cause
+            if (throwable.getCause() != null) {
+                message = throwable.getCause().getMessage();
+            }
+            if (message == null || message.isEmpty()) {
+                message = "An unexpected error occurred";
+            }
+        }
+
+        // Remove Java exception class prefixes (e.g., "java.lang.RuntimeException: ")
+        // Using pre-compiled patterns for performance
+        message = JAVA_EXCEPTION_PREFIX_PATTERN.matcher(message).replaceAll("");
+        
+        // Remove CompletableFuture-related wrapper messages
+        message = COMPLETION_EXCEPTION_PREFIX_PATTERN.matcher(message).replaceAll("");
+        
+        // Remove "RuntimeException: " with word boundary check to avoid false positives
+        // e.g., "RuntimeException: error" -> "error", but "RuntimeExceptionHandler" stays unchanged
+        message = RUNTIME_EXCEPTION_COLON_PATTERN.matcher(message).replaceAll("");
+
+        return message;
     }
 
     private boolean validateBatchInputs() {
