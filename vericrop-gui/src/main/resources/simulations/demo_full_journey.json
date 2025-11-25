@@ -1,0 +1,104 @@
+{
+  "id": "demo_full_journey",
+  "name": "Full Journey Demo - 4 Minutes",
+  "description": "Complete producer-to-consumer journey with quality decay events, alerts, and comprehensive lifecycle demonstration.",
+  "durationMinutes": 4,
+  "timeCompressionFactor": 15.0,
+  "simulatedDurationMinutes": 60,
+  "origin": {
+    "name": "Valley View Farms",
+    "latitude": 42.3401,
+    "longitude": -71.0289,
+    "description": "Premium produce farm with automated packaging"
+  },
+  "warehouse": {
+    "name": "Central Cold Chain Hub",
+    "latitude": 42.3568,
+    "longitude": -71.0689,
+    "description": "State-of-the-art cold storage with IoT monitoring"
+  },
+  "destination": {
+    "name": "Metro Fresh Consumer Store",
+    "latitude": 42.3736,
+    "longitude": -71.1097,
+    "description": "Consumer-facing retail destination"
+  },
+  "waypoints": [
+    {"name": "Farm Packaging Center", "lat": 42.3401, "lng": -71.0289, "minuteFromStart": 0, "temperature": 4.0, "humidity": 80},
+    {"name": "Quality Inspection Point", "lat": 42.3420, "lng": -71.0320, "minuteFromStart": 3, "temperature": 4.0, "humidity": 79},
+    {"name": "Farm Gate - Departure", "lat": 42.3440, "lng": -71.0360, "minuteFromStart": 5, "temperature": 4.2, "humidity": 78},
+    {"name": "County Road Section A", "lat": 42.3470, "lng": -71.0420, "minuteFromStart": 10, "temperature": 4.5, "humidity": 76},
+    {"name": "Highway Merge Point", "lat": 42.3500, "lng": -71.0500, "minuteFromStart": 15, "temperature": 5.0, "humidity": 74},
+    {"name": "Highway - Checkpoint Alpha", "lat": 42.3520, "lng": -71.0560, "minuteFromStart": 20, "temperature": 5.5, "humidity": 72},
+    {"name": "Highway - Rest Stop", "lat": 42.3540, "lng": -71.0620, "minuteFromStart": 25, "temperature": 6.0, "humidity": 70},
+    {"name": "Cold Chain Hub Approach", "lat": 42.3560, "lng": -71.0670, "minuteFromStart": 28, "temperature": 5.0, "humidity": 72},
+    {"name": "Cold Chain Hub - Intake", "lat": 42.3568, "lng": -71.0689, "minuteFromStart": 30, "temperature": 3.5, "humidity": 75},
+    {"name": "Hub - Quality Rescan", "lat": 42.3570, "lng": -71.0700, "minuteFromStart": 33, "temperature": 3.5, "humidity": 76},
+    {"name": "Hub - Reloading Complete", "lat": 42.3580, "lng": -71.0750, "minuteFromStart": 36, "temperature": 3.8, "humidity": 77},
+    {"name": "Urban Highway Entry", "lat": 42.3610, "lng": -71.0820, "minuteFromStart": 40, "temperature": 4.2, "humidity": 75},
+    {"name": "Metro Area - Checkpoint Beta", "lat": 42.3650, "lng": -71.0900, "minuteFromStart": 45, "temperature": 4.5, "humidity": 74},
+    {"name": "Downtown Ring Road", "lat": 42.3690, "lng": -71.0980, "minuteFromStart": 50, "temperature": 4.8, "humidity": 73},
+    {"name": "Consumer Zone Approach", "lat": 42.3715, "lng": -71.1040, "minuteFromStart": 55, "temperature": 5.0, "humidity": 74},
+    {"name": "Metro Fresh - Receiving Dock", "lat": 42.3736, "lng": -71.1097, "minuteFromStart": 60, "temperature": 4.0, "humidity": 75}
+  ],
+  "productType": "Mixed Premium Produce",
+  "batchPrefix": "PREMIUM",
+  "initialQuality": 95.0,
+  "qualityDecay": {
+    "decayRatePerHour": 0.5,
+    "temperaturePenaltyPerDegree": 0.3,
+    "humidityPenaltyPerPercent": 0.1,
+    "idealTempMin": 4.0,
+    "idealTempMax": 8.0,
+    "idealHumidityMin": 70.0,
+    "idealHumidityMax": 85.0
+  },
+  "temperature": {
+    "target": 4.0,
+    "minAllowed": 2.0,
+    "maxAllowed": 8.0,
+    "variance": 2.0
+  },
+  "humidity": {
+    "target": 75.0,
+    "minAllowed": 65.0,
+    "maxAllowed": 90.0,
+    "variance": 5.0
+  },
+  "temperatureEvents": [
+    {
+      "atMinute": 25,
+      "durationMinutes": 3,
+      "temperature": 6.0,
+      "description": "Rest stop - door opened briefly"
+    },
+    {
+      "atMinute": 50,
+      "durationMinutes": 2,
+      "temperature": 5.5,
+      "description": "Urban traffic delay"
+    }
+  ],
+  "stageTransitions": {
+    "available": {"progressStart": 0, "progressEnd": 5, "description": "Batch created and ready for pickup"},
+    "inTransit": {"progressStart": 5, "progressEnd": 80, "description": "Active delivery in progress"},
+    "approaching": {"progressStart": 80, "progressEnd": 95, "description": "Nearing destination"},
+    "completed": {"progressStart": 95, "progressEnd": 100, "description": "Delivery completed successfully"}
+  },
+  "alerts": {
+    "temperatureThreshold": 7.0,
+    "qualityDropThreshold": 85.0,
+    "delayThresholdMinutes": 10
+  },
+  "waypointsPerSegment": 25,
+  "speedKmh": 45.0,
+  "scenario": "TEMPERATURE_SPIKE",
+  "consumerView": {
+    "showJourney": true,
+    "showQualityDecay": true,
+    "showTemperatureHistory": true,
+    "showFinalQualityScore": true,
+    "showLifecycleTimeline": true
+  },
+  "notes": "Full producer-to-consumer journey optimized for 4-minute demo. Demonstrates: (1) Quality decay with configurable parameters, (2) Temperature events triggering alerts, (3) Warehouse checkpoint with quality rescan, (4) All lifecycle stages with precise timing, (5) Consumer view with final quality display. Ideal for comprehensive university demonstrations."
+}

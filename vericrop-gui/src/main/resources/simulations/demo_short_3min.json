@@ -1,0 +1,63 @@
+{
+  "id": "demo_short_3min",
+  "name": "Quick Demo - 3 Minutes",
+  "description": "Fast demonstration showing complete delivery journey in 3 minutes. Perfect for quick demos and presentations.",
+  "durationMinutes": 3,
+  "timeCompressionFactor": 10.0,
+  "simulatedDurationMinutes": 30,
+  "origin": {
+    "name": "Sunny Valley Farm",
+    "latitude": 42.3601,
+    "longitude": -71.0589,
+    "description": "Starting point - organic produce farm"
+  },
+  "warehouse": {
+    "name": "Metro Fresh Distribution Center",
+    "latitude": 42.3668,
+    "longitude": -71.0843,
+    "description": "Cold storage warehouse checkpoint"
+  },
+  "destination": {
+    "name": "FreshMart Downtown",
+    "latitude": 42.3736,
+    "longitude": -71.1097,
+    "description": "Final retail destination"
+  },
+  "waypoints": [
+    {"name": "Farm Gate", "lat": 42.3601, "lng": -71.0589, "minuteFromStart": 0, "temperature": 4.0, "humidity": 75},
+    {"name": "Country Road Junction", "lat": 42.3615, "lng": -71.0620, "minuteFromStart": 3, "temperature": 4.2, "humidity": 74},
+    {"name": "Highway Entrance", "lat": 42.3630, "lng": -71.0680, "minuteFromStart": 6, "temperature": 4.5, "humidity": 73},
+    {"name": "Highway Mile 5", "lat": 42.3645, "lng": -71.0740, "minuteFromStart": 10, "temperature": 4.8, "humidity": 72},
+    {"name": "Distribution Center Approach", "lat": 42.3660, "lng": -71.0800, "minuteFromStart": 14, "temperature": 5.0, "humidity": 71},
+    {"name": "Distribution Center", "lat": 42.3668, "lng": -71.0843, "minuteFromStart": 16, "temperature": 4.0, "humidity": 70},
+    {"name": "DC Exit - Loaded", "lat": 42.3675, "lng": -71.0880, "minuteFromStart": 18, "temperature": 3.8, "humidity": 72},
+    {"name": "City Limits", "lat": 42.3695, "lng": -71.0950, "minuteFromStart": 22, "temperature": 4.2, "humidity": 73},
+    {"name": "Downtown Approach", "lat": 42.3715, "lng": -71.1020, "minuteFromStart": 26, "temperature": 4.5, "humidity": 74},
+    {"name": "FreshMart Loading Dock", "lat": 42.3736, "lng": -71.1097, "minuteFromStart": 30, "temperature": 4.0, "humidity": 75}
+  ],
+  "productType": "Summer Apples",
+  "batchPrefix": "DEMO",
+  "initialQuality": 95.0,
+  "temperature": {
+    "target": 4.0,
+    "minAllowed": 2.0,
+    "maxAllowed": 8.0,
+    "variance": 1.5
+  },
+  "humidity": {
+    "target": 75.0,
+    "minAllowed": 65.0,
+    "maxAllowed": 85.0,
+    "variance": 5.0
+  },
+  "stageTransitions": {
+    "available": {"progressStart": 0, "progressEnd": 5},
+    "inTransit": {"progressStart": 5, "progressEnd": 80},
+    "approaching": {"progressStart": 80, "progressEnd": 95},
+    "completed": {"progressStart": 95, "progressEnd": 100}
+  },
+  "waypointsPerSegment": 15,
+  "speedKmh": 45.0,
+  "scenario": "NORMAL",
+  "notes": "Optimized for 3-minute university demo. Shows full lifecycle: Available → In Transit → Approaching → Completed. Quality decay demonstrates cold chain integrity."
+}

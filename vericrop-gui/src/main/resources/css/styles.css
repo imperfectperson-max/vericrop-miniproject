@@ -674,3 +674,219 @@
     -fx-stroke-width: 2;
     -fx-stroke-dash-array: 5 5;
 }
+
+/* ===== COMPACT MODE FOR LAPTOP SCREENS (1366x768) ===== */
+.compact .main-container {
+    -fx-padding: 10;
+    -fx-spacing: 10;
+}
+
+.compact .kpi-container {
+    -fx-spacing: 8;
+}
+
+.compact .kpi-card {
+    -fx-padding: 10;
+}
+
+.compact .kpi-label {
+    -fx-font-size: 24px;
+}
+
+.compact .kpi-title {
+    -fx-font-size: 11px;
+}
+
+.compact .title-label {
+    -fx-font-size: 18px;
+}
+
+.compact .subtitle-label {
+    -fx-font-size: 14px;
+}
+
+.compact .left-panel,
+.compact .right-panel {
+    -fx-padding: 12;
+}
+
+.compact .dashboard-card {
+    -fx-padding: 12;
+}
+
+.compact .primary-button,
+.compact .success-button,
+.compact .warning-button,
+.compact .kafka-button {
+    -fx-padding: 6 12;
+    -fx-font-size: 12px;
+}
+
+.compact .text-field {
+    -fx-padding: 6 10;
+    -fx-font-size: 12px;
+}
+
+.compact .modern-list .list-cell {
+    -fx-padding: 6 10;
+    -fx-font-size: 11px;
+}
+
+.compact .metric-card {
+    -fx-padding: 10;
+}
+
+.compact .metric-value {
+    -fx-font-size: 18px;
+}
+
+.compact .metric-label {
+    -fx-font-size: 10px;
+}
+
+/* ===== RESPONSIVE WINDOW SIZING ===== */
+.responsive-root {
+    -fx-min-width: 1024px;
+    -fx-min-height: 600px;
+    -fx-pref-width: 1280px;
+    -fx-pref-height: 720px;
+}
+
+/* ===== NAVIGATION BUTTONS - COMPACT ===== */
+.nav-button-compact {
+    -fx-background-radius: 6;
+    -fx-padding: 6 10;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+}
+
+/* ===== CLOSE BUTTON FIX ===== */
+.close-button {
+    -fx-background-color: #DC2626;
+    -fx-text-fill: white;
+    -fx-background-radius: 4;
+    -fx-padding: 4 8;
+    -fx-font-size: 12px;
+    -fx-cursor: hand;
+    -fx-min-width: 24px;
+    -fx-min-height: 24px;
+}
+
+.close-button:hover {
+    -fx-background-color: #B91C1C;
+}
+
+/* ===== MAP ANIMATION SMOOTHING ===== */
+.map-vehicle {
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.3), 5, 0, 0, 2);
+}
+
+.map-route-line {
+    -fx-stroke: #3B82F6;
+    -fx-stroke-width: 3;
+    -fx-stroke-line-cap: round;
+    -fx-stroke-line-join: round;
+}
+
+.map-route-completed {
+    -fx-stroke: #10B981;
+    -fx-stroke-width: 3;
+}
+
+.map-waypoint {
+    -fx-fill: #6B7280;
+    -fx-stroke: white;
+    -fx-stroke-width: 1;
+}
+
+.map-waypoint-active {
+    -fx-fill: #F59E0B;
+    -fx-stroke: white;
+    -fx-stroke-width: 2;
+}
+
+/* ===== TIMELINE IMPROVEMENTS ===== */
+.journey-timeline {
+    -fx-spacing: 8;
+    -fx-padding: 10;
+}
+
+.journey-step-complete {
+    -fx-text-fill: #10B981;
+    -fx-font-weight: bold;
+}
+
+.journey-step-active {
+    -fx-text-fill: #3B82F6;
+    -fx-font-weight: bold;
+}
+
+.journey-step-pending {
+    -fx-text-fill: #9CA3AF;
+}
+
+/* ===== TEMPERATURE CHART STYLING ===== */
+.temperature-chart .chart-series-line {
+    -fx-stroke-width: 2px;
+    -fx-stroke: #3B82F6;
+}
+
+.temperature-chart .chart-line-symbol {
+    -fx-background-color: #3B82F6, white;
+    -fx-background-radius: 4px;
+    -fx-padding: 3px;
+}
+
+.temperature-warning .chart-series-line {
+    -fx-stroke: #F59E0B;
+}
+
+.temperature-critical .chart-series-line {
+    -fx-stroke: #EF4444;
+}
+
+/* ===== QUALITY DISPLAY ===== */
+.quality-excellent {
+    -fx-text-fill: #10B981;
+    -fx-font-weight: bold;
+}
+
+.quality-good {
+    -fx-text-fill: #3B82F6;
+    -fx-font-weight: bold;
+}
+
+.quality-warning {
+    -fx-text-fill: #F59E0B;
+    -fx-font-weight: bold;
+}
+
+.quality-poor {
+    -fx-text-fill: #EF4444;
+    -fx-font-weight: bold;
+}
+
+/* ===== SIMULATION STATUS INDICATORS ===== */
+.sim-status-running {
+    -fx-text-fill: #10B981;
+    -fx-font-weight: bold;
+}
+
+.sim-status-stopped {
+    -fx-text-fill: #6B7280;
+}
+
+.sim-status-error {
+    -fx-text-fill: #EF4444;
+    -fx-font-weight: bold;
+}
+
+/* ===== DEMO MODE INDICATOR ===== */
+.demo-badge {
+    -fx-background-color: #8B5CF6;
+    -fx-text-fill: white;
+    -fx-background-radius: 10;
+    -fx-padding: 2 8;
+    -fx-font-size: 10px;
+    -fx-font-weight: bold;
+}

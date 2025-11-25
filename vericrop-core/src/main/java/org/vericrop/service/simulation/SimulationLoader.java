@@ -375,10 +375,47 @@ public class SimulationLoader {
      */
     public static List<String> listAvailableSimulations() {
         List<String> simulations = new ArrayList<>();
+        // Demo simulations optimized for 3-4 minute presentations
+        simulations.add("demo_short_3min");
+        simulations.add("demo_medium_4min");
+        simulations.add("demo_full_journey");
+        // Original example simulations
         simulations.add("example_1_farmer_to_consumer");
         simulations.add("example_2_producer_local");
         simulations.add("example_3_long_route");
         return simulations;
+    }
+    
+    /**
+     * List demo simulation definitions optimized for presentations.
+     */
+    public static List<String> listDemoSimulations() {
+        List<String> demos = new ArrayList<>();
+        demos.add("demo_short_3min");
+        demos.add("demo_medium_4min");
+        demos.add("demo_full_journey");
+        return demos;
+    }
+    
+    /**
+     * Load the quick 3-minute demo simulation.
+     */
+    public static SimulationDefinition loadQuickDemo() throws IOException {
+        return loadFromResource("/simulations/demo_short_3min.json");
+    }
+    
+    /**
+     * Load the standard 4-minute demo simulation.
+     */
+    public static SimulationDefinition loadStandardDemo() throws IOException {
+        return loadFromResource("/simulations/demo_medium_4min.json");
+    }
+    
+    /**
+     * Load the full journey demo simulation.
+     */
+    public static SimulationDefinition loadFullJourneyDemo() throws IOException {
+        return loadFromResource("/simulations/demo_full_journey.json");
     }
     
     /**
