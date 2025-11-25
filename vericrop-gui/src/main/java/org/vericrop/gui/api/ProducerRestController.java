@@ -330,10 +330,10 @@ public class ProducerRestController {
                     "Validation failed", validation.getError()));
             }
             
-            // Generate batch ID if not provided
+            // Generate batch ID if not provided (using UUID for uniqueness)
             String batchId = request.getBatchId();
             if (batchId == null || batchId.trim().isEmpty()) {
-                batchId = "BATCH_" + System.currentTimeMillis();
+                batchId = generateBatchId();
             }
             
             // Create batch data map (simulating in-memory persistence for now)
@@ -357,13 +357,13 @@ public class ProducerRestController {
             // Store batch in ledger for persistence
             try {
                 ShipmentRecord record = new ShipmentRecord();
-                record.setShipmentId("SHIP_" + java.util.UUID.randomUUID().toString().substring(0, 8) + "_" + System.currentTimeMillis());
+                record.setShipmentId(generateShipmentId());
                 record.setBatchId(batchId);
                 record.setFromParty(request.getProducerId());
                 record.setToParty("processing");
                 record.setStatus("CREATED");
                 if (request.getQualityScore() != null) {
-                    record.setQualityScore(request.getQualityScore() * 100);
+                    record.setQualityScore(convertQualityScoreToPercentage(request.getQualityScore()));
                 }
                 ShipmentRecord saved = ledgerService.recordShipment(record);
                 response.put("ledger_id", saved.getLedgerId());
@@ -623,20 +623,44 @@ public class ProducerRestController {
     }
     
     /**
+     * Generate a unique shipment ID using UUID for guaranteed uniqueness.
+     * @return A unique shipment ID
+     */
+    private String generateShipmentId() {
+        return "SHIP_" + java.util.UUID.randomUUID().toString().substring(0, 8) + "_" + System.currentTimeMillis();
+    }
+    
+    /**
+     * Generate a unique batch ID using UUID for guaranteed uniqueness.
+     * @return A unique batch ID
+     */
+    private String generateBatchId() {
+        return "BATCH_" + java.util.UUID.randomUUID().toString().substring(0, 8) + "_" + System.currentTimeMillis();
+    }
+    
+    /**
+     * Convert quality score (0.0-1.0) to percentage (0-100).
+     * @param qualityScore Quality score between 0 and 1
+     * @return Quality score as percentage
+     */
+    private double convertQualityScoreToPercentage(Double qualityScore) {
+        return qualityScore != null ? qualityScore * 100 : 0.0;
+    }
+    
+    /**
      * Create a ledger/shipment record.
      */
     private String createLedgerRecord(String batchId, BlockchainRecordRequest request, Block block) {
         try {
             ShipmentRecord record = new ShipmentRecord();
-            // Use UUID for guaranteed uniqueness instead of timestamp-based ID
-            record.setShipmentId("SHIP_" + java.util.UUID.randomUUID().toString().substring(0, 8) + "_" + System.currentTimeMillis());
+            record.setShipmentId(generateShipmentId());
             record.setBatchId(batchId);
             record.setFromParty(request.getProducerId());
             record.setToParty("blockchain");
             record.setStatus("CREATED");
             
             if (request.getQualityScore() != null) {
-                record.setQualityScore(request.getQualityScore() * 100); // Convert to percentage
+                record.setQualityScore(convertQualityScoreToPercentage(request.getQualityScore()));
             }
             
             ShipmentRecord saved = ledgerService.recordShipment(record);
