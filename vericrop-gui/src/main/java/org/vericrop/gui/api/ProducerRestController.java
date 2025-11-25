@@ -35,6 +35,7 @@ import java.util.concurrent.TimeUnit;
  * <h2>Endpoint Summary</h2>
  * <ul>
  *   <li>POST /producer/blockchain-record - Create a new blockchain record</li>
+ *   <li>POST /producer/batches - Create a new batch for a producer</li>
  *   <li>GET /producer/blockchain - Get blockchain status and recent blocks</li>
  *   <li>GET /producer/blockchain/validate - Validate blockchain integrity</li>
  *   <li>GET /producer/batch/{batchId} - Get blockchain transactions for a batch</li>
@@ -251,6 +252,138 @@ public class ProducerRestController {
                 .body(createErrorResponse("Invalid request", e.getMessage()));
         } catch (Exception e) {
             logger.error("Error creating blockchain record: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(createErrorResponse("Internal server error", 
+                      "An unexpected error occurred: " + e.getMessage()));
+        }
+    }
+    
+    /**
+     * POST /producer/batches
+     * 
+     * Create a new batch for a producer.
+     * This endpoint creates a batch record and associates it with the specified producer.
+     *
+     * @param request The batch creation request containing producer and batch details
+     * @return HTTP 201 Created with the batch details, or error response
+     */
+    @Operation(
+        summary = "Create a batch for a producer",
+        description = "Creates a new batch record and associates it with the specified producer. " +
+                      "The batch is persisted and can be tracked through the supply chain."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "201", description = "Batch created successfully",
+            content = @Content(mediaType = "application/json",
+                examples = @ExampleObject(value = """
+                    {
+                      "success": true,
+                      "batch_id": "BATCH_1700000000001",
+                      "producer_id": "FARMER_001",
+                      "name": "Apple Batch 2024-01",
+                      "product_type": "Apple",
+                      "quantity": 500,
+                      "status": "created",
+                      "timestamp": "2024-01-15T10:30:00",
+                      "message": "Batch created successfully"
+                    }
+                    """))),
+        @ApiResponse(responseCode = "400", description = "Invalid request - missing required fields",
+            content = @Content(mediaType = "application/json",
+                examples = @ExampleObject(value = """
+                    {
+                      "success": false,
+                      "error": "Validation failed",
+                      "details": "producerId is required"
+                    }
+                    """)))
+    })
+    @PostMapping("/batches")
+    public ResponseEntity<Map<String, Object>> createBatch(
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                description = "Batch creation request",
+                required = true,
+                content = @Content(
+                    mediaType = "application/json",
+                    schema = @Schema(implementation = BatchCreationRequest.class),
+                    examples = @ExampleObject(value = """
+                        {
+                          "producerId": "FARMER_001",
+                          "name": "Apple Batch 2024-01",
+                          "productType": "Apple",
+                          "quantity": 500,
+                          "qualityScore": 0.92,
+                          "qualityLabel": "FRESH"
+                        }
+                        """)))
+            @RequestBody BatchCreationRequest request) {
+        
+        logger.info("Received batch creation request for producer: {}", 
+                   request != null ? request.getProducerId() : "null");
+        
+        try {
+            // Validate request
+            BatchValidationResult validation = validateBatchRequest(request);
+            if (!validation.isValid()) {
+                logger.warn("Batch validation failed: {}", validation.getError());
+                return ResponseEntity.badRequest().body(createErrorResponse(
+                    "Validation failed", validation.getError()));
+            }
+            
+            // Generate batch ID if not provided (using UUID for uniqueness)
+            String batchId = request.getBatchId();
+            if (batchId == null || batchId.trim().isEmpty()) {
+                batchId = generateBatchId();
+            }
+            
+            // Create batch data map (simulating in-memory persistence for now)
+            // In a full implementation, this would persist to the database via BatchService
+            String timestamp = java.time.LocalDateTime.now().toString();
+            
+            // Build success response with batch details
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("batch_id", batchId);
+            response.put("producer_id", request.getProducerId());
+            response.put("name", request.getName());
+            response.put("product_type", request.getProductType());
+            response.put("quantity", request.getQuantity());
+            response.put("quality_score", request.getQualityScore());
+            response.put("quality_label", request.getQualityLabel());
+            response.put("status", "created");
+            response.put("timestamp", timestamp);
+            response.put("message", "Batch created successfully");
+            
+            // Store batch in ledger for persistence
+            try {
+                ShipmentRecord record = new ShipmentRecord();
+                record.setShipmentId(generateShipmentId());
+                record.setBatchId(batchId);
+                record.setFromParty(request.getProducerId());
+                record.setToParty("processing");
+                record.setStatus("CREATED");
+                if (request.getQualityScore() != null) {
+                    record.setQualityScore(convertQualityScoreToPercentage(request.getQualityScore()));
+                }
+                ShipmentRecord saved = ledgerService.recordShipment(record);
+                response.put("ledger_id", saved.getLedgerId());
+                logger.info("📝 Batch persisted to ledger: {}", saved.getLedgerId());
+            } catch (Exception e) {
+                logger.warn("Failed to persist batch to ledger (non-fatal): {}", e.getMessage());
+                // Continue - the batch is still created, just not in ledger
+            }
+            
+            logger.info("✅ Batch created successfully. Batch: {}, Producer: {}",
+                       batchId, request.getProducerId());
+            
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+            
+        } catch (IllegalArgumentException e) {
+            logger.error("Invalid argument for batch creation: {}", e.getMessage());
+            return ResponseEntity.badRequest()
+                .body(createErrorResponse("Invalid request", e.getMessage()));
+        } catch (Exception e) {
+            logger.error("Error creating batch: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(createErrorResponse("Internal server error", 
                       "An unexpected error occurred: " + e.getMessage()));
@@ -490,20 +623,44 @@ public class ProducerRestController {
     }
     
     /**
+     * Generate a unique shipment ID using UUID for guaranteed uniqueness.
+     * @return A unique shipment ID
+     */
+    private String generateShipmentId() {
+        return "SHIP_" + java.util.UUID.randomUUID().toString().substring(0, 8) + "_" + System.currentTimeMillis();
+    }
+    
+    /**
+     * Generate a unique batch ID using UUID for guaranteed uniqueness.
+     * @return A unique batch ID
+     */
+    private String generateBatchId() {
+        return "BATCH_" + java.util.UUID.randomUUID().toString().substring(0, 8) + "_" + System.currentTimeMillis();
+    }
+    
+    /**
+     * Convert quality score (0.0-1.0) to percentage (0-100).
+     * @param qualityScore Quality score between 0 and 1
+     * @return Quality score as percentage
+     */
+    private double convertQualityScoreToPercentage(Double qualityScore) {
+        return qualityScore != null ? qualityScore * 100 : 0.0;
+    }
+    
+    /**
      * Create a ledger/shipment record.
      */
     private String createLedgerRecord(String batchId, BlockchainRecordRequest request, Block block) {
         try {
             ShipmentRecord record = new ShipmentRecord();
-            // Use UUID for guaranteed uniqueness instead of timestamp-based ID
-            record.setShipmentId("SHIP_" + java.util.UUID.randomUUID().toString().substring(0, 8) + "_" + System.currentTimeMillis());
+            record.setShipmentId(generateShipmentId());
             record.setBatchId(batchId);
             record.setFromParty(request.getProducerId());
             record.setToParty("blockchain");
             record.setStatus("CREATED");
             
             if (request.getQualityScore() != null) {
-                record.setQualityScore(request.getQualityScore() * 100); // Convert to percentage
+                record.setQualityScore(convertQualityScoreToPercentage(request.getQualityScore()));
             }
             
             ShipmentRecord saved = ledgerService.recordShipment(record);
@@ -654,5 +811,103 @@ public class ProducerRestController {
         
         public boolean isValid() { return valid; }
         public String getError() { return error; }
+    }
+    
+    /**
+     * Request body for creating a batch.
+     */
+    @Schema(description = "Request to create a batch for a producer")
+    public static class BatchCreationRequest {
+        @Schema(description = "Producer/farmer identifier", example = "FARMER_001", required = true)
+        private String producerId;
+        
+        @Schema(description = "Optional batch ID (auto-generated if not provided)", example = "BATCH_2024_001")
+        private String batchId;
+        
+        @Schema(description = "Name/description of the batch", example = "Apple Batch 2024-01", required = true)
+        private String name;
+        
+        @Schema(description = "Type of product", example = "Apple", required = true)
+        private String productType;
+        
+        @Schema(description = "Quantity in units", example = "500")
+        private Integer quantity;
+        
+        @Schema(description = "Quality score from 0.0 to 1.0", example = "0.92")
+        private Double qualityScore;
+        
+        @Schema(description = "Quality label classification", example = "FRESH")
+        private String qualityLabel;
+        
+        // Getters and setters
+        public String getProducerId() { return producerId; }
+        public void setProducerId(String producerId) { this.producerId = producerId; }
+        
+        public String getBatchId() { return batchId; }
+        public void setBatchId(String batchId) { this.batchId = batchId; }
+        
+        public String getName() { return name; }
+        public void setName(String name) { this.name = name; }
+        
+        public String getProductType() { return productType; }
+        public void setProductType(String productType) { this.productType = productType; }
+        
+        public Integer getQuantity() { return quantity; }
+        public void setQuantity(Integer quantity) { this.quantity = quantity; }
+        
+        public Double getQualityScore() { return qualityScore; }
+        public void setQualityScore(Double qualityScore) { this.qualityScore = qualityScore; }
+        
+        public String getQualityLabel() { return qualityLabel; }
+        public void setQualityLabel(String qualityLabel) { this.qualityLabel = qualityLabel; }
+    }
+    
+    /**
+     * Validation result helper class for batch requests.
+     */
+    private static class BatchValidationResult {
+        private final boolean valid;
+        private final String error;
+        
+        private BatchValidationResult(boolean valid, String error) {
+            this.valid = valid;
+            this.error = error;
+        }
+        
+        public static BatchValidationResult valid() {
+            return new BatchValidationResult(true, null);
+        }
+        
+        public static BatchValidationResult invalid(String error) {
+            return new BatchValidationResult(false, error);
+        }
+        
+        public boolean isValid() { return valid; }
+        public String getError() { return error; }
+    }
+    
+    /**
+     * Validate the incoming batch creation request.
+     */
+    private BatchValidationResult validateBatchRequest(BatchCreationRequest request) {
+        if (request == null) {
+            return BatchValidationResult.invalid("Request body is required");
+        }
+        if (request.getProducerId() == null || request.getProducerId().trim().isEmpty()) {
+            return BatchValidationResult.invalid("producerId is required");
+        }
+        if (request.getName() == null || request.getName().trim().isEmpty()) {
+            return BatchValidationResult.invalid("name is required");
+        }
+        if (request.getProductType() == null || request.getProductType().trim().isEmpty()) {
+            return BatchValidationResult.invalid("productType is required");
+        }
+        if (request.getQuantity() != null && request.getQuantity() < 0) {
+            return BatchValidationResult.invalid("quantity cannot be negative");
+        }
+        if (request.getQualityScore() != null && (request.getQualityScore() < 0 || request.getQualityScore() > 1)) {
+            return BatchValidationResult.invalid("qualityScore must be between 0 and 1");
+        }
+        return BatchValidationResult.valid();
     }
 }

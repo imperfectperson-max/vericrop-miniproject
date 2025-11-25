@@ -292,6 +292,209 @@ class ProducerRestControllerTest {
         assertNotNull(response.getBody().get("blockchain_valid"));
     }
     
+    // ==================== Batch Creation Tests ====================
+    
+    @Test
+    void testCreateBatch_Success() {
+        ProducerRestController.BatchCreationRequest request = createValidBatchRequest();
+        
+        ResponseEntity<Map<String, Object>> response = controller.createBatch(request);
+        
+        assertEquals(HttpStatus.CREATED, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertTrue((Boolean) response.getBody().get("success"));
+        assertNotNull(response.getBody().get("batch_id"));
+        assertEquals("FARMER_001", response.getBody().get("producer_id"));
+        assertEquals("Test Apple Batch", response.getBody().get("name"));
+        assertEquals("Apple", response.getBody().get("product_type"));
+        assertEquals(100, response.getBody().get("quantity"));
+        assertEquals("created", response.getBody().get("status"));
+        assertEquals("Batch created successfully", response.getBody().get("message"));
+    }
+    
+    @Test
+    void testCreateBatch_WithCustomBatchId() {
+        ProducerRestController.BatchCreationRequest request = createValidBatchRequest();
+        request.setBatchId("CUSTOM_BATCH_001");
+        
+        ResponseEntity<Map<String, Object>> response = controller.createBatch(request);
+        
+        assertEquals(HttpStatus.CREATED, response.getStatusCode());
+        assertEquals("CUSTOM_BATCH_001", response.getBody().get("batch_id"));
+        assertEquals("FARMER_001", response.getBody().get("producer_id"));
+    }
+    
+    @Test
+    void testCreateBatch_WithQualityScoreAndLabel() {
+        ProducerRestController.BatchCreationRequest request = createValidBatchRequest();
+        request.setQualityScore(0.95);
+        request.setQualityLabel("FRESH");
+        
+        ResponseEntity<Map<String, Object>> response = controller.createBatch(request);
+        
+        assertEquals(HttpStatus.CREATED, response.getStatusCode());
+        assertEquals(0.95, response.getBody().get("quality_score"));
+        assertEquals("FRESH", response.getBody().get("quality_label"));
+    }
+    
+    @Test
+    void testCreateBatch_NullRequest() {
+        ResponseEntity<Map<String, Object>> response = controller.createBatch(null);
+        
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertFalse((Boolean) response.getBody().get("success"));
+        assertEquals("Validation failed", response.getBody().get("error"));
+    }
+    
+    @Test
+    void testCreateBatch_MissingProducerId() {
+        ProducerRestController.BatchCreationRequest request = createValidBatchRequest();
+        request.setProducerId(null);
+        
+        ResponseEntity<Map<String, Object>> response = controller.createBatch(request);
+        
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertFalse((Boolean) response.getBody().get("success"));
+        assertTrue(response.getBody().get("details").toString().contains("producerId"));
+    }
+    
+    @Test
+    void testCreateBatch_EmptyProducerId() {
+        ProducerRestController.BatchCreationRequest request = createValidBatchRequest();
+        request.setProducerId("   ");
+        
+        ResponseEntity<Map<String, Object>> response = controller.createBatch(request);
+        
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertFalse((Boolean) response.getBody().get("success"));
+    }
+    
+    @Test
+    void testCreateBatch_MissingName() {
+        ProducerRestController.BatchCreationRequest request = createValidBatchRequest();
+        request.setName(null);
+        
+        ResponseEntity<Map<String, Object>> response = controller.createBatch(request);
+        
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertTrue(response.getBody().get("details").toString().contains("name"));
+    }
+    
+    @Test
+    void testCreateBatch_MissingProductType() {
+        ProducerRestController.BatchCreationRequest request = createValidBatchRequest();
+        request.setProductType(null);
+        
+        ResponseEntity<Map<String, Object>> response = controller.createBatch(request);
+        
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertTrue(response.getBody().get("details").toString().contains("productType"));
+    }
+    
+    @Test
+    void testCreateBatch_NegativeQuantity() {
+        ProducerRestController.BatchCreationRequest request = createValidBatchRequest();
+        request.setQuantity(-100);
+        
+        ResponseEntity<Map<String, Object>> response = controller.createBatch(request);
+        
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertTrue(response.getBody().get("details").toString().contains("quantity"));
+    }
+    
+    @Test
+    void testCreateBatch_InvalidQualityScore_TooLow() {
+        ProducerRestController.BatchCreationRequest request = createValidBatchRequest();
+        request.setQualityScore(-0.1);
+        
+        ResponseEntity<Map<String, Object>> response = controller.createBatch(request);
+        
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertTrue(response.getBody().get("details").toString().contains("qualityScore"));
+    }
+    
+    @Test
+    void testCreateBatch_InvalidQualityScore_TooHigh() {
+        ProducerRestController.BatchCreationRequest request = createValidBatchRequest();
+        request.setQualityScore(1.5);
+        
+        ResponseEntity<Map<String, Object>> response = controller.createBatch(request);
+        
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertTrue(response.getBody().get("details").toString().contains("qualityScore"));
+    }
+    
+    @Test
+    void testCreateBatch_ValidQualityScoreBoundary_Zero() {
+        ProducerRestController.BatchCreationRequest request = createValidBatchRequest();
+        request.setQualityScore(0.0);
+        
+        ResponseEntity<Map<String, Object>> response = controller.createBatch(request);
+        
+        assertEquals(HttpStatus.CREATED, response.getStatusCode());
+    }
+    
+    @Test
+    void testCreateBatch_ValidQualityScoreBoundary_One() {
+        ProducerRestController.BatchCreationRequest request = createValidBatchRequest();
+        request.setQualityScore(1.0);
+        
+        ResponseEntity<Map<String, Object>> response = controller.createBatch(request);
+        
+        assertEquals(HttpStatus.CREATED, response.getStatusCode());
+    }
+    
+    @Test
+    void testCreateBatch_MultipleBatches_SameProducer() {
+        // Create first batch
+        ProducerRestController.BatchCreationRequest request1 = createValidBatchRequest();
+        request1.setName("Batch 1");
+        ResponseEntity<Map<String, Object>> response1 = controller.createBatch(request1);
+        assertEquals(HttpStatus.CREATED, response1.getStatusCode());
+        String batchId1 = (String) response1.getBody().get("batch_id");
+        
+        // Create second batch for same producer
+        ProducerRestController.BatchCreationRequest request2 = createValidBatchRequest();
+        request2.setName("Batch 2");
+        ResponseEntity<Map<String, Object>> response2 = controller.createBatch(request2);
+        assertEquals(HttpStatus.CREATED, response2.getStatusCode());
+        String batchId2 = (String) response2.getBody().get("batch_id");
+        
+        // Verify both have same producer but different batch IDs
+        assertEquals("FARMER_001", response1.getBody().get("producer_id"));
+        assertEquals("FARMER_001", response2.getBody().get("producer_id"));
+        assertNotEquals(batchId1, batchId2);
+    }
+    
+    @Test
+    void testCreateBatch_MultipleBatches_DifferentProducers() {
+        // Create batch for first producer
+        ProducerRestController.BatchCreationRequest request1 = createValidBatchRequest();
+        request1.setProducerId("FARMER_001");
+        ResponseEntity<Map<String, Object>> response1 = controller.createBatch(request1);
+        assertEquals(HttpStatus.CREATED, response1.getStatusCode());
+        
+        // Create batch for second producer
+        ProducerRestController.BatchCreationRequest request2 = createValidBatchRequest();
+        request2.setProducerId("FARMER_002");
+        ResponseEntity<Map<String, Object>> response2 = controller.createBatch(request2);
+        assertEquals(HttpStatus.CREATED, response2.getStatusCode());
+        
+        // Verify different producers
+        assertEquals("FARMER_001", response1.getBody().get("producer_id"));
+        assertEquals("FARMER_002", response2.getBody().get("producer_id"));
+    }
+    
+    @Test
+    void testCreateBatch_ResponseContainsTimestamp() {
+        ProducerRestController.BatchCreationRequest request = createValidBatchRequest();
+        
+        ResponseEntity<Map<String, Object>> response = controller.createBatch(request);
+        
+        assertEquals(HttpStatus.CREATED, response.getStatusCode());
+        assertNotNull(response.getBody().get("timestamp"));
+    }
+    
     // ==================== Helper Methods ====================
     
     private ProducerRestController.BlockchainRecordRequest createValidRequest() {
@@ -302,6 +505,15 @@ class ProducerRestControllerTest {
         request.setQuantity(100);
         request.setQualityScore(0.85);
         request.setLocation("Test Farm");
+        return request;
+    }
+    
+    private ProducerRestController.BatchCreationRequest createValidBatchRequest() {
+        ProducerRestController.BatchCreationRequest request = new ProducerRestController.BatchCreationRequest();
+        request.setProducerId("FARMER_001");
+        request.setName("Test Apple Batch");
+        request.setProductType("Apple");
+        request.setQuantity(100);
         return request;
     }
 }
