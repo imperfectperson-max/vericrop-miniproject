@@ -92,6 +92,9 @@ public class OpenApiConfig {
                                 .name("Evaluation")
                                 .description("Quality evaluation and assessment endpoints"),
                         new Tag()
+                                .name("Producer")
+                                .description("Producer blockchain record creation and management"),
+                        new Tag()
                                 .name("Quality")
                                 .description("Quality management and monitoring"),
                         new Tag()
