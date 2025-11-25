@@ -55,12 +55,24 @@ public class ProducerRestController {
     /**
      * Constructor with dependency injection.
      * Initializes blockchain and related services.
+     * 
+     * Uses default constructor for backwards compatibility with existing tests.
+     * For production use with Spring, services can be injected via setter methods.
      */
     public ProducerRestController() {
-        // Initialize blockchain
-        this.blockchain = new Blockchain();
+        this(new Blockchain(), new FileLedgerService());
+    }
+    
+    /**
+     * Constructor for dependency injection (for testing and Spring DI).
+     * 
+     * @param blockchain The blockchain instance to use
+     * @param ledgerService The ledger service for recording shipments
+     */
+    public ProducerRestController(Blockchain blockchain, FileLedgerService ledgerService) {
+        this.blockchain = blockchain;
         this.blockchainService = new BlockchainService(blockchain);
-        this.ledgerService = new FileLedgerService();
+        this.ledgerService = ledgerService;
         
         // Initialize Kafka producer (optional - may fail in environments without Kafka)
         try {
@@ -341,6 +353,7 @@ public class ProducerRestController {
                description = "Retrieves all blockchain transactions associated with a batch ID")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Transactions retrieved"),
+        @ApiResponse(responseCode = "400", description = "Invalid batch ID"),
         @ApiResponse(responseCode = "404", description = "No transactions found for batch")
     })
     @GetMapping("/batch/{batchId}")
@@ -349,6 +362,12 @@ public class ProducerRestController {
             @PathVariable String batchId) {
         
         try {
+            // Validate batch ID
+            if (batchId == null || batchId.trim().isEmpty()) {
+                return ResponseEntity.badRequest()
+                    .body(createErrorResponse("Invalid batch ID", "Batch ID cannot be null or empty"));
+            }
+            
             List<Transaction> transactions = blockchain.getTransactionsForBatch(batchId);
             
             if (transactions.isEmpty()) {
@@ -377,7 +396,10 @@ public class ProducerRestController {
             response.put("transactions", transactionList);
             
             return ResponseEntity.ok(response);
-            
+        } catch (IllegalArgumentException e) {
+            logger.warn("Invalid argument for batch transactions: {}", e.getMessage());
+            return ResponseEntity.badRequest()
+                .body(createErrorResponse("Invalid batch ID", e.getMessage()));
         } catch (Exception e) {
             logger.error("Error retrieving batch transactions: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -445,7 +467,10 @@ public class ProducerRestController {
             input.append(request.getQuantity());
             input.append(request.getQualityScore());
             input.append(request.getLocation());
-            input.append(System.currentTimeMillis());
+            // Include batch ID if provided for deterministic hashing
+            if (request.getBatchId() != null) {
+                input.append(request.getBatchId());
+            }
             
             byte[] hashBytes = digest.digest(input.toString().getBytes());
             return bytesToHex(hashBytes);
@@ -470,7 +495,8 @@ public class ProducerRestController {
     private String createLedgerRecord(String batchId, BlockchainRecordRequest request, Block block) {
         try {
             ShipmentRecord record = new ShipmentRecord();
-            record.setShipmentId("SHIP_" + System.currentTimeMillis());
+            // Use UUID for guaranteed uniqueness instead of timestamp-based ID
+            record.setShipmentId("SHIP_" + java.util.UUID.randomUUID().toString().substring(0, 8) + "_" + System.currentTimeMillis());
             record.setBatchId(batchId);
             record.setFromParty(request.getProducerId());
             record.setToParty("blockchain");
@@ -486,7 +512,8 @@ public class ProducerRestController {
             
         } catch (Exception e) {
             logger.warn("Failed to create ledger record (non-fatal): {}", e.getMessage());
-            return "LEDGER_" + System.currentTimeMillis();
+            // Use UUID-based fallback for uniqueness
+            return "LEDGER_" + java.util.UUID.randomUUID().toString().substring(0, 12);
         }
     }
     
