@@ -53,12 +53,12 @@ public class ProducerController implements SimulationListener {
     private static final int SHIPMENT_UPDATE_INTERVAL_MS = 2000;
     
     // Pre-compiled patterns for error message cleaning (performance optimization)
-    // Pattern to match fully-qualified exception class names including inner classes (e.g., "org.vericrop.gui.ProducerController$BatchCreationException: ")
+    // Pattern to match fully-qualified exception/error class names including inner classes (e.g., "org.vericrop.gui.ProducerController$BatchCreationException: ")
     private static final Pattern FULLY_QUALIFIED_EXCEPTION_PATTERN = 
-        Pattern.compile("^([a-zA-Z_][a-zA-Z0-9_]*\\.)+[a-zA-Z_][a-zA-Z0-9_$]*Exception:\\s*");
-    // Pattern to match simple exception class names with colon (e.g., "RuntimeException: ", "BatchCreationException: ")
+        Pattern.compile("^([a-zA-Z_][a-zA-Z0-9_]*\\.)+[a-zA-Z_][a-zA-Z0-9_$]*(Exception|Error):\\s*");
+    // Pattern to match simple exception/error class names with colon (e.g., "RuntimeException: ", "OutOfMemoryError: ")
     private static final Pattern SIMPLE_EXCEPTION_COLON_PATTERN = 
-        Pattern.compile("^[A-Z][a-zA-Z0-9_$]*Exception:\\s*");
+        Pattern.compile("^[A-Z][a-zA-Z0-9_$]*(Exception|Error):\\s*");
 
     private Blockchain blockchain;
     private BlockchainService blockchainService;

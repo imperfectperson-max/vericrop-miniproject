@@ -213,6 +213,22 @@ public class ProducerControllerTest {
     }
     
     @Test
+    public void testExtractUserFriendlyErrorMessage_ErrorClass() throws Exception {
+        // Test Error class handling (e.g., OutOfMemoryError, StackOverflowError)
+        RuntimeException ex = new RuntimeException("java.lang.OutOfMemoryError: Java heap space");
+        String result = (String) extractUserFriendlyErrorMessageMethod.invoke(controller, ex);
+        assertEquals("Java heap space", result, "Should strip Error class prefixes");
+    }
+    
+    @Test
+    public void testExtractUserFriendlyErrorMessage_SimpleErrorClass() throws Exception {
+        // Test simple Error class name without package prefix
+        RuntimeException ex = new RuntimeException("OutOfMemoryError: GC overhead limit exceeded");
+        String result = (String) extractUserFriendlyErrorMessageMethod.invoke(controller, ex);
+        assertEquals("GC overhead limit exceeded", result, "Should strip simple Error class prefix");
+    }
+    
+    @Test
     public void testCalculateRates_NormalCounts() throws Exception {
         // Test with normal counts: 8 prime, 2 rejected
         // Expected: prime_rate = 80%, rejection_rate = 20%
