@@ -73,7 +73,21 @@ $env:VERICROP_LOAD_DEMO="true"
 - All UI flows operational
 - Full screen display on PC (maximized window)
 
-See [vericrop-gui/README.md](vericrop-gui/README.md) for detailed demo mode documentation.
+**Time-compressed demo simulation (3-4 minutes):**
+```bash
+export VERICROP_DEMO_MODE=true
+export VERICROP_LOAD_DEMO=true
+./gradlew :vericrop-gui:run
+```
+
+This enables:
+- 10x speed factor for faster simulation
+- Complete lifecycle (Available → In Transit → Approaching → Completed) in ~3-4 minutes
+- Visible quality decay during delivery
+- Smooth single-vehicle map animation
+
+See [vericrop-gui/DEMO_MODE.md](vericrop-gui/DEMO_MODE.md) for detailed demo mode simulation documentation.
+See [vericrop-gui/README.md](vericrop-gui/README.md) for general demo mode documentation.
 
 ### Map Simulation and Scenario Management
 

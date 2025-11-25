@@ -419,6 +419,51 @@ ab -n 1000 -c 10 http://localhost:8080/api/simulation/active-shipments
 - [ ] MapSimulator initialized with correct scenario
 - [ ] Scenario parameters applied (temp drift, speed multiplier)
 
+## Enhanced Simulation Components
+
+The enhanced simulation system includes:
+
+### DeliveryState Enum
+Robust lifecycle states with progress-based transitions:
+- `AVAILABLE` (0-10%): Initial state
+- `IN_TRANSIT` (10-70%): Delivery in progress
+- `APPROACHING` (70-95%): Nearing destination
+- `COMPLETED` (95-100%): Delivery complete
+
+### SimulationConfig
+Configuration for normal and demo modes:
+- Demo mode: 10x speed factor, completes in ~3-4 minutes
+- Normal mode: Standard timing for production use
+
+### DeliveryEvent
+Event model with:
+- State transitions
+- Quality tracking
+- Final quality on completion
+- Coordinates and environmental data
+
+### Quality Decay
+Exponential decay formula:
+```
+finalQuality = initialQuality × exp(-decayRate × exposureSeconds)
+```
+
+### Running Enhanced Simulation Tests
+
+```bash
+# Run new simulation tests
+./gradlew :vericrop-gui:test --tests "com.vericrop.simulation.*"
+
+# Run quality decay tests
+./gradlew :vericrop-gui:test --tests "*QualityDecayTest*"
+
+# Run lifecycle state tests
+./gradlew :vericrop-gui:test --tests "*LifecycleStateTest*"
+
+# Run integration tests
+./gradlew :vericrop-gui:test --tests "*SimulationIntegrationTest*"
+```
+
 ## Success Criteria
 
 All of the following must be true:
@@ -433,6 +478,9 @@ All of the following must be true:
 - ✅ Temperature monitoring generates appropriate alerts
 - ✅ Simulation stops cleanly without errors
 - ✅ No memory leaks after multiple simulation cycles
+- ✅ Quality decay formula is correctly implemented
+- ✅ State transitions occur exactly once per state
+- ✅ Demo mode completes within 4 minutes
 
 ## Next Steps
 
