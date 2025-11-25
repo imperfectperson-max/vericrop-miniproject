@@ -97,8 +97,16 @@ public class ProducerControllerTest {
     public void testExtractUserFriendlyErrorMessage_StripsRuntimeException() throws Exception {
         RuntimeException ex = new RuntimeException("RuntimeException: Something went wrong");
         String result = (String) extractUserFriendlyErrorMessageMethod.invoke(controller, ex);
-        assertFalse(result.contains("RuntimeException"), "Should strip RuntimeException from message");
+        assertFalse(result.contains("RuntimeException:"), "Should strip RuntimeException: from message");
         assertTrue(result.contains("Something went wrong"), "Should keep the actual error message");
+    }
+    
+    @Test
+    public void testExtractUserFriendlyErrorMessage_PreservesRuntimeExceptionInClassName() throws Exception {
+        // Ensure class names like "RuntimeExceptionHandler" are not mangled
+        RuntimeException ex = new RuntimeException("RuntimeExceptionHandler failed");
+        String result = (String) extractUserFriendlyErrorMessageMethod.invoke(controller, ex);
+        assertEquals("RuntimeExceptionHandler failed", result, "Should preserve class names containing RuntimeException");
     }
     
     @Test

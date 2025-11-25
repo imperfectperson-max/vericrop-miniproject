@@ -44,9 +44,18 @@ import org.vericrop.gui.services.LogisticsService;
 import org.vericrop.kafka.producers.BatchUpdateEventProducer;
 import org.vericrop.dto.BatchUpdateEvent;
 import java.time.Duration;
+import java.util.regex.Pattern;
 
 public class ProducerController implements SimulationListener {
     private static final int SHIPMENT_UPDATE_INTERVAL_MS = 2000;
+    
+    // Pre-compiled patterns for error message cleaning (performance optimization)
+    private static final Pattern JAVA_EXCEPTION_PREFIX_PATTERN = 
+        Pattern.compile("^(java\\.\\w+\\.)*\\w+Exception:\\s*");
+    private static final Pattern COMPLETION_EXCEPTION_PREFIX_PATTERN = 
+        Pattern.compile("^java\\.util\\.concurrent\\.CompletionException:\\s*");
+    private static final Pattern RUNTIME_EXCEPTION_COLON_PATTERN = 
+        Pattern.compile("\\bRuntimeException:\\s*");
 
     private Blockchain blockchain;
     private BlockchainService blockchainService;
@@ -587,8 +596,12 @@ public class ProducerController implements SimulationListener {
                     return "Backend error: " + errorResponse.get("message");
                 }
             }
-        } catch (Exception ignored) {
-            // Failed to parse error response, use default message
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            // Response is not valid JSON, fall through to default message
+            System.err.println("Warning: Could not parse backend error response as JSON: " + e.getMessage());
+        } catch (Exception e) {
+            // Unexpected error parsing response
+            System.err.println("Warning: Error parsing backend response: " + e.getMessage());
         }
         return "Backend returned error " + statusCode + (responseBody != null && !responseBody.isEmpty() ? ": " + responseBody : "");
     }
@@ -872,16 +885,15 @@ public class ProducerController implements SimulationListener {
         }
 
         // Remove Java exception class prefixes (e.g., "java.lang.RuntimeException: ")
-        message = message.replaceAll("^(java\\.\\w+\\.)*\\w+Exception:\\s*", "");
+        // Using pre-compiled patterns for performance
+        message = JAVA_EXCEPTION_PREFIX_PATTERN.matcher(message).replaceAll("");
         
         // Remove CompletableFuture-related wrapper messages
-        message = message.replaceAll("^(java\\.util\\.concurrent\\.CompletionException:\\s*)", "");
+        message = COMPLETION_EXCEPTION_PREFIX_PATTERN.matcher(message).replaceAll("");
         
-        // If the message still contains "RuntimeException", clean it up
-        if (message.contains("RuntimeException")) {
-            message = message.replace("RuntimeException: ", "");
-            message = message.replace("RuntimeException", "Error");
-        }
+        // Remove "RuntimeException: " with word boundary check to avoid false positives
+        // e.g., "RuntimeException: error" -> "error", but "RuntimeExceptionHandler" stays unchanged
+        message = RUNTIME_EXCEPTION_COLON_PATTERN.matcher(message).replaceAll("");
 
         return message;
     }
