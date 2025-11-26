@@ -94,7 +94,8 @@ public class LogisticsController implements SimulationListener {
     private Map<String, XYChart.Series<Number, Number>> temperatureSeriesMap = new ConcurrentHashMap<>();
     
     // Start time for chart X axis (milliseconds since epoch, used to calculate seconds since controller initialization)
-    private long chartStartTimeMillis;
+    // Initialized at declaration to handle any events that arrive before setupTemperatureChart() is called
+    private long chartStartTimeMillis = System.currentTimeMillis();
     
     // Chart axis configuration constants
     private static final double CHART_AXIS_EXPANSION_THRESHOLD = 10.0; // Expand when within 10 seconds of upper bound
