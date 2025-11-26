@@ -684,14 +684,19 @@ public class ProducerRestController {
         }
     }
     
+    // Quality score distribution constants
+    private static final double QUALITY_SCORE_MEAN = 70.0;
+    private static final double QUALITY_SCORE_STDDEV = 10.0;
+    
     /**
      * Generate a realistic quality score (0-100).
-     * Uses a distribution that favors higher quality scores (typical for production).
+     * Uses a Gaussian distribution that favors higher quality scores (typical for production).
+     * Mean is 70, standard deviation is 10, producing scores mostly in the 60-80 range.
      */
     private int generateRealisticQualityScore() {
         Random random = new Random();
-        // Use a distribution that favors scores between 70-95
-        double base = 70.0 + random.nextGaussian() * 10;
+        // Use a Gaussian distribution centered around QUALITY_SCORE_MEAN with QUALITY_SCORE_STDDEV
+        double base = QUALITY_SCORE_MEAN + random.nextGaussian() * QUALITY_SCORE_STDDEV;
         return Math.max(0, Math.min(100, (int) Math.round(base)));
     }
     

@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
@@ -199,7 +200,7 @@ public class ConsumerRestController {
             }
             // Try to decode as base64 text
             byte[] decoded = Base64.getDecoder().decode(qrCode.trim());
-            return new String(decoded);
+            return new String(decoded, StandardCharsets.UTF_8);
         } catch (Exception e) {
             logger.debug("Could not decode QR payload: {}", e.getMessage());
             return null;
