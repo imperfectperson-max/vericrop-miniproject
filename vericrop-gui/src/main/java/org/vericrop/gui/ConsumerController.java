@@ -135,6 +135,19 @@ public class ConsumerController implements SimulationListener {
     /** Default backend URL for batch API - can be overridden via environment variable VERICROP_BACKEND_URL */
     private static final String DEFAULT_BACKEND_URL = "http://localhost:8000";
     
+    // Pre-compiled regex patterns for QR fallback parsing (cached for performance)
+    /** Pattern for extracting batch ID from URL path like /batches/{id} or /batch/{id} */
+    private static final Pattern URL_PATH_PATTERN = Pattern.compile("/batch(?:es)?/([^/?#]+)", Pattern.CASE_INSENSITIVE);
+    
+    /** Pattern for extracting batch ID from query parameters like batchId=, batch=, or id= */
+    private static final Pattern QUERY_PARAM_PATTERN = Pattern.compile("[?&](?:batchId|batch|id)=([^&]+)", Pattern.CASE_INSENSITIVE);
+    
+    /** Pattern for extracting BATCH_* style identifiers */
+    private static final Pattern BATCH_ID_PATTERN = Pattern.compile("BATCH_[A-Za-z0-9_-]+", Pattern.CASE_INSENSITIVE);
+    
+    /** Pattern for extracting alphanumeric tokens (4+ characters) as last resort */
+    private static final Pattern ALPHANUMERIC_TOKEN_PATTERN = Pattern.compile("[A-Za-z0-9_-]{4,}");
+    
     /** HTTP client for backend API calls - reused for all requests */
     private OkHttpClient httpClient;
     
@@ -307,8 +320,7 @@ public class ConsumerController implements SimulationListener {
         System.out.println("QR fallback parsing: attempting to extract batch ID from: " + content);
         
         // 1. Try to extract from URL path: /batches/{id} or /batch/{id}
-        Pattern pathPattern = Pattern.compile("/batch(?:es)?/([^/?#]+)", Pattern.CASE_INSENSITIVE);
-        Matcher pathMatcher = pathPattern.matcher(content);
+        Matcher pathMatcher = URL_PATH_PATTERN.matcher(content);
         if (pathMatcher.find()) {
             String batchId = pathMatcher.group(1);
             System.out.println("QR fallback parsing: extracted from URL path: " + batchId);
@@ -316,8 +328,7 @@ public class ConsumerController implements SimulationListener {
         }
         
         // 2. Try to extract from query parameters: batchId=, batch=, or id=
-        Pattern queryPattern = Pattern.compile("[?&](?:batchId|batch|id)=([^&]+)", Pattern.CASE_INSENSITIVE);
-        Matcher queryMatcher = queryPattern.matcher(content);
+        Matcher queryMatcher = QUERY_PARAM_PATTERN.matcher(content);
         if (queryMatcher.find()) {
             String batchId = queryMatcher.group(1);
             System.out.println("QR fallback parsing: extracted from query parameter: " + batchId);
@@ -325,8 +336,7 @@ public class ConsumerController implements SimulationListener {
         }
         
         // 3. Try regex for BATCH_* pattern
-        Pattern batchPattern = Pattern.compile("BATCH_[A-Za-z0-9_-]+", Pattern.CASE_INSENSITIVE);
-        Matcher batchMatcher = batchPattern.matcher(content);
+        Matcher batchMatcher = BATCH_ID_PATTERN.matcher(content);
         if (batchMatcher.find()) {
             String batchId = batchMatcher.group();
             System.out.println("QR fallback parsing: extracted BATCH_* pattern: " + batchId);
@@ -334,8 +344,7 @@ public class ConsumerController implements SimulationListener {
         }
         
         // 4. Last resort: look for alphanumeric token at least 4 characters
-        Pattern alphanumPattern = Pattern.compile("[A-Za-z0-9_-]{4,}");
-        Matcher alphanumMatcher = alphanumPattern.matcher(content);
+        Matcher alphanumMatcher = ALPHANUMERIC_TOKEN_PATTERN.matcher(content);
         if (alphanumMatcher.find()) {
             String batchId = alphanumMatcher.group();
             System.out.println("QR fallback parsing: extracted alphanumeric token: " + batchId);
