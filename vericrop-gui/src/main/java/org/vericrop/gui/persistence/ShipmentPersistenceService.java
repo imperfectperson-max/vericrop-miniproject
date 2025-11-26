@@ -174,9 +174,16 @@ public class ShipmentPersistenceService {
     }
     
     /**
-     * Load shipments from file
+     * Load shipments from file.
+     * Distinguishes between 'file doesn't exist' (expected on first run) and 
+     * 'file exists but is corrupted/unreadable' (data integrity issue).
      */
     private void loadShipments() throws IOException {
+        if (!Files.exists(shipmentsFile)) {
+            logger.info("Shipments file does not exist yet, will be created on first save");
+            return;
+        }
+        
         try {
             List<PersistedShipment> shipments = objectMapper.readValue(
                     shipmentsFile.toFile(),
@@ -190,7 +197,8 @@ public class ShipmentPersistenceService {
             }
             logger.info("Loaded {} shipments from file", shipments.size());
         } catch (IOException e) {
-            logger.warn("Failed to load shipments file, starting fresh: {}", e.getMessage());
+            logger.error("Failed to parse shipments file - data may be corrupted: {}", e.getMessage());
+            // Keep cache empty rather than throwing, allowing the app to continue
         }
     }
     
@@ -292,9 +300,16 @@ public class ShipmentPersistenceService {
     }
     
     /**
-     * Load simulations from file
+     * Load simulations from file.
+     * Distinguishes between 'file doesn't exist' (expected on first run) and 
+     * 'file exists but is corrupted/unreadable' (data integrity issue).
      */
     private void loadSimulations() throws IOException {
+        if (!Files.exists(simulationsFile)) {
+            logger.info("Simulations file does not exist yet, will be created on first save");
+            return;
+        }
+        
         try {
             List<PersistedSimulation> simulations = objectMapper.readValue(
                     simulationsFile.toFile(),
@@ -308,7 +323,8 @@ public class ShipmentPersistenceService {
             }
             logger.info("Loaded {} simulations from file", simulations.size());
         } catch (IOException e) {
-            logger.warn("Failed to load simulations file, starting fresh: {}", e.getMessage());
+            logger.error("Failed to parse simulations file - data may be corrupted: {}", e.getMessage());
+            // Keep cache empty rather than throwing, allowing the app to continue
         }
     }
     

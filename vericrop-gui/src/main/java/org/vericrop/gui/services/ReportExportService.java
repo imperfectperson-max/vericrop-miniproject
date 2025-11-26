@@ -28,6 +28,18 @@ public class ReportExportService {
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private static final DateTimeFormatter DATETIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     
+    // CSV Header constants for maintainability
+    private static final String CSV_HEADER_SHIPMENT_SUMMARY = 
+            "Batch ID,Status,Location,Temperature (°C),Humidity (%),Vehicle,ETA,Created At,Updated At,Origin,Destination,Quality Score";
+    private static final String CSV_HEADER_TEMPERATURE_LOG = 
+            "Batch ID,Timestamp,Temperature (°C),Humidity (%),Status,Location,Source";
+    private static final String CSV_HEADER_QUALITY_COMPLIANCE = 
+            "Batch ID,Scenario,Status,Completed,Final Quality (%),Initial Quality (%),Violations,Compliance Status,Avg Temp (°C),Min Temp (°C),Max Temp (°C),Start Time,End Time";
+    private static final String CSV_HEADER_DELIVERY_PERFORMANCE = 
+            "Batch ID,Type,Status,Duration (min),Final Quality (%),Avg Temperature (°C),Waypoints,Start Time,End Time";
+    private static final String CSV_HEADER_SIMULATION_LOG = 
+            "ID,Batch ID,Farmer ID,Scenario,Status,Completed,Initial Quality (%),Final Quality (%),Waypoints,Avg Temp (°C),Min Temp (°C),Max Temp (°C),Avg Humidity (%),Violations,Compliance,Origin,Destination,Start Time,End Time";
+    
     private final ShipmentPersistenceService persistenceService;
     private final Path reportsDirectory;
     
@@ -191,8 +203,7 @@ public class ReportExportService {
     
     private String generateShipmentSummaryCsv(List<PersistedShipment> shipments, LocalDate startDate, LocalDate endDate) {
         StringBuilder sb = new StringBuilder();
-        // CSV Header
-        sb.append("Batch ID,Status,Location,Temperature (°C),Humidity (%),Vehicle,ETA,Created At,Updated At,Origin,Destination,Quality Score\n");
+        sb.append(CSV_HEADER_SHIPMENT_SUMMARY).append("\n");
         
         // CSV Data
         for (PersistedShipment shipment : shipments) {
@@ -273,7 +284,7 @@ public class ReportExportService {
                                               List<PersistedSimulation> simulations,
                                               LocalDate startDate, LocalDate endDate) {
         StringBuilder sb = new StringBuilder();
-        sb.append("Batch ID,Timestamp,Temperature (°C),Humidity (%),Status,Location,Source\n");
+        sb.append(CSV_HEADER_TEMPERATURE_LOG).append("\n");
         
         // Shipment temperature data
         for (PersistedShipment shipment : shipments) {
@@ -360,7 +371,7 @@ public class ReportExportService {
     private String generateQualityComplianceCsv(List<PersistedSimulation> simulations, 
                                                  LocalDate startDate, LocalDate endDate) {
         StringBuilder sb = new StringBuilder();
-        sb.append("Batch ID,Scenario,Status,Completed,Final Quality (%),Initial Quality (%),Violations,Compliance Status,Avg Temp (°C),Min Temp (°C),Max Temp (°C),Start Time,End Time\n");
+        sb.append(CSV_HEADER_QUALITY_COMPLIANCE).append("\n");
         
         for (PersistedSimulation simulation : simulations) {
             sb.append(escapeCsv(simulation.getBatchId())).append(",");
@@ -447,7 +458,7 @@ public class ReportExportService {
                                                    List<PersistedShipment> shipments,
                                                    LocalDate startDate, LocalDate endDate) {
         StringBuilder sb = new StringBuilder();
-        sb.append("Batch ID,Type,Status,Duration (min),Final Quality (%),Avg Temperature (°C),Waypoints,Start Time,End Time\n");
+        sb.append(CSV_HEADER_DELIVERY_PERFORMANCE).append("\n");
         
         for (PersistedSimulation simulation : simulations) {
             long durationMs = simulation.getEndTime() - simulation.getStartTime();
@@ -524,7 +535,7 @@ public class ReportExportService {
     private String generateSimulationLogCsv(List<PersistedSimulation> simulations, 
                                              LocalDate startDate, LocalDate endDate) {
         StringBuilder sb = new StringBuilder();
-        sb.append("ID,Batch ID,Farmer ID,Scenario,Status,Completed,Initial Quality (%),Final Quality (%),Waypoints,Avg Temp (°C),Min Temp (°C),Max Temp (°C),Avg Humidity (%),Violations,Compliance,Origin,Destination,Start Time,End Time\n");
+        sb.append(CSV_HEADER_SIMULATION_LOG).append("\n");
         
         for (PersistedSimulation simulation : simulations) {
             sb.append(escapeCsv(simulation.getId())).append(",");

@@ -28,6 +28,8 @@ import org.vericrop.kafka.consumers.MapSimulationEventConsumer;
 import org.vericrop.kafka.consumers.TemperatureComplianceEventConsumer;
 import org.vericrop.kafka.producers.QualityAlertProducer;
 import org.vericrop.kafka.events.QualityAlertEvent;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -48,6 +50,7 @@ import org.vericrop.gui.services.ReportExportService;
 import org.vericrop.dto.SimulationResult;
 
 public class LogisticsController implements SimulationListener {
+    private static final Logger logger = LoggerFactory.getLogger(LogisticsController.class);
 
     @FXML private TableView<Shipment> shipmentsTable;
     @FXML private ListView<String> alertsList;
@@ -91,6 +94,16 @@ public class LogisticsController implements SimulationListener {
     
     // Track latest environmental data by batch ID for shipments table
     private Map<String, ShipmentEnvironmentalData> environmentalDataMap = new ConcurrentHashMap<>();
+    
+    // Report type display name to enum mapping
+    private static final Map<String, ReportExportService.ReportType> REPORT_TYPE_MAP = new HashMap<>();
+    static {
+        REPORT_TYPE_MAP.put("Shipment Summary", ReportExportService.ReportType.SHIPMENT_SUMMARY);
+        REPORT_TYPE_MAP.put("Temperature Log", ReportExportService.ReportType.TEMPERATURE_LOG);
+        REPORT_TYPE_MAP.put("Quality Compliance", ReportExportService.ReportType.QUALITY_COMPLIANCE);
+        REPORT_TYPE_MAP.put("Delivery Performance", ReportExportService.ReportType.DELIVERY_PERFORMANCE);
+        REPORT_TYPE_MAP.put("Simulation Log", ReportExportService.ReportType.SIMULATION_LOG);
+    }
     
     /**
      * Helper class to track environmental data for a shipment
@@ -897,10 +910,9 @@ public class LogisticsController implements SimulationListener {
         try {
             persistenceService = new ShipmentPersistenceService();
             reportExportService = new ReportExportService(persistenceService);
-            System.out.println("✅ Persistence services initialized. Data directory: " + persistenceService.getDataDirectoryPath());
+            logger.info("Persistence services initialized. Data directory: {}", persistenceService.getDataDirectoryPath());
         } catch (Exception e) {
-            System.err.println("⚠️ Failed to initialize persistence services: " + e.getMessage());
-            e.printStackTrace();
+            logger.warn("Failed to initialize persistence services: {}", e.getMessage(), e);
         }
     }
 
@@ -1003,35 +1015,17 @@ public class LogisticsController implements SimulationListener {
             startDate = endDate.minusDays(30);
         }
         
-        // Get export format
+        // Get export format using enum parsing
         String formatStr = exportFormatCombo != null && exportFormatCombo.getValue() != null 
                 ? exportFormatCombo.getValue() : "TXT";
-        ReportExportService.ExportFormat format = "CSV".equalsIgnoreCase(formatStr) 
-                ? ReportExportService.ExportFormat.CSV 
-                : ReportExportService.ExportFormat.TXT;
+        ReportExportService.ExportFormat format = parseExportFormat(formatStr);
         
-        // Map report type string to enum
-        ReportExportService.ReportType reportTypeEnum;
-        switch (reportType) {
-            case "Shipment Summary":
-                reportTypeEnum = ReportExportService.ReportType.SHIPMENT_SUMMARY;
-                break;
-            case "Temperature Log":
-                reportTypeEnum = ReportExportService.ReportType.TEMPERATURE_LOG;
-                break;
-            case "Quality Compliance":
-                reportTypeEnum = ReportExportService.ReportType.QUALITY_COMPLIANCE;
-                break;
-            case "Delivery Performance":
-                reportTypeEnum = ReportExportService.ReportType.DELIVERY_PERFORMANCE;
-                break;
-            case "Simulation Log":
-                reportTypeEnum = ReportExportService.ReportType.SIMULATION_LOG;
-                break;
-            default:
-                showAlert(Alert.AlertType.WARNING, "Invalid Report Type",
-                        "Unknown report type: " + reportType);
-                return;
+        // Map report type string to enum using the static map
+        ReportExportService.ReportType reportTypeEnum = REPORT_TYPE_MAP.get(reportType);
+        if (reportTypeEnum == null) {
+            showAlert(Alert.AlertType.WARNING, "Invalid Report Type",
+                    "Unknown report type: " + reportType);
+            return;
         }
         
         try {
@@ -1052,10 +1046,24 @@ public class LogisticsController implements SimulationListener {
             alerts.add(0, "📄 Exported report: " + exportedFile.getName());
             
         } catch (Exception e) {
-            System.err.println("❌ Failed to export report: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Failed to export report: {}", e.getMessage(), e);
             showAlert(Alert.AlertType.ERROR, "Export Failed",
                     "Failed to export report: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Parse export format string to enum with proper fallback.
+     */
+    private ReportExportService.ExportFormat parseExportFormat(String formatStr) {
+        if (formatStr == null || formatStr.trim().isEmpty()) {
+            return ReportExportService.ExportFormat.TXT;
+        }
+        try {
+            return ReportExportService.ExportFormat.valueOf(formatStr.toUpperCase().trim());
+        } catch (IllegalArgumentException e) {
+            logger.warn("Unknown export format '{}', defaulting to TXT", formatStr);
+            return ReportExportService.ExportFormat.TXT;
         }
     }
 
