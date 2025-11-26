@@ -941,12 +941,13 @@ public class LogisticsController implements SimulationListener {
                     @Override
                     public String toString(Number secondsSinceEpoch) {
                         if (secondsSinceEpoch == null) return "";
-                        // Convert seconds back to a time format
+                        // Convert seconds since chart epoch to actual wall clock time
                         long totalSeconds = secondsSinceEpoch.longValue();
-                        long hours = (totalSeconds / 3600) % 24;
-                        long minutes = (totalSeconds / 60) % 60;
-                        long seconds = totalSeconds % 60;
-                        return String.format("%02d:%02d:%02d", hours, minutes, seconds);
+                        long actualTimestamp = chartEpochStart + (totalSeconds * 1000);
+                        java.time.LocalTime wallClockTime = java.time.Instant.ofEpochMilli(actualTimestamp)
+                            .atZone(java.time.ZoneId.systemDefault())
+                            .toLocalTime();
+                        return wallClockTime.format(DateTimeFormatter.ofPattern("HH:mm:ss"));
                     }
                     
                     @Override
@@ -958,24 +959,25 @@ public class LogisticsController implements SimulationListener {
             }
 
             if (shouldLoadDemoData()) {
-                // Demo data uses numeric x-values (seconds): 0, 4*3600, 8*3600, etc. represent hours
+                // Demo data uses numeric x-values (seconds): 0, 4, 8, 12, 16, 20 seconds for testing
+                // These small values demonstrate the chart works with real-time updates
                 XYChart.Series<Number, Number> series1 = new XYChart.Series<>();
                 series1.setName("BATCH_A2386 (demo)");
                 series1.getData().add(new XYChart.Data<>(0, 4.2));
-                series1.getData().add(new XYChart.Data<>(4 * 3600, 4.5));
-                series1.getData().add(new XYChart.Data<>(8 * 3600, 4.8));
-                series1.getData().add(new XYChart.Data<>(12 * 3600, 5.1));
-                series1.getData().add(new XYChart.Data<>(16 * 3600, 4.6));
-                series1.getData().add(new XYChart.Data<>(20 * 3600, 4.3));
+                series1.getData().add(new XYChart.Data<>(4, 4.5));
+                series1.getData().add(new XYChart.Data<>(8, 4.8));
+                series1.getData().add(new XYChart.Data<>(12, 5.1));
+                series1.getData().add(new XYChart.Data<>(16, 4.6));
+                series1.getData().add(new XYChart.Data<>(20, 4.3));
 
                 XYChart.Series<Number, Number> series2 = new XYChart.Series<>();
                 series2.setName("BATCH_A2387 (demo)");
                 series2.getData().add(new XYChart.Data<>(0, 3.8));
-                series2.getData().add(new XYChart.Data<>(4 * 3600, 3.9));
-                series2.getData().add(new XYChart.Data<>(8 * 3600, 4.1));
-                series2.getData().add(new XYChart.Data<>(12 * 3600, 4.3));
-                series2.getData().add(new XYChart.Data<>(16 * 3600, 4.0));
-                series2.getData().add(new XYChart.Data<>(20 * 3600, 3.8));
+                series2.getData().add(new XYChart.Data<>(4, 3.9));
+                series2.getData().add(new XYChart.Data<>(8, 4.1));
+                series2.getData().add(new XYChart.Data<>(12, 4.3));
+                series2.getData().add(new XYChart.Data<>(16, 4.0));
+                series2.getData().add(new XYChart.Data<>(20, 3.8));
 
                 temperatureChart.getData().addAll(series1, series2);
             }
@@ -1933,16 +1935,18 @@ public class LogisticsController implements SimulationListener {
             result.setStatus(completed ? "COMPLETED" : "STOPPED");
             result.setFinalQuality(completed ? 95.0 : 80.0); // Default values
             
-            // Add temperature data points from chart series (convert numeric x-value to HH:mm:ss string)
+            // Add temperature data points from chart series
             if (tempSeries != null && tempSeries.getData() != null) {
                 for (XYChart.Data<Number, Number> point : tempSeries.getData()) {
                     long totalSeconds = point.getXValue().longValue();
-                    long hours = (totalSeconds / 3600) % 24;
-                    long minutes = (totalSeconds / 60) % 60;
-                    long seconds = totalSeconds % 60;
-                    String timeLabel = String.format("%02d:%02d:%02d", hours, minutes, seconds);
+                    long actualTimestamp = chartEpochStart + (totalSeconds * 1000);
+                    // Convert actual timestamp to HH:mm:ss wall clock time
+                    java.time.LocalTime wallClockTime = java.time.Instant.ofEpochMilli(actualTimestamp)
+                        .atZone(java.time.ZoneId.systemDefault())
+                        .toLocalTime();
+                    String timeLabel = wallClockTime.format(DateTimeFormatter.ofPattern("HH:mm:ss"));
                     result.addTemperaturePoint(
-                            chartEpochStart + (totalSeconds * 1000), 
+                            actualTimestamp, 
                             point.getYValue().doubleValue(),
                             timeLabel);
                 }
@@ -1978,15 +1982,17 @@ public class LogisticsController implements SimulationListener {
         
         SimulationResult result = new SimulationResult(batchId, null);
         
-        // Populate temperature series from chart data (convert numeric x-value to HH:mm:ss string)
+        // Populate temperature series from chart data
         for (XYChart.Data<Number, Number> point : tempSeries.getData()) {
             long totalSeconds = point.getXValue().longValue();
-            long hours = (totalSeconds / 3600) % 24;
-            long minutes = (totalSeconds / 60) % 60;
-            long seconds = totalSeconds % 60;
-            String timeLabel = String.format("%02d:%02d:%02d", hours, minutes, seconds);
+            long actualTimestamp = chartEpochStart + (totalSeconds * 1000);
+            // Convert actual timestamp to HH:mm:ss wall clock time
+            java.time.LocalTime wallClockTime = java.time.Instant.ofEpochMilli(actualTimestamp)
+                .atZone(java.time.ZoneId.systemDefault())
+                .toLocalTime();
+            String timeLabel = wallClockTime.format(DateTimeFormatter.ofPattern("HH:mm:ss"));
             result.addTemperaturePoint(
-                    chartEpochStart + (totalSeconds * 1000), 
+                    actualTimestamp, 
                     point.getYValue().doubleValue(),
                     timeLabel);
         }
