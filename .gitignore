@@ -103,3 +103,6 @@ blockchain.json
 vericrop_chain.json
 dev_blockchain.json
 airflow/logs/*
+
+# Data persistence files
+data/

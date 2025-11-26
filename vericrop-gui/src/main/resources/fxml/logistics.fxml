@@ -41,7 +41,6 @@
         </HBox>
 
         <Button text="Refresh" styleClass="primary-button" onAction="#handleRefresh"/>
-        <Button text="Export Report" styleClass="success-button" onAction="#handleExportReport"/>
         <Button fx:id="logoutButton" text="🚪 Logout"
                 style="-fx-background-color: #DC2626; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8; -fx-padding: 8 12;"
                 onAction="#handleLogout"/>
@@ -169,11 +168,14 @@
 
             <Tab text="Reports">
                 <VBox spacing="15">
-                    <HBox spacing="10">
-                        <ComboBox fx:id="reportTypeCombo" promptText="Select Report Type"/>
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <ComboBox fx:id="reportTypeCombo" promptText="Select Report Type" prefWidth="180"/>
                         <DatePicker fx:id="startDatePicker" promptText="Start Date"/>
                         <DatePicker fx:id="endDatePicker" promptText="End Date"/>
+                        <Label text="Format:"/>
+                        <ComboBox fx:id="exportFormatCombo" prefWidth="80"/>
                         <Button text="Generate Report" styleClass="primary-button" onAction="#handleGenerateReport"/>
+                        <Button text="Export Report" styleClass="success-button" onAction="#handleExportReport"/>
                     </HBox>
                     <TextArea fx:id="reportArea" styleClass="text-area" VBox.vgrow="ALWAYS"/>
                 </VBox>

@@ -38,13 +38,21 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ConcurrentHashMap;
 import java.time.LocalTime;
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.io.File;
+import org.vericrop.gui.persistence.ShipmentPersistenceService;
+import org.vericrop.gui.persistence.PersistedShipment;
+import org.vericrop.gui.persistence.PersistedSimulation;
+import org.vericrop.gui.services.ReportExportService;
+import org.vericrop.dto.SimulationResult;
 
 public class LogisticsController implements SimulationListener {
 
     @FXML private TableView<Shipment> shipmentsTable;
     @FXML private ListView<String> alertsList;
     @FXML private ComboBox<String> reportTypeCombo;
+    @FXML private ComboBox<String> exportFormatCombo;
     @FXML private DatePicker startDatePicker;
     @FXML private DatePicker endDatePicker;
     @FXML private TextArea reportArea;
@@ -65,6 +73,10 @@ public class LogisticsController implements SimulationListener {
     private ScheduledExecutorService syncExecutor;
     private Map<String, MapVisualization> activeShipments = new HashMap<>();
     private org.vericrop.service.DeliverySimulator deliverySimulator;
+    
+    // Persistence and export services
+    private ShipmentPersistenceService persistenceService;
+    private ReportExportService reportExportService;
     
     // Kafka consumers for real-time events
     private MapSimulationEventConsumer mapSimulationConsumer;
@@ -125,10 +137,14 @@ public class LogisticsController implements SimulationListener {
         setupShipmentsTable();
         setupAlertsList();
         setupReportCombo();
+        setupExportFormatCombo();
         setupTemperatureChart();
         setupNavigationButtons();
         setupMapContainer();
         startSyncService();
+        
+        // Initialize persistence and export services
+        initializePersistenceServices();
         
         // Initialize Kafka consumers for real-time updates
         setupKafkaConsumers();
@@ -858,8 +874,34 @@ public class LogisticsController implements SimulationListener {
                 "Shipment Summary",
                 "Temperature Log",
                 "Quality Compliance",
-                "Delivery Performance"
+                "Delivery Performance",
+                "Simulation Log"
         );
+    }
+    
+    /**
+     * Setup export format dropdown with TXT and CSV options.
+     * Defaults to TXT format.
+     */
+    private void setupExportFormatCombo() {
+        if (exportFormatCombo != null) {
+            exportFormatCombo.getItems().addAll("TXT", "CSV");
+            exportFormatCombo.setValue("TXT"); // Default to TXT
+        }
+    }
+    
+    /**
+     * Initialize persistence and report export services.
+     */
+    private void initializePersistenceServices() {
+        try {
+            persistenceService = new ShipmentPersistenceService();
+            reportExportService = new ReportExportService(persistenceService);
+            System.out.println("✅ Persistence services initialized. Data directory: " + persistenceService.getDataDirectoryPath());
+        } catch (Exception e) {
+            System.err.println("⚠️ Failed to initialize persistence services: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 
     private void setupTemperatureChart() {
@@ -945,12 +987,75 @@ public class LogisticsController implements SimulationListener {
     @FXML
     private void handleExportReport() {
         String reportType = reportTypeCombo.getValue();
-        if (reportType != null) {
-            showAlert(Alert.AlertType.INFORMATION, "Export Complete",
-                    "Report '" + reportType + "' has been exported successfully");
-        } else {
+        if (reportType == null) {
             showAlert(Alert.AlertType.WARNING, "No Report Selected",
                     "Please select a report type before exporting");
+            return;
+        }
+        
+        // Get date range
+        LocalDate startDate = startDatePicker.getValue();
+        LocalDate endDate = endDatePicker.getValue();
+        
+        if (startDate == null || endDate == null) {
+            // Use default date range (last 30 days)
+            endDate = LocalDate.now();
+            startDate = endDate.minusDays(30);
+        }
+        
+        // Get export format
+        String formatStr = exportFormatCombo != null && exportFormatCombo.getValue() != null 
+                ? exportFormatCombo.getValue() : "TXT";
+        ReportExportService.ExportFormat format = "CSV".equalsIgnoreCase(formatStr) 
+                ? ReportExportService.ExportFormat.CSV 
+                : ReportExportService.ExportFormat.TXT;
+        
+        // Map report type string to enum
+        ReportExportService.ReportType reportTypeEnum;
+        switch (reportType) {
+            case "Shipment Summary":
+                reportTypeEnum = ReportExportService.ReportType.SHIPMENT_SUMMARY;
+                break;
+            case "Temperature Log":
+                reportTypeEnum = ReportExportService.ReportType.TEMPERATURE_LOG;
+                break;
+            case "Quality Compliance":
+                reportTypeEnum = ReportExportService.ReportType.QUALITY_COMPLIANCE;
+                break;
+            case "Delivery Performance":
+                reportTypeEnum = ReportExportService.ReportType.DELIVERY_PERFORMANCE;
+                break;
+            case "Simulation Log":
+                reportTypeEnum = ReportExportService.ReportType.SIMULATION_LOG;
+                break;
+            default:
+                showAlert(Alert.AlertType.WARNING, "Invalid Report Type",
+                        "Unknown report type: " + reportType);
+                return;
+        }
+        
+        try {
+            if (reportExportService == null) {
+                showAlert(Alert.AlertType.ERROR, "Export Error",
+                        "Report export service not available. Please restart the application.");
+                return;
+            }
+            
+            File exportedFile = reportExportService.exportReport(reportTypeEnum, startDate, endDate, format);
+            
+            String message = String.format(
+                    "Report '%s' exported successfully!\n\nFile: %s\nFormat: %s\nDate Range: %s to %s",
+                    reportType, exportedFile.getName(), format, startDate, endDate);
+            showAlert(Alert.AlertType.INFORMATION, "Export Complete", message);
+            
+            // Add alert to the alerts list
+            alerts.add(0, "📄 Exported report: " + exportedFile.getName());
+            
+        } catch (Exception e) {
+            System.err.println("❌ Failed to export report: " + e.getMessage());
+            e.printStackTrace();
+            showAlert(Alert.AlertType.ERROR, "Export Failed",
+                    "Failed to export report: " + e.getMessage());
         }
     }
 
@@ -1203,8 +1308,59 @@ public class LogisticsController implements SimulationListener {
             // Initialize temperature chart series
             initializeTemperatureChartSeries(batchId);
             
+            // Persist simulation start
+            persistSimulationStart(batchId, farmerId);
+            
+            // Persist shipment
+            persistShipmentUpdate(batchId, farmerId, "CREATED", "Origin", 4.0, 65.0, "Starting", null);
+            
             System.out.println("LogisticsController: Simulation started - " + batchId);
         });
+    }
+    
+    /**
+     * Persist simulation start event.
+     */
+    private void persistSimulationStart(String batchId, String farmerId) {
+        if (persistenceService == null) return;
+        
+        try {
+            PersistedSimulation simulation = new PersistedSimulation(batchId, farmerId, "NORMAL");
+            simulation.setStatus("STARTED");
+            simulation.setInitialQuality(100.0);
+            persistenceService.saveSimulation(simulation);
+            System.out.println("📝 Persisted simulation start: " + batchId);
+        } catch (Exception e) {
+            System.err.println("⚠️ Failed to persist simulation start: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Persist shipment update.
+     */
+    private void persistShipmentUpdate(String batchId, String farmerId, String status, 
+                                       String location, double temperature, double humidity,
+                                       String eta, String vehicle) {
+        if (persistenceService == null) return;
+        
+        try {
+            PersistedShipment shipment = persistenceService.getShipment(batchId)
+                    .orElse(new PersistedShipment(batchId, status, location, temperature, humidity, eta, vehicle));
+            
+            shipment.setFarmerId(farmerId);
+            shipment.setStatus(status);
+            shipment.setLocation(location);
+            shipment.setTemperature(temperature);
+            shipment.setHumidity(humidity);
+            shipment.setEta(eta);
+            if (vehicle != null) {
+                shipment.setVehicle(vehicle);
+            }
+            
+            persistenceService.saveShipment(shipment);
+        } catch (Exception e) {
+            System.err.println("⚠️ Failed to persist shipment update: " + e.getMessage());
+        }
     }
     
     /**
@@ -1650,6 +1806,18 @@ public class LogisticsController implements SimulationListener {
                 "⏹ Delivery simulation stopped for: " + batchId;
             alerts.add(0, message);
             
+            // Persist simulation completion
+            persistSimulationComplete(batchId, completed);
+            
+            // Update shipment status
+            String status = completed ? "DELIVERED" : "STOPPED";
+            ShipmentEnvironmentalData envData = environmentalDataMap.get(batchId);
+            if (envData != null) {
+                persistShipmentUpdate(batchId, null, status, "Destination", 
+                        envData.temperature, envData.humidity, 
+                        completed ? "DELIVERED" : "STOPPED", null);
+            }
+            
             // Clean up map marker after a delay if completed
             if (completed) {
                 // Move marker to destination
@@ -1700,6 +1868,81 @@ public class LogisticsController implements SimulationListener {
         } catch (Exception e) {
             System.err.println("Error cleaning up map marker: " + e.getMessage());
         }
+    }
+    
+    /**
+     * Persist simulation completion.
+     */
+    private void persistSimulationComplete(String batchId, boolean completed) {
+        if (persistenceService == null) return;
+        
+        try {
+            // Get temperature series data to build SimulationResult
+            XYChart.Series<String, Number> tempSeries = temperatureSeriesMap.get(batchId);
+            ShipmentEnvironmentalData envData = environmentalDataMap.get(batchId);
+            
+            // Create simulation result with temperature series
+            SimulationResult result = new SimulationResult(batchId, null);
+            result.setStartTime(System.currentTimeMillis() - 120000); // Approximate
+            result.setEndTime(System.currentTimeMillis());
+            result.setStatus(completed ? "COMPLETED" : "STOPPED");
+            result.setFinalQuality(completed ? 95.0 : 80.0); // Default values
+            
+            // Add temperature data points from chart series
+            if (tempSeries != null && tempSeries.getData() != null) {
+                for (XYChart.Data<String, Number> point : tempSeries.getData()) {
+                    result.addTemperaturePoint(
+                            System.currentTimeMillis(), 
+                            point.getYValue().doubleValue(),
+                            point.getXValue());
+                }
+            }
+            
+            // Calculate statistics
+            result.calculateStatistics();
+            
+            // Create persisted simulation from result
+            PersistedSimulation simulation = PersistedSimulation.fromSimulationResult(result, "NORMAL");
+            persistenceService.saveSimulation(simulation);
+            
+            System.out.println("📝 Persisted simulation complete: " + batchId + " (completed=" + completed + ")");
+        } catch (Exception e) {
+            System.err.println("⚠️ Failed to persist simulation completion: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Get the current temperature series data for a batch (for graph rendering in simulations).
+     * This method provides the same data structure used by the live temperature monitoring graph.
+     * 
+     * @param batchId The batch identifier
+     * @return SimulationResult containing temperature series, or null if not found
+     */
+    public SimulationResult getSimulationResultWithTemperatureSeries(String batchId) {
+        XYChart.Series<String, Number> tempSeries = temperatureSeriesMap.get(batchId);
+        ShipmentEnvironmentalData envData = environmentalDataMap.get(batchId);
+        
+        if (tempSeries == null) {
+            return null;
+        }
+        
+        SimulationResult result = new SimulationResult(batchId, null);
+        
+        // Populate temperature series from chart data
+        for (XYChart.Data<String, Number> point : tempSeries.getData()) {
+            result.addTemperaturePoint(
+                    System.currentTimeMillis(), 
+                    point.getYValue().doubleValue(),
+                    point.getXValue());
+        }
+        
+        // Add humidity data if available
+        if (envData != null) {
+            result.addHumidityPoint(System.currentTimeMillis(), envData.humidity, "Current");
+        }
+        
+        result.calculateStatistics();
+        return result;
     }
     
     @Override
