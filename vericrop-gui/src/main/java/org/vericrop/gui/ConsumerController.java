@@ -13,6 +13,8 @@ import java.util.HashSet;
 import java.util.Map;
 import java.io.File;
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.concurrent.TimeUnit;
@@ -67,23 +69,37 @@ public class ConsumerController implements SimulationListener {
     /** Default final quality used when SimulationManager data is unavailable */
     private static final double DEFAULT_FINAL_QUALITY = 95.0;
     
+    /** HTTP client timeout in seconds */
+    private static final int HTTP_TIMEOUT_SECONDS = 30;
+    
+    /** Default backend URL for batch API - can be overridden via environment variable VERICROP_BACKEND_URL */
+    private static final String DEFAULT_BACKEND_URL = "http://localhost:8000";
+    
     /** HTTP client for backend API calls - reused for all requests */
     private OkHttpClient httpClient;
     
     /** JSON object mapper for parsing backend responses */
     private ObjectMapper mapper;
+    
+    /** Backend URL for batch API calls */
+    private String backendUrl;
 
     @FXML
     public void initialize() {
-        // Initialize HTTP client with 30s connect/read timeouts
+        // Initialize HTTP client with configurable timeouts
         httpClient = new OkHttpClient.Builder()
-                .connectTimeout(30, TimeUnit.SECONDS)
-                .readTimeout(30, TimeUnit.SECONDS)
-                .writeTimeout(30, TimeUnit.SECONDS)
+                .connectTimeout(HTTP_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .readTimeout(HTTP_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                 .build();
         
         // Initialize JSON mapper
         mapper = new ObjectMapper();
+        
+        // Get backend URL from environment or use default
+        backendUrl = System.getenv("VERICROP_BACKEND_URL");
+        if (backendUrl == null || backendUrl.trim().isEmpty()) {
+            backendUrl = DEFAULT_BACKEND_URL;
+        }
         
         setupVerificationHistory();
         setupNavigationButtons();
@@ -427,8 +443,12 @@ public class ConsumerController implements SimulationListener {
     @SuppressWarnings("unchecked")
     private Map<String, Object> fetchBatchFromBackend(String batchId) {
         try {
+            // URL-encode the batch ID to prevent injection and handle special characters
+            String encodedBatchId = URLEncoder.encode(batchId, StandardCharsets.UTF_8.toString());
+            String url = backendUrl + "/batches/" + encodedBatchId;
+            
             Request request = new Request.Builder()
-                    .url("http://localhost:8000/batches/" + batchId)
+                    .url(url)
                     .get()
                     .build();
             

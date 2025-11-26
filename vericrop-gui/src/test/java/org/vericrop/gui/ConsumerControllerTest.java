@@ -81,6 +81,11 @@ public class ConsumerControllerTest {
         Method initializeMethod = ConsumerController.class.getDeclaredMethod("initialize");
         initializeMethod.setAccessible(true);
         
+        // Get the timeout constant from the controller
+        java.lang.reflect.Field timeoutField = ConsumerController.class.getDeclaredField("HTTP_TIMEOUT_SECONDS");
+        timeoutField.setAccessible(true);
+        int expectedTimeoutSeconds = timeoutField.getInt(null);
+        
         // Need to handle the Platform.runLater calls - in test, they may throw
         // Just verify the client and mapper are created
         OkHttpClient client = (OkHttpClient) httpClientField.get(controller);
@@ -92,8 +97,8 @@ public class ConsumerControllerTest {
         
         // Manually initialize the HTTP client and mapper (as initialize() would do)
         OkHttpClient newClient = new OkHttpClient.Builder()
-                .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-                .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+                .connectTimeout(expectedTimeoutSeconds, java.util.concurrent.TimeUnit.SECONDS)
+                .readTimeout(expectedTimeoutSeconds, java.util.concurrent.TimeUnit.SECONDS)
                 .build();
         httpClientField.set(controller, newClient);
         
@@ -106,8 +111,10 @@ public class ConsumerControllerTest {
         
         assertNotNull(client, "HTTP client should be initialized");
         assertNotNull(mapper, "Object mapper should be initialized");
-        assertEquals(30000, client.connectTimeoutMillis(), "Connect timeout should be 30s");
-        assertEquals(30000, client.readTimeoutMillis(), "Read timeout should be 30s");
+        assertEquals(expectedTimeoutSeconds * 1000, client.connectTimeoutMillis(), 
+            "Connect timeout should match HTTP_TIMEOUT_SECONDS constant");
+        assertEquals(expectedTimeoutSeconds * 1000, client.readTimeoutMillis(), 
+            "Read timeout should match HTTP_TIMEOUT_SECONDS constant");
     }
     
     @Test
