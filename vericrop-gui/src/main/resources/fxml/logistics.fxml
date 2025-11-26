@@ -108,10 +108,10 @@
                                 <Label text="Temperature History"/>
                                 <LineChart fx:id="temperatureChart" prefHeight="150">
                                     <xAxis>
-                                        <CategoryAxis label="Time" />
+                                        <NumberAxis fx:id="temperatureXAxis" label="Time" />
                                     </xAxis>
                                     <yAxis>
-                                        <NumberAxis label="°C" lowerBound="0" upperBound="10" tickUnit="2"/>
+                                        <NumberAxis fx:id="temperatureYAxis" label="°C" lowerBound="0" upperBound="10" tickUnit="2"/>
                                     </yAxis>
                                 </LineChart>
                             </VBox>
