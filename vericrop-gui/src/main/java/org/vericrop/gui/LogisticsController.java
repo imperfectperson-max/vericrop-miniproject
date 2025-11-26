@@ -941,13 +941,7 @@ public class LogisticsController implements SimulationListener {
                     @Override
                     public String toString(Number secondsSinceEpoch) {
                         if (secondsSinceEpoch == null) return "";
-                        // Convert seconds since chart epoch to actual wall clock time
-                        long totalSeconds = secondsSinceEpoch.longValue();
-                        long actualTimestamp = chartEpochStart + (totalSeconds * 1000);
-                        java.time.LocalTime wallClockTime = java.time.Instant.ofEpochMilli(actualTimestamp)
-                            .atZone(java.time.ZoneId.systemDefault())
-                            .toLocalTime();
-                        return wallClockTime.format(DateTimeFormatter.ofPattern("HH:mm:ss"));
+                        return formatSecondsAsWallClockTime(secondsSinceEpoch.longValue());
                     }
                     
                     @Override
@@ -959,8 +953,8 @@ public class LogisticsController implements SimulationListener {
             }
 
             if (shouldLoadDemoData()) {
-                // Demo data uses numeric x-values (seconds): 0, 4, 8, 12, 16, 20 seconds for testing
-                // These small values demonstrate the chart works with real-time updates
+                // Demo data uses small numeric x-values (0, 4, 8, etc. seconds elapsed since chart start)
+                // to show sample temperature readings for demonstration purposes
                 XYChart.Series<Number, Number> series1 = new XYChart.Series<>();
                 series1.setName("BATCH_A2386 (demo)");
                 series1.getData().add(new XYChart.Data<>(0, 4.2));
@@ -982,6 +976,20 @@ public class LogisticsController implements SimulationListener {
                 temperatureChart.getData().addAll(series1, series2);
             }
         }
+    }
+    
+    /**
+     * Convert seconds since chart epoch to wall clock time formatted as HH:mm:ss.
+     * 
+     * @param secondsSinceEpoch seconds elapsed since chartEpochStart
+     * @return formatted time string in HH:mm:ss format
+     */
+    private String formatSecondsAsWallClockTime(long secondsSinceEpoch) {
+        long actualTimestamp = chartEpochStart + (secondsSinceEpoch * 1000);
+        java.time.LocalTime wallClockTime = java.time.Instant.ofEpochMilli(actualTimestamp)
+            .atZone(java.time.ZoneId.systemDefault())
+            .toLocalTime();
+        return wallClockTime.format(DateTimeFormatter.ofPattern("HH:mm:ss"));
     }
 
     // Navigation methods
@@ -1940,11 +1948,7 @@ public class LogisticsController implements SimulationListener {
                 for (XYChart.Data<Number, Number> point : tempSeries.getData()) {
                     long totalSeconds = point.getXValue().longValue();
                     long actualTimestamp = chartEpochStart + (totalSeconds * 1000);
-                    // Convert actual timestamp to HH:mm:ss wall clock time
-                    java.time.LocalTime wallClockTime = java.time.Instant.ofEpochMilli(actualTimestamp)
-                        .atZone(java.time.ZoneId.systemDefault())
-                        .toLocalTime();
-                    String timeLabel = wallClockTime.format(DateTimeFormatter.ofPattern("HH:mm:ss"));
+                    String timeLabel = formatSecondsAsWallClockTime(totalSeconds);
                     result.addTemperaturePoint(
                             actualTimestamp, 
                             point.getYValue().doubleValue(),
@@ -1986,11 +1990,7 @@ public class LogisticsController implements SimulationListener {
         for (XYChart.Data<Number, Number> point : tempSeries.getData()) {
             long totalSeconds = point.getXValue().longValue();
             long actualTimestamp = chartEpochStart + (totalSeconds * 1000);
-            // Convert actual timestamp to HH:mm:ss wall clock time
-            java.time.LocalTime wallClockTime = java.time.Instant.ofEpochMilli(actualTimestamp)
-                .atZone(java.time.ZoneId.systemDefault())
-                .toLocalTime();
-            String timeLabel = wallClockTime.format(DateTimeFormatter.ofPattern("HH:mm:ss"));
+            String timeLabel = formatSecondsAsWallClockTime(totalSeconds);
             result.addTemperaturePoint(
                     actualTimestamp, 
                     point.getYValue().doubleValue(),
