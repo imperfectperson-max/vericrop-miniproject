@@ -1205,6 +1205,62 @@ Run tests:
 ./gradlew :vericrop-core:test --tests "*ScenarioControllerTest"
 ```
 
+### Persistence and Report Export (NEW)
+
+VeriCrop now includes a complete data persistence layer and multi-format report export functionality.
+
+#### Persistence Features
+
+- **Location**: `data/` directory
+- **Files**:
+  - `shipments.json` - Persisted shipment records
+  - `simulations.json` - Persisted simulation run logs
+- **Features**:
+  - Automatic persistence of shipment updates during simulations
+  - Complete simulation run history with temperature series
+  - Date range queries for historical data
+  - JSON-based storage with automatic initialization
+
+#### Report Export Features
+
+- **Location**: `generated_reports/` directory
+- **Supported Formats**: TXT (human-readable), CSV (spreadsheet-compatible)
+- **Report Types**:
+  - **Shipment Summary**: Complete shipment list with status and environmental data
+  - **Temperature Log**: Temperature and humidity readings over time
+  - **Quality Compliance**: Compliance status and violation counts
+  - **Delivery Performance**: Duration, quality, and temperature metrics
+  - **Simulation Log**: Detailed simulation run history
+- **Filename Format**: `{report-type}_{start-date}_to_{end-date}.{format}`
+  - Example: `temperature-log_2025-11-01_to_2025-11-30.csv`
+
+#### Using Report Export
+
+1. Navigate to the **Logistics** screen
+2. Select the **Reports** tab
+3. Choose a **Report Type** from the dropdown
+4. Select **Start Date** and **End Date** (optional, defaults to last 30 days)
+5. Choose **Format** (TXT or CSV) from the format dropdown
+6. Click **Export Report** to generate and save the file
+
+#### Temperature Graph in Simulations
+
+Simulation responses now include `temperatureSeries` data that populates the live temperature monitoring graph:
+
+```json
+{
+  "batch_id": "BATCH_001",
+  "temperature_series": [
+    {"timestamp": 1700000000000, "temperature": 4.5, "location": "Highway Mile 10"},
+    {"timestamp": 1700000001000, "temperature": 4.8, "location": "Highway Mile 20"}
+  ],
+  "avg_temperature": 4.65,
+  "compliance_status": "COMPLIANT"
+}
+```
+
+**Note**: All generated directories (`data/`, `generated_reports/`) are excluded from version control via `.gitignore`.
+
 ### Logistics and Supply Chain Directory (NEW)
 - **Location**: `logistics-and-supply-chain/`
 - **Purpose**: Centralized export location for all supply chain reports and data
