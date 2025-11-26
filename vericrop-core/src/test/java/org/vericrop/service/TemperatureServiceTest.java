@@ -103,6 +103,88 @@ class TemperatureServiceTest {
         assertDoesNotThrow(() -> temperatureService.recordRoute(batchId, waypoints));
     }
     
+    /**
+     * Test average temperature calculation with multiple readings.
+     * Verifies that the arithmetic mean is calculated correctly.
+     */
+    @Test
+    void testAverageTemperatureCalculation() {
+        String batchId = "BATCH_TEST_AVG_001";
+        temperatureService.startMonitoring(batchId);
+        
+        // Create route with specific temperatures: 4.0, 5.0, 6.0
+        // Expected average: (4.0 + 5.0 + 6.0) / 3 = 5.0
+        List<RouteWaypoint> waypoints = createTestRoute(batchId, 4.0, 5.0, 6.0);
+        temperatureService.recordRoute(batchId, waypoints);
+        
+        TemperatureService.TemperatureMonitoring monitoring = temperatureService.getMonitoring(batchId);
+        
+        assertNotNull(monitoring);
+        assertEquals(3, monitoring.getReadingCount());
+        assertEquals(5.0, monitoring.getAvgTemp(), 0.01, 
+            "Average temperature should be 5.0°C for readings 4.0, 5.0, 6.0");
+    }
+    
+    /**
+     * Test average temperature with no readings.
+     * Verifies that getAvgTemp returns 0.0 when no readings have been recorded.
+     */
+    @Test
+    void testAverageTemperatureWithNoReadings() {
+        String batchId = "BATCH_TEST_AVG_002";
+        temperatureService.startMonitoring(batchId);
+        
+        TemperatureService.TemperatureMonitoring monitoring = temperatureService.getMonitoring(batchId);
+        
+        assertNotNull(monitoring);
+        assertEquals(0, monitoring.getReadingCount());
+        assertEquals(0.0, monitoring.getAvgTemp(), 0.01,
+            "Average temperature should be 0.0 when no readings exist");
+    }
+    
+    /**
+     * Test average temperature with a single reading.
+     * Verifies that single reading case is handled correctly.
+     */
+    @Test
+    void testAverageTemperatureWithSingleReading() {
+        String batchId = "BATCH_TEST_AVG_003";
+        temperatureService.startMonitoring(batchId);
+        
+        // Create route with a single waypoint at 4.5°C
+        List<RouteWaypoint> waypoints = new ArrayList<>();
+        waypoints.add(new RouteWaypoint(
+            new GeoCoordinate(40.0, -74.0, "Point 1"),
+            System.currentTimeMillis(),
+            4.5,
+            80.0
+        ));
+        temperatureService.recordRoute(batchId, waypoints);
+        
+        TemperatureService.TemperatureMonitoring monitoring = temperatureService.getMonitoring(batchId);
+        
+        assertNotNull(monitoring);
+        assertEquals(1, monitoring.getReadingCount());
+        assertEquals(4.5, monitoring.getAvgTemp(), 0.01,
+            "Average temperature with single reading should equal that reading");
+    }
+    
+    /**
+     * Test that getMonitoring returns null for unknown batch.
+     * This verifies the behavior when trying to get temperature data for a batch
+     * that was never monitored (e.g., "N/A" display case in Consumer view).
+     */
+    @Test
+    void testGetMonitoringForUnknownBatch() {
+        String unknownBatchId = "BATCH_UNKNOWN";
+        
+        TemperatureService.TemperatureMonitoring monitoring = 
+            temperatureService.getMonitoring(unknownBatchId);
+        
+        assertNull(monitoring, 
+            "getMonitoring should return null for unknown batch ID");
+    }
+    
     private List<RouteWaypoint> createTestRoute(String batchId, double temp1, double temp2, double temp3) {
         List<RouteWaypoint> waypoints = new ArrayList<>();
         long timestamp = System.currentTimeMillis();
