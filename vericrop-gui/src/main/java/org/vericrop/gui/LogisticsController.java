@@ -59,7 +59,8 @@ public class LogisticsController implements SimulationListener {
     @FXML private DatePicker startDatePicker;
     @FXML private DatePicker endDatePicker;
     @FXML private TextArea reportArea;
-    @FXML private LineChart<String, Number> temperatureChart;
+    @FXML private LineChart<Number, Number> temperatureChart;
+    @FXML private javafx.scene.chart.NumberAxis temperatureTimeAxis;
     @FXML private Pane mapContainer;
     @FXML private VBox timelineContainer;
 
@@ -90,7 +91,10 @@ public class LogisticsController implements SimulationListener {
     private QualityAlertProducer qualityAlertProducer;
     
     // Track temperature chart series by batch ID (thread-safe for Kafka consumer access)
-    private Map<String, XYChart.Series<String, Number>> temperatureSeriesMap = new ConcurrentHashMap<>();
+    private Map<String, XYChart.Series<Number, Number>> temperatureSeriesMap = new ConcurrentHashMap<>();
+    
+    // Start time for chart X axis (seconds since controller initialization)
+    private long chartStartTimeMillis;
     
     // Track latest environmental data by batch ID for shipments table
     private Map<String, ShipmentEnvironmentalData> environmentalDataMap = new ConcurrentHashMap<>();
@@ -509,13 +513,14 @@ public class LogisticsController implements SimulationListener {
     
     /**
      * Add temperature data point to chart for given batch.
+     * Uses seconds since controller start for the X axis (NumberAxis).
      */
     private void addTemperatureDataPoint(TemperatureComplianceEvent event) {
         if (temperatureChart == null) return;
         
         try {
             // Get or create series for this batch
-            XYChart.Series<String, Number> series = temperatureSeriesMap.get(event.getBatchId());
+            XYChart.Series<Number, Number> series = temperatureSeriesMap.get(event.getBatchId());
             if (series == null) {
                 series = new XYChart.Series<>();
                 series.setName(event.getBatchId());
@@ -523,11 +528,17 @@ public class LogisticsController implements SimulationListener {
                 temperatureChart.getData().add(series);
             }
             
-            // Format timestamp as time string
-            String timeLabel = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"));
+            // Calculate seconds since controller started
+            long currentTimeMillis = System.currentTimeMillis();
+            double secondsSinceStart = (currentTimeMillis - chartStartTimeMillis) / 1000.0;
             
-            // Add data point
-            series.getData().add(new XYChart.Data<>(timeLabel, event.getTemperature()));
+            // Add data point with numeric X value (seconds)
+            series.getData().add(new XYChart.Data<>(secondsSinceStart, event.getTemperature()));
+            
+            // Update X axis upper bound if needed to show all data points
+            if (temperatureTimeAxis != null && secondsSinceStart > temperatureTimeAxis.getUpperBound() - 10) {
+                temperatureTimeAxis.setUpperBound(secondsSinceStart + 30);
+            }
             
             // Keep chart size reasonable - limit to last N points
             if (series.getData().size() > MAX_CHART_DATA_POINTS) {
@@ -535,7 +546,7 @@ public class LogisticsController implements SimulationListener {
             }
             
             System.out.println("Added temperature point: " + event.getBatchId() + " = " + 
-                event.getTemperature() + "°C at " + timeLabel);
+                event.getTemperature() + "°C at " + String.format("%.1fs", secondsSinceStart));
         } catch (Exception e) {
             System.err.println("Error adding temperature data point: " + e.getMessage());
         }
@@ -917,28 +928,31 @@ public class LogisticsController implements SimulationListener {
     }
 
     private void setupTemperatureChart() {
+        // Initialize the chart start time for X axis calculations
+        chartStartTimeMillis = System.currentTimeMillis();
+        
         if (temperatureChart != null) {
             temperatureChart.setTitle("Temperature Monitoring");
             temperatureChart.setLegendVisible(true);
 
             if (shouldLoadDemoData()) {
-                XYChart.Series<String, Number> series1 = new XYChart.Series<>();
+                XYChart.Series<Number, Number> series1 = new XYChart.Series<>();
                 series1.setName("BATCH_A2386 (demo)");
-                series1.getData().add(new XYChart.Data<>("00:00", 4.2));
-                series1.getData().add(new XYChart.Data<>("04:00", 4.5));
-                series1.getData().add(new XYChart.Data<>("08:00", 4.8));
-                series1.getData().add(new XYChart.Data<>("12:00", 5.1));
-                series1.getData().add(new XYChart.Data<>("16:00", 4.6));
-                series1.getData().add(new XYChart.Data<>("20:00", 4.3));
+                series1.getData().add(new XYChart.Data<>(0, 4.2));
+                series1.getData().add(new XYChart.Data<>(10, 4.5));
+                series1.getData().add(new XYChart.Data<>(20, 4.8));
+                series1.getData().add(new XYChart.Data<>(30, 5.1));
+                series1.getData().add(new XYChart.Data<>(40, 4.6));
+                series1.getData().add(new XYChart.Data<>(50, 4.3));
 
-                XYChart.Series<String, Number> series2 = new XYChart.Series<>();
+                XYChart.Series<Number, Number> series2 = new XYChart.Series<>();
                 series2.setName("BATCH_A2387 (demo)");
-                series2.getData().add(new XYChart.Data<>("00:00", 3.8));
-                series2.getData().add(new XYChart.Data<>("04:00", 3.9));
-                series2.getData().add(new XYChart.Data<>("08:00", 4.1));
-                series2.getData().add(new XYChart.Data<>("12:00", 4.3));
-                series2.getData().add(new XYChart.Data<>("16:00", 4.0));
-                series2.getData().add(new XYChart.Data<>("20:00", 3.8));
+                series2.getData().add(new XYChart.Data<>(0, 3.8));
+                series2.getData().add(new XYChart.Data<>(10, 3.9));
+                series2.getData().add(new XYChart.Data<>(20, 4.1));
+                series2.getData().add(new XYChart.Data<>(30, 4.3));
+                series2.getData().add(new XYChart.Data<>(40, 4.0));
+                series2.getData().add(new XYChart.Data<>(50, 3.8));
 
                 temperatureChart.getData().addAll(series1, series2);
             }
@@ -1539,7 +1553,7 @@ public class LogisticsController implements SimulationListener {
                 }
                 
                 // Create new series for this batch
-                XYChart.Series<String, Number> series = new XYChart.Series<>();
+                XYChart.Series<Number, Number> series = new XYChart.Series<>();
                 series.setName(batchId);
                 
                 // Add to chart and tracking map
@@ -1886,7 +1900,7 @@ public class LogisticsController implements SimulationListener {
         
         try {
             // Get temperature series data to build SimulationResult
-            XYChart.Series<String, Number> tempSeries = temperatureSeriesMap.get(batchId);
+            XYChart.Series<Number, Number> tempSeries = temperatureSeriesMap.get(batchId);
             ShipmentEnvironmentalData envData = environmentalDataMap.get(batchId);
             
             // Create simulation result with temperature series
@@ -1898,11 +1912,13 @@ public class LogisticsController implements SimulationListener {
             
             // Add temperature data points from chart series
             if (tempSeries != null && tempSeries.getData() != null) {
-                for (XYChart.Data<String, Number> point : tempSeries.getData()) {
+                for (XYChart.Data<Number, Number> point : tempSeries.getData()) {
+                    // Convert numeric X value (seconds) back to a time label
+                    String timeLabel = String.format("%.0fs", point.getXValue().doubleValue());
                     result.addTemperaturePoint(
                             System.currentTimeMillis(), 
                             point.getYValue().doubleValue(),
-                            point.getXValue());
+                            timeLabel);
                 }
             }
             
@@ -1927,7 +1943,7 @@ public class LogisticsController implements SimulationListener {
      * @return SimulationResult containing temperature series, or null if not found
      */
     public SimulationResult getSimulationResultWithTemperatureSeries(String batchId) {
-        XYChart.Series<String, Number> tempSeries = temperatureSeriesMap.get(batchId);
+        XYChart.Series<Number, Number> tempSeries = temperatureSeriesMap.get(batchId);
         ShipmentEnvironmentalData envData = environmentalDataMap.get(batchId);
         
         if (tempSeries == null) {
@@ -1937,11 +1953,13 @@ public class LogisticsController implements SimulationListener {
         SimulationResult result = new SimulationResult(batchId, null);
         
         // Populate temperature series from chart data
-        for (XYChart.Data<String, Number> point : tempSeries.getData()) {
+        for (XYChart.Data<Number, Number> point : tempSeries.getData()) {
+            // Convert numeric X value (seconds) back to a time label
+            String timeLabel = String.format("%.0fs", point.getXValue().doubleValue());
             result.addTemperaturePoint(
                     System.currentTimeMillis(), 
                     point.getYValue().doubleValue(),
-                    point.getXValue());
+                    timeLabel);
         }
         
         // Add humidity data if available
