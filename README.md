@@ -1989,6 +1989,178 @@ curl http://localhost:8080/producer/blockchain?limit=5
 }
 ```
 
+### Batch Simulation Endpoints
+
+Generate simulated batches with realistic data for testing and integration with the Consumer verification endpoint.
+
+#### Generate Single Simulated Batch
+
+```bash
+GET /producer/simulate-batch
+
+# Response
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "qualityScore": 85,
+  "qrCode": "eyJpZCI6IjU1MGU4NDAwLWUyOWItNDFkNC1hNzE2LTQ0NjY1NTQ0MDAwMCIsInF1YWxpdHlTY29yZSI6ODUsInByb2R1Y2VySWQiOiJGQVJNRVJfMDAxIiwicHJvZHVjdFR5cGUiOiJBcHBsZSJ9",
+  "producerId": "FARMER_001",
+  "productType": "Apple",
+  "batchName": "Apple Batch 2024-01-15",
+  "quantity": 500,
+  "location": "Sunny Valley Farm",
+  "timestamp": 1700000000000
+}
+```
+
+**Response Fields:**
+- `id`: UUID format batch identifier
+- `qualityScore`: Integer 0-100
+- `qrCode`: Base64 encoded JSON payload containing batch info
+- `producerId`: Producer/farmer identifier
+- `productType`: Type of product
+- `batchName`: Name of the batch
+- `quantity`: Quantity in units
+- `location`: Origin location
+- `timestamp`: Unix timestamp
+
+#### Generate Multiple Simulated Batches
+
+```bash
+GET /producer/simulate-batches?count=5
+
+# Response
+{
+  "count": 5,
+  "batches": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "qualityScore": 85,
+      "qrCode": "...",
+      ...
+    },
+    ...
+  ],
+  "timestamp": 1700000000000
+}
+```
+
+**Query Parameters:**
+- `count`: Number of batches to generate (default 5, max 20)
+
+## Consumer API (Batch Verification)
+
+The Consumer API provides REST endpoints for verifying batches and checking compliance status.
+
+### Base URL
+
+```
+http://localhost:8080/consumer
+```
+
+### Endpoints
+
+#### Verify Batch
+
+Verify a batch object and return verification result. Checks:
+- `id`: Present and valid UUID format
+- `qualityScore`: Present and between 0-100
+- `qrCode`: Present and valid base64 format (PNG data URL or plain base64)
+
+```bash
+POST /consumer/verify
+Content-Type: application/json
+
+# Request
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "qualityScore": 85,
+  "qrCode": "eyJpZCI6IjU1MGU4NDAwLWUyOWItNDFkNC1hNzE2LTQ0NjY1NTQ0MDAwMCJ9",
+  "productType": "Apple",
+  "producerId": "FARMER_001"
+}
+
+# Response (Success)
+{
+  "verified": true,
+  "reasons": [],
+  "batchId": "550e8400-e29b-41d4-a716-446655440000",
+  "details": {
+    "qualityScore": 85,
+    "qualityLabel": "Good",
+    "productType": "Apple",
+    "producerId": "FARMER_001",
+    "qrPayload": "{\"id\":\"550e8400-e29b-41d4-a716-446655440000\"}"
+  },
+  "timestamp": 1700000000000
+}
+
+# Response (Failure)
+{
+  "verified": false,
+  "reasons": [
+    "id must be a valid UUID format",
+    "qualityScore must be a number between 0 and 100"
+  ],
+  "batchId": null,
+  "details": {},
+  "timestamp": 1700000000000
+}
+```
+
+**Request Fields:**
+- `id` (required): Batch ID in UUID format
+- `qualityScore` (required): Quality score 0-100
+- `qrCode` (required): Base64 encoded QR code payload or data URL
+- `productType`: Type of product (optional, echoed in details)
+- `producerId`: Producer ID (optional, echoed in details)
+
+**Response Fields:**
+- `verified`: Boolean indicating if batch passed all validations
+- `reasons`: Array of failure reasons (empty if verified is true)
+- `batchId`: Echoed batch ID
+- `details`: Parsed/decoded information from the batch
+- `timestamp`: Response timestamp
+
+#### Quality Labels
+
+Based on `qualityScore`:
+- 90-100: "Fresh"
+- 70-89: "Good"
+- 50-69: "Fair"
+- 0-49: "Poor"
+
+### Integration Example: Producer to Consumer Verification
+
+```bash
+# 1. Generate a simulated batch from producer
+BATCH=$(curl -s http://localhost:8080/producer/simulate-batch)
+
+# 2. Verify the batch using consumer endpoint
+curl -X POST http://localhost:8080/consumer/verify \
+  -H "Content-Type: application/json" \
+  -d "$BATCH"
+
+# Expected: {"verified": true, "reasons": [], ...}
+```
+
+### Validation Helper Functions
+
+The ConsumerRestController provides static helper methods for validation:
+
+- `isValidUUID(String id)`: Validates UUID format (8-4-4-4-12 hex digits)
+- `isValidQualityScore(Integer score)`: Validates score is 0-100
+- `isValidQRCode(String qrCode)`: Validates base64 or PNG data URL format
+
+These can be used programmatically:
+
+```java
+import org.vericrop.gui.api.ConsumerRestController;
+
+boolean validUUID = ConsumerRestController.isValidUUID("550e8400-e29b-41d4-a716-446655440000");
+boolean validScore = ConsumerRestController.isValidQualityScore(85);
+boolean validQR = ConsumerRestController.isValidQRCode("SGVsbG8gV29ybGQ=");
+```
+
 ## Running Tests
 
 VeriCrop includes comprehensive test suites for Java and Python components. Always run tests before committing changes.

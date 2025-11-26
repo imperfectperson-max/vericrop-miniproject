@@ -560,6 +560,164 @@ public class ProducerRestController {
         return ResponseEntity.ok(health);
     }
     
+    /**
+     * GET /producer/simulate-batch
+     * 
+     * Generate a simulated batch with realistic data suitable for consumer verification.
+     * Creates a batch with UUID id, quality score (0-100), and base64 QR code.
+     * 
+     * @return Simulated batch data suitable for verification by ConsumerController
+     */
+    @Operation(
+        summary = "Generate a simulated batch",
+        description = "Creates a realistic simulated batch with UUID id, qualityScore (0-100), " +
+                      "and base64 QR code. Suitable for integration testing with ConsumerController /consumer/verify endpoint."
+    )
+    @ApiResponse(responseCode = "200", description = "Simulated batch generated successfully",
+        content = @Content(mediaType = "application/json",
+            examples = @ExampleObject(value = """
+                {
+                  "id": "550e8400-e29b-41d4-a716-446655440000",
+                  "qualityScore": 85,
+                  "qrCode": "eyJpZCI6IjU1MGU4NDAwLWUyOWItNDFkNC1hNzE2LTQ0NjY1NTQ0MDAwMCIsInF1YWxpdHlTY29yZSI6ODUsInByb2R1Y2VySWQiOiJGQVJNRVJfMDAxIiwicHJvZHVjdFR5cGUiOiJBcHBsZSJ9",
+                  "producerId": "FARMER_001",
+                  "productType": "Apple",
+                  "batchName": "Apple Batch 2024-01",
+                  "quantity": 500,
+                  "location": "Sunny Valley Farm",
+                  "timestamp": 1700000000000
+                }
+                """)))
+    @GetMapping("/simulate-batch")
+    public ResponseEntity<Map<String, Object>> simulateBatch() {
+        try {
+            // Generate a unique UUID for the batch
+            String batchId = UUID.randomUUID().toString();
+            
+            // Generate realistic quality score (0-100)
+            int qualityScore = generateRealisticQualityScore();
+            
+            // Generate sample producer data
+            String producerId = "FARMER_" + String.format("%03d", new Random().nextInt(1000));
+            String productType = getRandomProductType();
+            String batchName = productType + " Batch " + java.time.LocalDate.now();
+            int quantity = 100 + new Random().nextInt(900); // 100-999 units
+            String location = getRandomLocation();
+            long timestamp = System.currentTimeMillis();
+            
+            // Create QR code payload (JSON containing batch info)
+            Map<String, Object> qrPayload = new LinkedHashMap<>();
+            qrPayload.put("id", batchId);
+            qrPayload.put("qualityScore", qualityScore);
+            qrPayload.put("producerId", producerId);
+            qrPayload.put("productType", productType);
+            qrPayload.put("timestamp", timestamp);
+            
+            String qrCodePayloadJson = mapToJson(qrPayload);
+            String qrCode = Base64.getEncoder().encodeToString(qrCodePayloadJson.getBytes());
+            
+            // Build response
+            Map<String, Object> simulatedBatch = new LinkedHashMap<>();
+            simulatedBatch.put("id", batchId);
+            simulatedBatch.put("qualityScore", qualityScore);
+            simulatedBatch.put("qrCode", qrCode);
+            simulatedBatch.put("producerId", producerId);
+            simulatedBatch.put("productType", productType);
+            simulatedBatch.put("batchName", batchName);
+            simulatedBatch.put("quantity", quantity);
+            simulatedBatch.put("location", location);
+            simulatedBatch.put("timestamp", timestamp);
+            
+            logger.info("🔧 Simulated batch generated: id={}, qualityScore={}", batchId, qualityScore);
+            
+            return ResponseEntity.ok(simulatedBatch);
+            
+        } catch (Exception e) {
+            logger.error("Error generating simulated batch: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(createErrorResponse("Failed to generate simulated batch", e.getMessage()));
+        }
+    }
+    
+    /**
+     * GET /producer/simulate-batches
+     * 
+     * Generate multiple simulated batches for integration testing.
+     * 
+     * @param count Number of batches to generate (default 5, max 20)
+     * @return List of simulated batches
+     */
+    @Operation(
+        summary = "Generate multiple simulated batches",
+        description = "Creates multiple realistic simulated batches for integration testing"
+    )
+    @ApiResponse(responseCode = "200", description = "Simulated batches generated successfully")
+    @GetMapping("/simulate-batches")
+    public ResponseEntity<Map<String, Object>> simulateBatches(
+            @Parameter(description = "Number of batches to generate (1-20)")
+            @RequestParam(value = "count", defaultValue = "5") int count) {
+        try {
+            // Limit count to prevent abuse
+            int actualCount = Math.max(1, Math.min(count, 20));
+            
+            List<Map<String, Object>> batches = new ArrayList<>();
+            for (int i = 0; i < actualCount; i++) {
+                ResponseEntity<Map<String, Object>> response = simulateBatch();
+                if (response.getBody() != null && !response.getBody().containsKey("error")) {
+                    batches.add(response.getBody());
+                }
+            }
+            
+            Map<String, Object> result = new HashMap<>();
+            result.put("count", batches.size());
+            result.put("batches", batches);
+            result.put("timestamp", System.currentTimeMillis());
+            
+            logger.info("🔧 Generated {} simulated batches", batches.size());
+            
+            return ResponseEntity.ok(result);
+            
+        } catch (Exception e) {
+            logger.error("Error generating simulated batches: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(createErrorResponse("Failed to generate simulated batches", e.getMessage()));
+        }
+    }
+    
+    /**
+     * Generate a realistic quality score (0-100).
+     * Uses a distribution that favors higher quality scores (typical for production).
+     */
+    private int generateRealisticQualityScore() {
+        Random random = new Random();
+        // Use a distribution that favors scores between 70-95
+        double base = 70.0 + random.nextGaussian() * 10;
+        return Math.max(0, Math.min(100, (int) Math.round(base)));
+    }
+    
+    /**
+     * Get a random product type from common agricultural products.
+     */
+    private String getRandomProductType() {
+        String[] types = {"Apple", "Orange", "Banana", "Strawberry", "Grape", "Tomato", "Carrot", "Lettuce"};
+        return types[new Random().nextInt(types.length)];
+    }
+    
+    /**
+     * Get a random farm location name.
+     */
+    private String getRandomLocation() {
+        String[] locations = {
+            "Sunny Valley Farm", 
+            "Green Acres Orchard", 
+            "Mountain View Farm", 
+            "Riverside Gardens",
+            "Golden Harvest Fields",
+            "Blue Sky Ranch"
+        };
+        return locations[new Random().nextInt(locations.length)];
+    }
+    
     // ==================== Helper Methods ====================
     
     /**

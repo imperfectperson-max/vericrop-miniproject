@@ -495,6 +495,169 @@ class ProducerRestControllerTest {
         assertNotNull(response.getBody().get("timestamp"));
     }
     
+    // ==================== Simulation Endpoint Tests ====================
+    
+    @Test
+    void testSimulateBatch_Success() {
+        ResponseEntity<Map<String, Object>> response = controller.simulateBatch();
+        
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        
+        // Verify required fields are present
+        assertNotNull(response.getBody().get("id"));
+        assertNotNull(response.getBody().get("qualityScore"));
+        assertNotNull(response.getBody().get("qrCode"));
+        assertNotNull(response.getBody().get("producerId"));
+        assertNotNull(response.getBody().get("productType"));
+        assertNotNull(response.getBody().get("timestamp"));
+    }
+    
+    @Test
+    void testSimulateBatch_IdIsValidUUID() {
+        ResponseEntity<Map<String, Object>> response = controller.simulateBatch();
+        
+        String id = (String) response.getBody().get("id");
+        assertNotNull(id);
+        
+        // Verify it's a valid UUID format
+        try {
+            java.util.UUID.fromString(id);
+        } catch (IllegalArgumentException e) {
+            fail("ID is not a valid UUID: " + id);
+        }
+    }
+    
+    @Test
+    void testSimulateBatch_QualityScoreInRange() {
+        // Run multiple times to check random distribution
+        for (int i = 0; i < 10; i++) {
+            ResponseEntity<Map<String, Object>> response = controller.simulateBatch();
+            
+            Integer qualityScore = (Integer) response.getBody().get("qualityScore");
+            assertNotNull(qualityScore);
+            assertTrue(qualityScore >= 0 && qualityScore <= 100,
+                "Quality score " + qualityScore + " is out of range [0-100]");
+        }
+    }
+    
+    @Test
+    void testSimulateBatch_QrCodeIsValidBase64() {
+        ResponseEntity<Map<String, Object>> response = controller.simulateBatch();
+        
+        String qrCode = (String) response.getBody().get("qrCode");
+        assertNotNull(qrCode);
+        
+        // Verify it's valid base64 by decoding
+        try {
+            byte[] decoded = java.util.Base64.getDecoder().decode(qrCode);
+            assertTrue(decoded.length > 0);
+            
+            // Verify decoded content is valid JSON containing batch info
+            String payload = new String(decoded);
+            assertTrue(payload.contains("id"));
+            assertTrue(payload.contains("qualityScore"));
+        } catch (IllegalArgumentException e) {
+            fail("QR code is not valid base64: " + qrCode);
+        }
+    }
+    
+    @Test
+    void testSimulateBatches_Success() {
+        ResponseEntity<Map<String, Object>> response = controller.simulateBatches(3);
+        
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        
+        assertEquals(3, response.getBody().get("count"));
+        
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> batches = (List<Map<String, Object>>) response.getBody().get("batches");
+        assertEquals(3, batches.size());
+        
+        // Verify each batch has required fields
+        for (Map<String, Object> batch : batches) {
+            assertNotNull(batch.get("id"));
+            assertNotNull(batch.get("qualityScore"));
+            assertNotNull(batch.get("qrCode"));
+        }
+    }
+    
+    @Test
+    void testSimulateBatches_DefaultCount() {
+        ResponseEntity<Map<String, Object>> response = controller.simulateBatches(5);
+        
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(5, response.getBody().get("count"));
+    }
+    
+    @Test
+    void testSimulateBatches_MaxLimit() {
+        // Request more than max (20)
+        ResponseEntity<Map<String, Object>> response = controller.simulateBatches(100);
+        
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        // Should be limited to 20
+        Integer count = (Integer) response.getBody().get("count");
+        assertTrue(count <= 20, "Count should be limited to 20");
+    }
+    
+    @Test
+    void testSimulateBatches_MinLimit() {
+        // Request less than min (1)
+        ResponseEntity<Map<String, Object>> response = controller.simulateBatches(0);
+        
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        // Should be at least 1
+        Integer count = (Integer) response.getBody().get("count");
+        assertTrue(count >= 1, "Count should be at least 1");
+    }
+    
+    @Test
+    void testSimulateBatches_UniqueBatchIds() {
+        ResponseEntity<Map<String, Object>> response = controller.simulateBatches(5);
+        
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> batches = (List<Map<String, Object>>) response.getBody().get("batches");
+        
+        // Collect all IDs
+        java.util.Set<String> ids = new java.util.HashSet<>();
+        for (Map<String, Object> batch : batches) {
+            String id = (String) batch.get("id");
+            ids.add(id);
+        }
+        
+        // All IDs should be unique
+        assertEquals(5, ids.size(), "All batch IDs should be unique");
+    }
+    
+    @Test
+    void testSimulateBatch_CanBeVerifiedByConsumer() {
+        // Get a simulated batch from producer
+        ResponseEntity<Map<String, Object>> producerResponse = controller.simulateBatch();
+        Map<String, Object> simulatedBatch = producerResponse.getBody();
+        
+        // Create a ConsumerRestController and verify the batch
+        ConsumerRestController consumerController = new ConsumerRestController();
+        
+        ConsumerRestController.BatchVerificationRequest verifyRequest = 
+            new ConsumerRestController.BatchVerificationRequest();
+        verifyRequest.setId((String) simulatedBatch.get("id"));
+        verifyRequest.setQualityScore((Integer) simulatedBatch.get("qualityScore"));
+        verifyRequest.setQrCode((String) simulatedBatch.get("qrCode"));
+        verifyRequest.setProductType((String) simulatedBatch.get("productType"));
+        verifyRequest.setProducerId((String) simulatedBatch.get("producerId"));
+        
+        ResponseEntity<ConsumerRestController.VerificationResponse> verifyResponse = 
+            consumerController.verifyBatch(verifyRequest);
+        
+        // Verification should pass
+        assertEquals(HttpStatus.OK, verifyResponse.getStatusCode());
+        assertTrue(verifyResponse.getBody().isVerified(), 
+            "Simulated batch should pass verification. Reasons: " + verifyResponse.getBody().getReasons());
+        assertTrue(verifyResponse.getBody().getReasons().isEmpty());
+    }
+    
     // ==================== Helper Methods ====================
     
     private ProducerRestController.BlockchainRecordRequest createValidRequest() {
