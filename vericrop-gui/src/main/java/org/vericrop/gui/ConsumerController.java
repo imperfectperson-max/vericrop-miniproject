@@ -10,16 +10,25 @@ import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import java.util.Set;
 import java.util.HashSet;
+import java.util.Map;
 import java.io.File;
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.concurrent.TimeUnit;
 import org.vericrop.gui.util.QRDecoder;
 import org.vericrop.service.TemperatureService;
 import org.vericrop.service.simulation.SimulationConfig;
 import org.vericrop.service.simulation.SimulationListener;
 import org.vericrop.service.simulation.SimulationManager;
 import com.google.zxing.NotFoundException;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
+import okhttp3.ResponseBody;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class ConsumerController implements SimulationListener {
 
@@ -59,9 +68,39 @@ public class ConsumerController implements SimulationListener {
     
     /** Default final quality used when SimulationManager data is unavailable */
     private static final double DEFAULT_FINAL_QUALITY = 95.0;
+    
+    /** HTTP client timeout in seconds */
+    private static final int HTTP_TIMEOUT_SECONDS = 30;
+    
+    /** Default backend URL for batch API - can be overridden via environment variable VERICROP_BACKEND_URL */
+    private static final String DEFAULT_BACKEND_URL = "http://localhost:8000";
+    
+    /** HTTP client for backend API calls - reused for all requests */
+    private OkHttpClient httpClient;
+    
+    /** JSON object mapper for parsing backend responses */
+    private ObjectMapper mapper;
+    
+    /** Backend URL for batch API calls */
+    private String backendUrl;
 
     @FXML
     public void initialize() {
+        // Initialize HTTP client with configurable timeouts
+        httpClient = new OkHttpClient.Builder()
+                .connectTimeout(HTTP_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .readTimeout(HTTP_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .build();
+        
+        // Initialize JSON mapper
+        mapper = new ObjectMapper();
+        
+        // Get backend URL from environment or use default
+        backendUrl = System.getenv("VERICROP_BACKEND_URL");
+        if (backendUrl == null || backendUrl.trim().isEmpty()) {
+            backendUrl = DEFAULT_BACKEND_URL;
+        }
+        
         setupVerificationHistory();
         setupNavigationButtons();
         registerWithSimulationManager();
@@ -263,15 +302,11 @@ public class ConsumerController implements SimulationListener {
             return;
         }
 
-        // Check if batch ID exists in knownBatchIds (case-insensitive)
+        String trimmedBatchId = batchId.trim();
+        
+        // Check if batch ID exists in knownBatchIds (case-insensitive) - for demo mode
         if (shouldLoadDemoData() && !knownBatchIds.isEmpty()) {
-            boolean found = false;
-            for (String knownId : knownBatchIds) {
-                if (knownId.equalsIgnoreCase(batchId.trim())) {
-                    found = true;
-                    break;
-                }
-            }
+            boolean found = isKnownBatchId(trimmedBatchId);
             
             if (!found) {
                 showAlert(Alert.AlertType.WARNING, "Batch ID Not Found", 
@@ -289,57 +324,278 @@ public class ConsumerController implements SimulationListener {
             }
         }
 
-        // TODO: In production, query actual blockchain/ledger service for batch info
-        // For now, provide basic verification response
+        // Variables for batch info
         String productName;
         String quality;
         String origin;
-        int qualityScore;
+        double qualityScore;
+        double primeRate = 0.0;
+        double rejectionRate = 0.0;
+        boolean realDataFetched = false;
         
-        // Only use demo data if flag is set
-        if (shouldLoadDemoData()) {
-            // Demo verification with mock data patterns
-            if (batchId.toUpperCase().contains("A")) {
+        // If NOT in demo mode, try to fetch real batch data from backend
+        if (!shouldLoadDemoData()) {
+            Map<String, Object> batchData = fetchBatchFromBackend(trimmedBatchId);
+            
+            if (batchData != null) {
+                // Successfully fetched real batch data
+                realDataFetched = true;
+                
+                // Extract fields from batch data
+                productName = safeGetString(batchData, "product_type", 
+                             safeGetString(batchData, "name", "Unknown Product"));
+                origin = safeGetString(batchData, "farmer", "Unknown Origin");
+                qualityScore = safeGetDouble(batchData, "quality_score", 0.85) * 100.0;
+                primeRate = safeGetDouble(batchData, "prime_rate", 0.0) * 100.0;
+                rejectionRate = safeGetDouble(batchData, "rejection_rate", 0.0) * 100.0;
+                
+                // Determine quality classification
+                if (qualityScore >= 80) {
+                    quality = "PRIME";
+                } else if (qualityScore >= 60) {
+                    quality = "STANDARD";
+                } else {
+                    quality = "SUB-STANDARD";
+                }
+                
+                // Cache the batch ID for faster future lookups (case-insensitive)
+                addToKnownBatchIds(trimmedBatchId);
+                
+                // Update journey display if simulation is running for this batch
+                updateJourneyForVerifiedBatch(trimmedBatchId, batchData);
+            } else {
+                // Backend unreachable or batch not found - use fallback
+                productName = "Product (Batch " + batchId + ")";
+                quality = "VERIFIED";
+                qualityScore = 85.0;
+                origin = "Farm Network";
+            }
+        } else {
+            // Demo mode - use mock data patterns
+            if (trimmedBatchId.toUpperCase().contains("A")) {
                 productName = "Summer Apples (demo)";
                 quality = "PRIME";
-                qualityScore = 92;
+                qualityScore = 92.0;
                 origin = "Sunny Valley Orchards (demo)";
-            } else if (batchId.toUpperCase().contains("B")) {
+            } else if (trimmedBatchId.toUpperCase().contains("B")) {
                 productName = "Organic Carrots (demo)";
                 quality = "PRIME";
-                qualityScore = 88;
+                qualityScore = 88.0;
                 origin = "Green Fields Farm (demo)";
             } else {
                 productName = "Mixed Vegetables (demo)";
                 quality = "STANDARD";
-                qualityScore = 85;
+                qualityScore = 85.0;
                 origin = "Valley Fresh Farms (demo)";
             }
-        } else {
-            // Provide basic fallback when demo mode is not enabled
-            productName = "Product (Batch " + batchId + ")";
-            quality = "VERIFIED";
-            qualityScore = 85;
-            origin = "Farm Network";
         }
 
-        String verificationResult = "✅ VERIFIED: Batch " + batchId +
-                "\nProduct: " + productName +
-                "\nQuality: " + quality + " (" + qualityScore + "%)" +
-                "\nOrigin: " + origin +
-                "\nVerification Time: " + java.time.LocalDateTime.now().format(
-                        java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        // Build verification result message
+        StringBuilder verificationResult = new StringBuilder();
+        verificationResult.append("✅ VERIFIED: Batch ").append(batchId)
+                .append("\nProduct: ").append(productName)
+                .append("\nQuality: ").append(quality).append(" (").append(String.format("%.1f", qualityScore)).append("%)")
+                .append("\nOrigin: ").append(origin);
+        
+        // Include prime/rejection rates if real data was fetched
+        if (realDataFetched) {
+            verificationResult.append("\nPrime Rate: ").append(String.format("%.1f", primeRate)).append("%");
+            verificationResult.append("\nRejection Rate: ").append(String.format("%.1f", rejectionRate)).append("%");
+        }
+        
+        verificationResult.append("\nVerification Time: ").append(java.time.LocalDateTime.now().format(
+                        java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
 
-        showAlert(Alert.AlertType.INFORMATION, "Verification Complete", verificationResult);
+        showAlert(Alert.AlertType.INFORMATION, "Verification Complete", verificationResult.toString());
 
-        // Add to history with proper formatting
+        // Add to history with proper formatting including quality score
+        final String historyProductName = productName;
+        final double historyQualityScore = qualityScore;
+        final boolean updateQualityUI = realDataFetched;
         String historyEntry = java.time.LocalDateTime.now().format(
                 java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) + 
-                ": " + batchId + " - ✅ VERIFIED (" + productName + ")";
+                ": " + batchId + " - ✅ VERIFIED (" + historyProductName + ", " + 
+                String.format("%.1f", historyQualityScore) + "%)";
         
         Platform.runLater(() -> {
             verificationHistory.add(0, historyEntry);
+            
+            // Update quality metrics UI with real values
+            if (updateQualityUI && finalQualityLabel != null) {
+                finalQualityLabel.setText(String.format("%.1f%%", historyQualityScore));
+                if (historyQualityScore >= 80) {
+                    finalQualityLabel.setStyle("-fx-text-fill: #10b981; -fx-font-size: 28px;"); // Green
+                } else if (historyQualityScore >= 60) {
+                    finalQualityLabel.setStyle("-fx-text-fill: #f59e0b; -fx-font-size: 28px;"); // Yellow
+                } else {
+                    finalQualityLabel.setStyle("-fx-text-fill: #dc2626; -fx-font-size: 28px;"); // Red
+                }
+            }
         });
+    }
+    
+    /**
+     * Fetch batch data from the backend ledger/API.
+     * 
+     * @param batchId The batch ID to fetch
+     * @return Map containing batch data, or null if not found or error
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> fetchBatchFromBackend(String batchId) {
+        try {
+            // URL-encode the batch ID to prevent injection and handle special characters
+            String encodedBatchId = URLEncoder.encode(batchId, StandardCharsets.UTF_8.toString());
+            String url = backendUrl + "/batches/" + encodedBatchId;
+            
+            Request request = new Request.Builder()
+                    .url(url)
+                    .get()
+                    .build();
+            
+            try (Response response = httpClient.newCall(request).execute()) {
+                ResponseBody body = response.body();
+                
+                if (response.isSuccessful() && body != null) {
+                    String responseBody = body.string();
+                    return mapper.readValue(responseBody, Map.class);
+                } else if (response.code() == 404) {
+                    System.out.println("Batch not found in backend: " + batchId);
+                    return null;
+                } else {
+                    System.err.println("Backend returned error " + response.code() + " for batch: " + batchId);
+                    return null;
+                }
+            }
+        } catch (java.net.ConnectException e) {
+            System.err.println("Cannot connect to backend service: " + e.getMessage());
+            Platform.runLater(() -> {
+                showAlert(Alert.AlertType.WARNING, "Backend Unavailable", 
+                    "Could not connect to backend service. Using fallback verification.");
+            });
+            return null;
+        } catch (java.net.SocketTimeoutException e) {
+            System.err.println("Backend request timed out: " + e.getMessage());
+            Platform.runLater(() -> {
+                showAlert(Alert.AlertType.WARNING, "Request Timeout", 
+                    "Backend request timed out. Using fallback verification.");
+            });
+            return null;
+        } catch (IOException e) {
+            System.err.println("Error fetching batch from backend: " + e.getMessage());
+            return null;
+        } catch (Exception e) {
+            System.err.println("Unexpected error fetching batch: " + e.getMessage());
+            return null;
+        }
+    }
+    
+    /**
+     * Update journey display when a batch is verified, integrating with SimulationManager.
+     * 
+     * @param batchId The verified batch ID
+     * @param batchData The batch data from backend
+     */
+    private void updateJourneyForVerifiedBatch(String batchId, Map<String, Object> batchData) {
+        try {
+            // Check if SimulationManager is running a simulation for this batch
+            if (SimulationManager.isInitialized()) {
+                SimulationManager manager = SimulationManager.getInstance();
+                
+                if (manager.isRunning()) {
+                    String runningBatchId = manager.getSimulationId();
+                    
+                    // Case-insensitive comparison for batch ID
+                    if (runningBatchId != null && runningBatchId.equalsIgnoreCase(batchId)) {
+                        // Simulation is running for this batch - update journey display
+                        double progress = manager.getProgress();
+                        String location = manager.getCurrentLocation();
+                        
+                        Platform.runLater(() -> {
+                            currentBatchId = batchId;
+                            updateJourneyFromProgress(batchId, progress, location);
+                            
+                            if (statusLabel != null) {
+                                statusLabel.setText("In Transit");
+                            }
+                        });
+                        
+                        System.out.println("ConsumerController: Updated journey display for running simulation - " + batchId);
+                    }
+                }
+            }
+            
+            // Update UI with batch-specific data from backend
+            Platform.runLater(() -> {
+                double qualityScore = safeGetDouble(batchData, "quality_score", 0.0) * 100.0;
+                String productType = safeGetString(batchData, "product_type", 
+                                     safeGetString(batchData, "name", "Unknown"));
+                String farmer = safeGetString(batchData, "farmer", "Unknown");
+                
+                // Update step 1 with real batch info
+                updateJourneyStep(1, "✅", "Batch Verified - " + batchId,
+                    "Product: " + productType + " | Origin: " + farmer + 
+                    " | Quality: " + String.format("%.1f%%", qualityScore));
+            });
+            
+        } catch (Exception e) {
+            System.err.println("Error updating journey for verified batch: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Check if batch ID exists in known batch IDs (case-insensitive).
+     */
+    private boolean isKnownBatchId(String batchId) {
+        if (batchId == null) {
+            return false;
+        }
+        for (String knownId : knownBatchIds) {
+            if (knownId.equalsIgnoreCase(batchId.trim())) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    /**
+     * Add a batch ID to the known batch IDs cache (avoids duplicates, case-insensitive).
+     */
+    private void addToKnownBatchIds(String batchId) {
+        if (batchId != null && !isKnownBatchId(batchId)) {
+            knownBatchIds.add(batchId.trim());
+        }
+    }
+    
+    /**
+     * Safely get a string value from a map, with a default fallback.
+     */
+    private String safeGetString(Map<String, Object> map, String key, String defaultValue) {
+        if (map == null) {
+            return defaultValue;
+        }
+        Object value = map.get(key);
+        return value != null ? value.toString() : defaultValue;
+    }
+    
+    /**
+     * Safely get a double value from a map, with a default fallback.
+     */
+    private double safeGetDouble(Map<String, Object> map, String key, double defaultValue) {
+        if (map == null) {
+            return defaultValue;
+        }
+        Object value = map.get(key);
+        if (value instanceof Number) {
+            return ((Number) value).doubleValue();
+        }
+        if (value != null) {
+            try {
+                return Double.parseDouble(value.toString());
+            } catch (NumberFormatException e) {
+                return defaultValue;
+            }
+        }
+        return defaultValue;
     }
     
     private boolean shouldLoadDemoData() {
