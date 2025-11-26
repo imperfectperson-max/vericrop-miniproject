@@ -11,6 +11,8 @@ import javafx.stage.Stage;
 import java.util.Set;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.io.File;
 import java.io.IOException;
 import java.net.URLEncoder;
@@ -31,6 +33,64 @@ import okhttp3.ResponseBody;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class ConsumerController implements SimulationListener {
+
+    /**
+     * Status of a backend fetch operation.
+     */
+    public enum FetchStatus {
+        /** Batch was found and data is available */
+        FOUND,
+        /** Batch was not found (HTTP 404) */
+        NOT_FOUND,
+        /** Backend unavailable or network error */
+        UNAVAILABLE
+    }
+
+    /**
+     * Result wrapper for backend fetch operations.
+     * Contains the status and optional payload data.
+     */
+    public static class FetchResult {
+        private final FetchStatus status;
+        private final Map<String, Object> data;
+
+        public FetchResult(FetchStatus status, Map<String, Object> data) {
+            this.status = status;
+            this.data = data;
+        }
+
+        public FetchStatus getStatus() {
+            return status;
+        }
+
+        public Map<String, Object> getData() {
+            return data;
+        }
+
+        public boolean isFound() {
+            return status == FetchStatus.FOUND && data != null;
+        }
+
+        public boolean isNotFound() {
+            return status == FetchStatus.NOT_FOUND;
+        }
+
+        public boolean isUnavailable() {
+            return status == FetchStatus.UNAVAILABLE;
+        }
+
+        public static FetchResult found(Map<String, Object> data) {
+            return new FetchResult(FetchStatus.FOUND, data);
+        }
+
+        public static FetchResult notFound() {
+            return new FetchResult(FetchStatus.NOT_FOUND, null);
+        }
+
+        public static FetchResult unavailable() {
+            return new FetchResult(FetchStatus.UNAVAILABLE, null);
+        }
+    }
 
     @FXML private TextField batchIdField;
     @FXML private ListView<String> verificationHistoryList;
@@ -200,8 +260,13 @@ public class ConsumerController implements SimulationListener {
                 // Decode the QR code from the image
                 String qrContent = QRDecoder.decodeQRCode(selectedFile);
                 
-                // Extract batch ID from QR content
+                // Try to extract batch ID using the QRDecoder first
                 String batchId = QRDecoder.extractBatchId(qrContent);
+                
+                // If extractBatchId returns null or empty, try fallback parsing
+                if (batchId == null || batchId.trim().isEmpty()) {
+                    batchId = extractBatchIdFallback(qrContent);
+                }
                 
                 if (batchId != null && !batchId.trim().isEmpty()) {
                     // Set the batch ID in the text field
@@ -224,6 +289,61 @@ public class ConsumerController implements SimulationListener {
                     "An unexpected error occurred while reading the QR code: " + e.getMessage());
             }
         }
+    }
+
+    /**
+     * Fallback batch ID extraction from QR content.
+     * Attempts to parse common QR payload formats when QRDecoder.extractBatchId fails.
+     * 
+     * @param qrContent The decoded QR code content
+     * @return Extracted batch ID, or null if not found
+     */
+    private String extractBatchIdFallback(String qrContent) {
+        if (qrContent == null || qrContent.trim().isEmpty()) {
+            return null;
+        }
+        
+        String content = qrContent.trim();
+        System.out.println("QR fallback parsing: attempting to extract batch ID from: " + content);
+        
+        // 1. Try to extract from URL path: /batches/{id} or /batch/{id}
+        Pattern pathPattern = Pattern.compile("/batch(?:es)?/([^/?#]+)", Pattern.CASE_INSENSITIVE);
+        Matcher pathMatcher = pathPattern.matcher(content);
+        if (pathMatcher.find()) {
+            String batchId = pathMatcher.group(1);
+            System.out.println("QR fallback parsing: extracted from URL path: " + batchId);
+            return batchId;
+        }
+        
+        // 2. Try to extract from query parameters: batchId=, batch=, or id=
+        Pattern queryPattern = Pattern.compile("[?&](?:batchId|batch|id)=([^&]+)", Pattern.CASE_INSENSITIVE);
+        Matcher queryMatcher = queryPattern.matcher(content);
+        if (queryMatcher.find()) {
+            String batchId = queryMatcher.group(1);
+            System.out.println("QR fallback parsing: extracted from query parameter: " + batchId);
+            return batchId;
+        }
+        
+        // 3. Try regex for BATCH_* pattern
+        Pattern batchPattern = Pattern.compile("BATCH_[A-Za-z0-9_-]+", Pattern.CASE_INSENSITIVE);
+        Matcher batchMatcher = batchPattern.matcher(content);
+        if (batchMatcher.find()) {
+            String batchId = batchMatcher.group();
+            System.out.println("QR fallback parsing: extracted BATCH_* pattern: " + batchId);
+            return batchId;
+        }
+        
+        // 4. Last resort: look for alphanumeric token at least 4 characters
+        Pattern alphanumPattern = Pattern.compile("[A-Za-z0-9_-]{4,}");
+        Matcher alphanumMatcher = alphanumPattern.matcher(content);
+        if (alphanumMatcher.find()) {
+            String batchId = alphanumMatcher.group();
+            System.out.println("QR fallback parsing: extracted alphanumeric token: " + batchId);
+            return batchId;
+        }
+        
+        System.out.println("QR fallback parsing: could not extract batch ID from content");
+        return null;
     }
 
     @FXML
@@ -335,11 +455,12 @@ public class ConsumerController implements SimulationListener {
         
         // If NOT in demo mode, try to fetch real batch data from backend
         if (!shouldLoadDemoData()) {
-            Map<String, Object> batchData = fetchBatchFromBackend(trimmedBatchId);
+            FetchResult fetchResult = fetchBatchFromBackend(trimmedBatchId);
             
-            if (batchData != null) {
+            if (fetchResult.isFound()) {
                 // Successfully fetched real batch data
                 realDataFetched = true;
+                Map<String, Object> batchData = fetchResult.getData();
                 
                 // Extract fields from batch data
                 productName = safeGetString(batchData, "product_type", 
@@ -363,8 +484,28 @@ public class ConsumerController implements SimulationListener {
                 
                 // Update journey display if simulation is running for this batch
                 updateJourneyForVerifiedBatch(trimmedBatchId, batchData);
+            } else if (fetchResult.isNotFound()) {
+                // Backend explicitly returned 404 - batch does not exist
+                System.out.println("Batch NOT FOUND in backend (404): " + trimmedBatchId);
+                showAlert(Alert.AlertType.WARNING, "Batch ID Not Found", 
+                    "The batch ID '" + batchId + "' was not found in the backend system.");
+                
+                // Add failure entry to verification history
+                String failureEntry = java.time.LocalDateTime.now().format(
+                        java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) + 
+                        ": " + batchId + " - ❌ NOT FOUND";
+                
+                Platform.runLater(() -> {
+                    verificationHistory.add(0, failureEntry);
+                });
+                
+                // Do NOT mark as verified, do NOT update UI
+                return;
             } else {
-                // Backend unreachable or batch not found - use fallback
+                // Backend unavailable - use fallback verification
+                System.out.println("Backend UNAVAILABLE for batch: " + trimmedBatchId + " - using fallback verification");
+                showAlert(Alert.AlertType.WARNING, "Backend Unavailable", 
+                    "Backend unavailable - using fallback verification.");
                 productName = "Product (Batch " + batchId + ")";
                 quality = "VERIFIED";
                 qualityScore = 85.0;
@@ -438,10 +579,10 @@ public class ConsumerController implements SimulationListener {
      * Fetch batch data from the backend ledger/API.
      * 
      * @param batchId The batch ID to fetch
-     * @return Map containing batch data, or null if not found or error
+     * @return FetchResult containing status (FOUND, NOT_FOUND, UNAVAILABLE) and optional data
      */
     @SuppressWarnings("unchecked")
-    private Map<String, Object> fetchBatchFromBackend(String batchId) {
+    private FetchResult fetchBatchFromBackend(String batchId) {
         try {
             // URL-encode the batch ID to prevent injection and handle special characters
             String encodedBatchId = URLEncoder.encode(batchId, StandardCharsets.UTF_8.toString());
@@ -457,35 +598,29 @@ public class ConsumerController implements SimulationListener {
                 
                 if (response.isSuccessful() && body != null) {
                     String responseBody = body.string();
-                    return mapper.readValue(responseBody, Map.class);
+                    Map<String, Object> data = mapper.readValue(responseBody, Map.class);
+                    System.out.println("FetchResult: FOUND - batch " + batchId + " retrieved successfully");
+                    return FetchResult.found(data);
                 } else if (response.code() == 404) {
-                    System.out.println("Batch not found in backend: " + batchId);
-                    return null;
+                    System.out.println("FetchResult: NOT_FOUND - batch " + batchId + " does not exist in backend");
+                    return FetchResult.notFound();
                 } else {
-                    System.err.println("Backend returned error " + response.code() + " for batch: " + batchId);
-                    return null;
+                    System.err.println("FetchResult: UNAVAILABLE - backend returned error " + response.code() + " for batch: " + batchId);
+                    return FetchResult.unavailable();
                 }
             }
         } catch (java.net.ConnectException e) {
-            System.err.println("Cannot connect to backend service: " + e.getMessage());
-            Platform.runLater(() -> {
-                showAlert(Alert.AlertType.WARNING, "Backend Unavailable", 
-                    "Could not connect to backend service. Using fallback verification.");
-            });
-            return null;
+            System.err.println("FetchResult: UNAVAILABLE - cannot connect to backend service: " + e.getMessage());
+            return FetchResult.unavailable();
         } catch (java.net.SocketTimeoutException e) {
-            System.err.println("Backend request timed out: " + e.getMessage());
-            Platform.runLater(() -> {
-                showAlert(Alert.AlertType.WARNING, "Request Timeout", 
-                    "Backend request timed out. Using fallback verification.");
-            });
-            return null;
+            System.err.println("FetchResult: UNAVAILABLE - backend request timed out: " + e.getMessage());
+            return FetchResult.unavailable();
         } catch (IOException e) {
-            System.err.println("Error fetching batch from backend: " + e.getMessage());
-            return null;
+            System.err.println("FetchResult: UNAVAILABLE - error fetching batch from backend: " + e.getMessage());
+            return FetchResult.unavailable();
         } catch (Exception e) {
-            System.err.println("Unexpected error fetching batch: " + e.getMessage());
-            return null;
+            System.err.println("FetchResult: UNAVAILABLE - unexpected error fetching batch: " + e.getMessage());
+            return FetchResult.unavailable();
         }
     }
     
