@@ -93,8 +93,12 @@ public class LogisticsController implements SimulationListener {
     // Track temperature chart series by batch ID (thread-safe for Kafka consumer access)
     private Map<String, XYChart.Series<Number, Number>> temperatureSeriesMap = new ConcurrentHashMap<>();
     
-    // Start time for chart X axis (seconds since controller initialization)
+    // Start time for chart X axis (milliseconds since epoch, used to calculate seconds since controller initialization)
     private long chartStartTimeMillis;
+    
+    // Chart axis configuration constants
+    private static final double CHART_AXIS_EXPANSION_THRESHOLD = 10.0; // Expand when within 10 seconds of upper bound
+    private static final double CHART_AXIS_EXPANSION_AMOUNT = 30.0; // Extend by 30 seconds when expanding
     
     // Track latest environmental data by batch ID for shipments table
     private Map<String, ShipmentEnvironmentalData> environmentalDataMap = new ConcurrentHashMap<>();
@@ -135,6 +139,14 @@ public class LogisticsController implements SimulationListener {
     // Temperature chart configuration
     private static final int MAX_CHART_DATA_POINTS = 20;
     private static final int MAX_ALERT_ITEMS = 50;
+    
+    /**
+     * Format seconds value as a time label string (e.g., "10s", "120s").
+     * Used for consistent time label formatting when converting numeric X values to strings.
+     */
+    private static String formatSecondsAsTimeLabel(double seconds) {
+        return String.format("%.0fs", seconds);
+    }
     
     // Demo data identifier
     private static final String DEMO_DATA_SUFFIX = "(demo)";
@@ -536,8 +548,8 @@ public class LogisticsController implements SimulationListener {
             series.getData().add(new XYChart.Data<>(secondsSinceStart, event.getTemperature()));
             
             // Update X axis upper bound if needed to show all data points
-            if (temperatureTimeAxis != null && secondsSinceStart > temperatureTimeAxis.getUpperBound() - 10) {
-                temperatureTimeAxis.setUpperBound(secondsSinceStart + 30);
+            if (temperatureTimeAxis != null && secondsSinceStart > temperatureTimeAxis.getUpperBound() - CHART_AXIS_EXPANSION_THRESHOLD) {
+                temperatureTimeAxis.setUpperBound(secondsSinceStart + CHART_AXIS_EXPANSION_AMOUNT);
             }
             
             // Keep chart size reasonable - limit to last N points
@@ -546,7 +558,7 @@ public class LogisticsController implements SimulationListener {
             }
             
             System.out.println("Added temperature point: " + event.getBatchId() + " = " + 
-                event.getTemperature() + "°C at " + String.format("%.1fs", secondsSinceStart));
+                event.getTemperature() + "°C at " + formatSecondsAsTimeLabel(secondsSinceStart));
         } catch (Exception e) {
             System.err.println("Error adding temperature data point: " + e.getMessage());
         }
@@ -1914,7 +1926,7 @@ public class LogisticsController implements SimulationListener {
             if (tempSeries != null && tempSeries.getData() != null) {
                 for (XYChart.Data<Number, Number> point : tempSeries.getData()) {
                     // Convert numeric X value (seconds) back to a time label
-                    String timeLabel = String.format("%.0fs", point.getXValue().doubleValue());
+                    String timeLabel = formatSecondsAsTimeLabel(point.getXValue().doubleValue());
                     result.addTemperaturePoint(
                             System.currentTimeMillis(), 
                             point.getYValue().doubleValue(),
@@ -1955,7 +1967,7 @@ public class LogisticsController implements SimulationListener {
         // Populate temperature series from chart data
         for (XYChart.Data<Number, Number> point : tempSeries.getData()) {
             // Convert numeric X value (seconds) back to a time label
-            String timeLabel = String.format("%.0fs", point.getXValue().doubleValue());
+            String timeLabel = formatSecondsAsTimeLabel(point.getXValue().doubleValue());
             result.addTemperaturePoint(
                     System.currentTimeMillis(), 
                     point.getYValue().doubleValue(),
