@@ -311,6 +311,11 @@ public class SimulationManager {
         // Use NORMAL scenario if none provided
         Scenario effectiveScenario = scenario != null ? scenario : Scenario.NORMAL;
         
+        // Mark as running and notify listeners immediately to update UI fast
+        // This ensures "Starting simulation..." disappears quickly and UI shows active state
+        running.set(true);
+        notifyStarted(batchId, farmerId);
+        
         try {
             logger.info("=== Starting End-to-End Simulation ===");
             logger.info("Batch: {}, Farmer: {}, Scenario: {}", batchId, farmerId, effectiveScenario.getDisplayName());
@@ -378,8 +383,8 @@ public class SimulationManager {
                 handleSimulationEvent(event);
             }, updateIntervalMs);
             
-            // Notify listeners
-            notifyStarted(batchId, farmerId);
+            // Note: Listeners were already notified at the start of this method
+            // to ensure fast UI update. No need to notify again here.
             
             logger.info("=== Simulation Started Successfully ===");
             logger.info("Batch: {}, Scenario: {}, Waypoints: {}", 
@@ -389,6 +394,9 @@ public class SimulationManager {
             startProgressMonitoring(batchId);
             
         } catch (Exception e) {
+            // Reset state since we failed after marking as running
+            running.set(false);
+            currentSimulation.set(null);
             logger.error("Failed to start simulation for batch: {}", batchId, e);
             notifyError(batchId, "Failed to start simulation: " + e.getMessage());
         }
