@@ -15,6 +15,7 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import org.vericrop.gui.util.QRDecoder;
+import org.vericrop.service.TemperatureService;
 import org.vericrop.service.simulation.SimulationConfig;
 import org.vericrop.service.simulation.SimulationListener;
 import org.vericrop.service.simulation.SimulationManager;
@@ -464,6 +465,60 @@ public class ConsumerController implements SimulationListener {
             "Quality score based on temperature and time");
     }
     
+    /**
+     * Display average temperature for the delivered batch.
+     * Retrieves temperature data from TemperatureService and shows it in the UI.
+     * Shows "N/A" if no temperature samples exist for the batch.
+     * 
+     * @param batchId The batch identifier to get temperature data for
+     */
+    private void displayAverageTemperature(String batchId) {
+        if (temperatureLabel == null) {
+            return;
+        }
+        
+        try {
+            // Get TemperatureService from ApplicationContext
+            TemperatureService tempService = MainApp.getInstance()
+                .getApplicationContext()
+                .getTemperatureService();
+            
+            if (tempService != null) {
+                TemperatureService.TemperatureMonitoring monitoring = tempService.getMonitoring(batchId);
+                
+                if (monitoring != null && monitoring.getReadingCount() > 0) {
+                    // Display average temperature with one decimal place
+                    double avgTemp = monitoring.getAvgTemp();
+                    temperatureLabel.setText(String.format("%.1f°C", avgTemp));
+                    
+                    // Color based on temperature compliance (2-8°C is optimal for cold chain)
+                    if (avgTemp >= 2.0 && avgTemp <= 8.0) {
+                        temperatureLabel.setStyle("-fx-text-fill: #10b981;"); // Green - compliant
+                    } else if (avgTemp < 2.0 || avgTemp > 10.0) {
+                        temperatureLabel.setStyle("-fx-text-fill: #dc2626;"); // Red - out of range
+                    } else {
+                        temperatureLabel.setStyle("-fx-text-fill: #f59e0b;"); // Yellow - marginal
+                    }
+                    
+                    System.out.println("ConsumerController: Displayed average temperature " + 
+                        String.format("%.1f°C", avgTemp) + " for batch " + batchId);
+                } else {
+                    // No temperature samples recorded
+                    temperatureLabel.setText("N/A");
+                    temperatureLabel.setStyle("-fx-text-fill: #64748b;"); // Gray
+                    System.out.println("ConsumerController: No temperature data for batch " + batchId);
+                }
+            } else {
+                temperatureLabel.setText("N/A");
+                temperatureLabel.setStyle("-fx-text-fill: #64748b;");
+            }
+        } catch (Exception e) {
+            System.err.println("Error getting average temperature: " + e.getMessage());
+            temperatureLabel.setText("N/A");
+            temperatureLabel.setStyle("-fx-text-fill: #64748b;");
+        }
+    }
+    
     // ========== SimulationListener Implementation ==========
     
     @Override
@@ -539,6 +594,9 @@ public class ConsumerController implements SimulationListener {
                 
                 // Display final quality
                 displayFinalQuality(batchId, finalQuality);
+                
+                // Get and display average temperature from TemperatureService
+                displayAverageTemperature(batchId);
                 
                 // Update all journey steps to complete
                 updateJourneyFromProgress(batchId, 100.0, "Delivered");
