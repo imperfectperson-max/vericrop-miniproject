@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.vericrop.gui.services.SimulationAsyncService;
 import org.vericrop.service.DeliverySimulator;
 import org.vericrop.service.MapSimulator;
 import org.vericrop.service.ScenarioManager;
@@ -28,6 +29,7 @@ public class SimulationRestController {
     private final ScenarioManager scenarioManager;
     private final DeliverySimulator deliverySimulator;
     private final SimulationManager simulationManager;
+    private final SimulationAsyncService simulationAsyncService;
     
     /**
      * Constructor with Spring dependency injection.
@@ -36,12 +38,14 @@ public class SimulationRestController {
     public SimulationRestController(MapSimulator mapSimulator, 
                                    ScenarioManager scenarioManager,
                                    DeliverySimulator deliverySimulator,
-                                   SimulationManager simulationManager) {
+                                   SimulationManager simulationManager,
+                                   SimulationAsyncService simulationAsyncService) {
         this.mapSimulator = mapSimulator;
         this.scenarioManager = scenarioManager;
         this.deliverySimulator = deliverySimulator;
         this.simulationManager = simulationManager;
-        logger.info("SimulationRestController initialized with all dependencies");
+        this.simulationAsyncService = simulationAsyncService;
+        logger.info("SimulationRestController initialized with all dependencies including async service");
     }
     
     /**
@@ -285,5 +289,165 @@ public class SimulationRestController {
         error.put("message", message);
         error.put("timestamp", System.currentTimeMillis());
         return error;
+    }
+    
+    /**
+     * Start a new simulation asynchronously.
+     * Returns HTTP 202 Accepted immediately with a simulation ID.
+     * The actual simulation creation runs in the background.
+     * 
+     * <h3>Async Simulation Flow</h3>
+     * <ol>
+     *   <li>Client calls POST /api/simulation/start-async</li>
+     *   <li>Server immediately returns HTTP 202 with simulation_id</li>
+     *   <li>Simulation creation runs in background thread</li>
+     *   <li>Client polls GET /api/simulation/{id}/status for progress</li>
+     * </ol>
+     * 
+     * @param request Simulation start request with parameters
+     * @return HTTP 202 Accepted with simulation ID for polling
+     */
+    @PostMapping("/start-async")
+    public ResponseEntity<Map<String, Object>> startSimulationAsync(@RequestBody Map<String, Object> request) {
+        try {
+            // Generate unique simulation ID
+            String simulationId = "SIM_" + System.currentTimeMillis() + "_" + 
+                                  UUID.randomUUID().toString().substring(0, 8);
+            
+            // Extract parameters with defaults
+            String batchId = (String) request.getOrDefault("batch_id", "BATCH_" + System.currentTimeMillis());
+            String farmerId = (String) request.getOrDefault("farmer_id", "FARMER_DEFAULT");
+            
+            // Origin coordinates (default: Sunny Valley Farm)
+            double originLat = getDoubleValue(request, "origin_lat", 42.3601);
+            double originLon = getDoubleValue(request, "origin_lon", -71.0589);
+            String originName = (String) request.getOrDefault("origin_name", "Sunny Valley Farm");
+            
+            // Destination coordinates (default: Metro Fresh Warehouse)
+            double destLat = getDoubleValue(request, "dest_lat", 42.3736);
+            double destLon = getDoubleValue(request, "dest_lon", -71.1097);
+            String destName = (String) request.getOrDefault("dest_name", "Metro Fresh Warehouse");
+            
+            // Simulation parameters
+            int numWaypoints = getIntValue(request, "num_waypoints", 20);
+            double avgSpeedKmh = getDoubleValue(request, "avg_speed_kmh", 50.0);
+            long updateIntervalMs = getLongValue(request, "update_interval_ms", 10000);
+            
+            // Quick validation - check for existing running simulation
+            if (SimulationManager.isInitialized() && simulationManager.isRunning()) {
+                String runningId = simulationManager.getSimulationId();
+                return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(createConflictResponse(runningId));
+            }
+            
+            // Start async simulation creation (returns immediately)
+            simulationAsyncService.createSimulationAsync(
+                simulationId, batchId, farmerId,
+                originLat, originLon, originName,
+                destLat, destLon, destName,
+                numWaypoints, avgSpeedKmh, updateIntervalMs
+            );
+            
+            logger.info("✅ Async simulation creation scheduled: {} for batch {}", simulationId, batchId);
+            
+            // Build response with simulation ID for polling
+            Map<String, Object> response = new HashMap<>();
+            response.put("accepted", true);
+            response.put("simulation_id", simulationId);
+            response.put("batch_id", batchId);
+            response.put("farmer_id", farmerId);
+            response.put("message", "Simulation creation started. Poll /api/simulation/" + simulationId + "/status for progress.");
+            response.put("status_url", "/api/simulation/" + simulationId + "/status");
+            response.put("timestamp", System.currentTimeMillis());
+            
+            // Return HTTP 202 Accepted immediately
+            return ResponseEntity.accepted().body(response);
+            
+        } catch (Exception e) {
+            logger.error("Error scheduling async simulation", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(createErrorResponse("Failed to schedule simulation: " + e.getMessage()));
+        }
+    }
+    
+    /**
+     * Get the status of an async simulation task.
+     * Use this endpoint to poll for simulation progress after calling start-async.
+     * 
+     * @param simulationId The simulation ID returned from start-async
+     * @return Current status of the simulation
+     */
+    @GetMapping("/{simulationId}/status")
+    public ResponseEntity<Map<String, Object>> getSimulationTaskStatus(@PathVariable String simulationId) {
+        try {
+            SimulationAsyncService.SimulationTaskStatus taskStatus = 
+                simulationAsyncService.getTaskStatus(simulationId);
+            
+            if (taskStatus == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(createErrorResponse("Simulation not found: " + simulationId));
+            }
+            
+            return ResponseEntity.ok(taskStatus.toMap());
+            
+        } catch (Exception e) {
+            logger.error("Error getting simulation status for {}", simulationId, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(createErrorResponse("Failed to get simulation status: " + e.getMessage()));
+        }
+    }
+    
+    /**
+     * Create a conflict response for when a simulation is already running.
+     */
+    private Map<String, Object> createConflictResponse(String runningSimulationId) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("error", true);
+        response.put("message", "Another simulation is already running");
+        response.put("running_simulation_id", runningSimulationId);
+        response.put("timestamp", System.currentTimeMillis());
+        return response;
+    }
+    
+    /**
+     * Safely extract a double value from a map with default.
+     */
+    private double getDoubleValue(Map<String, Object> map, String key, double defaultValue) {
+        Object value = map.get(key);
+        if (value == null) return defaultValue;
+        if (value instanceof Number) return ((Number) value).doubleValue();
+        try {
+            return Double.parseDouble(value.toString());
+        } catch (NumberFormatException e) {
+            return defaultValue;
+        }
+    }
+    
+    /**
+     * Safely extract an int value from a map with default.
+     */
+    private int getIntValue(Map<String, Object> map, String key, int defaultValue) {
+        Object value = map.get(key);
+        if (value == null) return defaultValue;
+        if (value instanceof Number) return ((Number) value).intValue();
+        try {
+            return Integer.parseInt(value.toString());
+        } catch (NumberFormatException e) {
+            return defaultValue;
+        }
+    }
+    
+    /**
+     * Safely extract a long value from a map with default.
+     */
+    private long getLongValue(Map<String, Object> map, String key, long defaultValue) {
+        Object value = map.get(key);
+        if (value == null) return defaultValue;
+        if (value instanceof Number) return ((Number) value).longValue();
+        try {
+            return Long.parseLong(value.toString());
+        } catch (NumberFormatException e) {
+            return defaultValue;
+        }
     }
 }
