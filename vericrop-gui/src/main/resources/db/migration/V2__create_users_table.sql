@@ -62,7 +62,7 @@ VALUES (
     '$2a$10$U1pDvXD5wH5y8ZQ7n9r8O.jV3KNY8j3r9sQP.rY8K9mVN2QH5xO6.',
     'farmer@vericrop.local',
     'Demo Farmer',
-    'FARMER',
+    'PRODUCER',
     'active'
 );
 
@@ -73,6 +73,6 @@ VALUES (
     '$2a$10$vWdKG6jN7xR8L4oQ3eT9juHYxC5mP8nZ2wR7QiV5bN9sY3jT6kH8K',
     'supplier@vericrop.local',
     'Demo Supplier',
-    'SUPPLIER',
+    'LOGISTICS',
     'active'
 );
