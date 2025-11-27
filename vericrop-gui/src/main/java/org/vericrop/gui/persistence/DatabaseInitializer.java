@@ -34,6 +34,16 @@ public class DatabaseInitializer {
     private static final String SCHEMA_PATH = "/db/schema.sql";
     
     /**
+     * Maximum length for SQL statement previews in log messages.
+     */
+    private static final int MAX_LOG_PREVIEW_LENGTH = 80;
+    
+    /**
+     * Truncation length for SQL statement previews (leaves room for ellipsis).
+     */
+    private static final int PREVIEW_TRUNCATION_LENGTH = 77;
+    
+    /**
      * Private constructor to prevent instantiation.
      */
     private DatabaseInitializer() {
@@ -215,7 +225,9 @@ public class DatabaseInitializer {
                         failCount++;
                         // Log the error but continue with other statements
                         // Many errors are expected (e.g., "relation already exists" warnings)
-                        String preview = sql.length() > 80 ? sql.substring(0, 77) + "..." : sql;
+                        String preview = sql.length() > MAX_LOG_PREVIEW_LENGTH 
+                            ? sql.substring(0, PREVIEW_TRUNCATION_LENGTH) + "..." 
+                            : sql;
                         preview = preview.replaceAll("\\s+", " ");
                         logger.debug("DatabaseInitializer: Statement warning/error: {} for statement: {}", 
                                     e.getMessage(), preview);

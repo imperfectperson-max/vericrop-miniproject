@@ -69,14 +69,9 @@ public class ApplicationContext {
         this.batchRepository = new PostgresBatchRepository(configService);
         
         // Initialize database schema (idempotent - safe to run multiple times)
+        // The DatabaseInitializer handles errors internally and logs them
         DataSource dataSource = this.batchRepository.getDataSource();
-        try {
-            DatabaseInitializer.initialize(dataSource);
-            logger.info("✅ Database schema initialized successfully");
-        } catch (Exception e) {
-            logger.warn("⚠️  Database schema initialization encountered issues: {}. Continuing anyway.", 
-                       e.getMessage());
-        }
+        DatabaseInitializer.initialize(dataSource);
         
         // Initialize DAO layer with shared DataSource
         this.userDao = new UserDao(dataSource);

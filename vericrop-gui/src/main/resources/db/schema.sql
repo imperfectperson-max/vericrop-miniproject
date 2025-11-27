@@ -46,6 +46,8 @@ CREATE TABLE IF NOT EXISTS batches (
 );
 
 -- Batch quality history table: tracks quality changes over time
+-- Note: Foreign key to batches(batch_id) is established by Flyway migrations.
+-- This table intentionally has no FK here for flexibility during initial setup.
 CREATE TABLE IF NOT EXISTS batch_quality_history (
     id BIGSERIAL PRIMARY KEY,
     batch_id VARCHAR(255) NOT NULL,
