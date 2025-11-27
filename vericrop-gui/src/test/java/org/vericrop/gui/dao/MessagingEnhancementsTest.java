@@ -76,7 +76,8 @@ class MessagingEnhancementsTest {
         Message longMessage = new Message(1L, 2L, "Test", longBody);
         
         String preview = longMessage.getBodyPreview();
-        assertTrue(preview.length() <= 100);
+        // Preview is 97 chars + "..." = exactly 100 chars
+        assertEquals(100, preview.length());
         assertTrue(preview.endsWith("..."));
         
         // Test null body

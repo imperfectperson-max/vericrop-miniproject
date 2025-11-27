@@ -177,10 +177,17 @@ public class UserDao {
      * Search for active users by username or full name (partial match).
      * Useful for contact search in messaging.
      * 
-     * @param searchTerm Search term to match against username or full name
+     * @param searchTerm Search term to match against username or full name. 
+     *                   If null or empty, returns an empty list.
      * @return List of matching users (excluding the current user if specified)
      */
     public List<User> searchUsers(String searchTerm) {
+        // Validate input to prevent returning all users on empty search
+        if (searchTerm == null || searchTerm.trim().isEmpty()) {
+            logger.debug("Search term is null or empty, returning empty list");
+            return new ArrayList<>();
+        }
+        
         String sql = "SELECT id, username, email, full_name, role, status, last_login, " +
                      "failed_login_attempts, locked_until, created_at, updated_at " +
                      "FROM users WHERE status = 'active' " +
@@ -188,7 +195,7 @@ public class UserDao {
                      "ORDER BY username";
         
         List<User> users = new ArrayList<>();
-        String pattern = "%" + searchTerm + "%";
+        String pattern = "%" + searchTerm.trim() + "%";
         
         try (Connection conn = dataSource.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -210,10 +217,17 @@ public class UserDao {
     /**
      * Get all active users except the specified user (for contact list).
      * 
-     * @param excludeUsername Username to exclude from results
+     * @param excludeUsername Username to exclude from results. If null or empty,
+     *                        returns all active users.
      * @return List of all active users except the specified one
      */
     public List<User> findAllActiveExcluding(String excludeUsername) {
+        // If excludeUsername is null or empty, return all active users
+        if (excludeUsername == null || excludeUsername.trim().isEmpty()) {
+            logger.debug("excludeUsername is null or empty, returning all active users");
+            return findAllActive();
+        }
+        
         String sql = "SELECT id, username, email, full_name, role, status, last_login, " +
                      "failed_login_attempts, locked_until, created_at, updated_at " +
                      "FROM users WHERE status = 'active' AND username != ? ORDER BY username";
@@ -223,7 +237,7 @@ public class UserDao {
         try (Connection conn = dataSource.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             
-            stmt.setString(1, excludeUsername);
+            stmt.setString(1, excludeUsername.trim());
             
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {

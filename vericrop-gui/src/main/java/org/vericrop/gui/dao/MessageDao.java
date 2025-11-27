@@ -62,13 +62,31 @@ public class MessageDao {
      * Send a new message from one user to another using usernames.
      * This method looks up user IDs from usernames and then sends the message.
      * 
-     * @param senderUsername Sender's username
-     * @param recipientUsername Recipient's username  
-     * @param subject Message subject
-     * @param body Message body
-     * @return Created Message object with ID and usernames set, or null if creation failed
+     * @param senderUsername Sender's username (required)
+     * @param recipientUsername Recipient's username (required)
+     * @param subject Message subject (required)
+     * @param body Message body (required)
+     * @return Created Message object with ID and usernames set, or null if creation failed or validation fails
      */
     public Message sendMessageByUsername(String senderUsername, String recipientUsername, String subject, String body) {
+        // Validate required parameters
+        if (senderUsername == null || senderUsername.trim().isEmpty()) {
+            logger.warn("Cannot send message: senderUsername is null or empty");
+            return null;
+        }
+        if (recipientUsername == null || recipientUsername.trim().isEmpty()) {
+            logger.warn("Cannot send message: recipientUsername is null or empty");
+            return null;
+        }
+        if (subject == null || subject.trim().isEmpty()) {
+            logger.warn("Cannot send message: subject is null or empty");
+            return null;
+        }
+        if (body == null || body.trim().isEmpty()) {
+            logger.warn("Cannot send message: body is null or empty");
+            return null;
+        }
+        
         String lookupSql = "SELECT id FROM users WHERE username = ? AND status = 'active'";
         String insertSql = "INSERT INTO messages (sender_id, recipient_id, subject, body, sent_at, is_read) " +
                           "VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, FALSE) " +
@@ -78,7 +96,7 @@ public class MessageDao {
             // Look up sender ID
             Long senderId = null;
             try (PreparedStatement stmt = conn.prepareStatement(lookupSql)) {
-                stmt.setString(1, senderUsername);
+                stmt.setString(1, senderUsername.trim());
                 try (ResultSet rs = stmt.executeQuery()) {
                     if (rs.next()) {
                         senderId = rs.getLong("id");
@@ -92,7 +110,7 @@ public class MessageDao {
             // Look up recipient ID
             Long recipientId = null;
             try (PreparedStatement stmt = conn.prepareStatement(lookupSql)) {
-                stmt.setString(1, recipientUsername);
+                stmt.setString(1, recipientUsername.trim());
                 try (ResultSet rs = stmt.executeQuery()) {
                     if (rs.next()) {
                         recipientId = rs.getLong("id");
@@ -107,16 +125,16 @@ public class MessageDao {
             try (PreparedStatement stmt = conn.prepareStatement(insertSql)) {
                 stmt.setLong(1, senderId);
                 stmt.setLong(2, recipientId);
-                stmt.setString(3, subject);
-                stmt.setString(4, body);
+                stmt.setString(3, subject.trim());
+                stmt.setString(4, body.trim());
                 
                 try (ResultSet rs = stmt.executeQuery()) {
                     if (rs.next()) {
-                        Message message = new Message(senderId, recipientId, subject, body);
+                        Message message = new Message(senderId, recipientId, subject.trim(), body.trim());
                         message.setId(rs.getLong("id"));
                         message.setSentAt(rs.getTimestamp("sent_at").toLocalDateTime());
-                        message.setSenderUsername(senderUsername);
-                        message.setRecipientUsername(recipientUsername);
+                        message.setSenderUsername(senderUsername.trim());
+                        message.setRecipientUsername(recipientUsername.trim());
                         logger.info("✅ Message sent successfully from {} to {}", senderUsername, recipientUsername);
                         return message;
                     }
