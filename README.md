@@ -1396,18 +1396,94 @@ nano .env
 
 ## Authentication and Messaging
 
-VeriCrop now includes a complete user authentication and messaging system with PostgreSQL backend.
+VeriCrop includes a complete user authentication and messaging system with PostgreSQL backend and REST API support.
 
 ### Features
 
 - **User Registration**: Create accounts with username, email, password, and role selection
 - **Secure Authentication**: BCrypt password hashing, account lockout protection
-- **Role-Based Access**: Four role types (FARMER, CONSUMER, ADMIN, SUPPLIER)
+- **JWT Token Authentication**: REST API endpoints secured with JWT tokens
+- **Role-Based Access**: Four role types (PRODUCER, CONSUMER, ADMIN, LOGISTICS)
 - **User Messaging**: Send and receive messages between users
 - **Inbox/Sent Items**: Manage messages with read/unread status
 - **Session Management**: Secure session handling with role-based navigation
 
-### Quick Start
+### REST API Endpoints
+
+VeriCrop provides REST API endpoints for authentication:
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/auth/register` | POST | Register a new user account |
+| `/api/auth/login` | POST | Authenticate and receive JWT token |
+| `/api/auth/validate` | GET | Validate a JWT token |
+| `/api/auth/me` | GET | Get current user info from token |
+| `/api/auth/health` | GET | Health check for auth service |
+
+#### Registration Example
+
+```bash
+curl -X POST http://localhost:8080/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "newuser",
+    "email": "newuser@example.com",
+    "password": "SecurePass123",
+    "fullName": "New User",
+    "role": "PRODUCER"
+  }'
+```
+
+**Password Requirements:**
+- Minimum 8 characters
+- At least one uppercase letter (A-Z)
+- At least one lowercase letter (a-z)
+- At least one digit (0-9)
+
+**Response (HTTP 201 Created):**
+```json
+{
+  "success": true,
+  "message": "User registered successfully",
+  "username": "newuser",
+  "role": "PRODUCER"
+}
+```
+
+#### Login Example
+
+```bash
+curl -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "newuser",
+    "password": "SecurePass123"
+  }'
+```
+
+**Response (HTTP 200 OK):**
+```json
+{
+  "success": true,
+  "message": "Login successful",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "username": "newuser",
+  "role": "PRODUCER",
+  "fullName": "New User",
+  "expiresIn": 86400
+}
+```
+
+#### Using JWT Token
+
+Include the JWT token in the Authorization header for authenticated requests:
+
+```bash
+curl -X GET http://localhost:8080/api/auth/me \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+### Quick Start (GUI)
 
 1. **Start the application** - Login screen appears automatically
 2. **Use demo accounts** or register a new account:
@@ -1430,10 +1506,24 @@ Migrations run automatically on application startup. No manual setup required!
 ### Authentication Features
 
 - **BCrypt Password Hashing**: Secure password storage (never plaintext)
+- **JWT Token Authentication**: Stateless authentication for REST API (24-hour expiration)
 - **Failed Login Tracking**: Account locks after 5 failed attempts
 - **Lockout Duration**: 30 minutes automatic unlock
 - **Role-Based Access**: Different dashboards for each role
 - **Session Persistence**: Sessions maintained until application close
+
+### Security Considerations
+
+1. **Password Security**: Passwords are hashed with BCrypt (cost factor 10)
+2. **Token Security**: JWT tokens are signed with HMAC-SHA256
+3. **Account Protection**: Automatic lockout after failed attempts
+4. **Error Messages**: Generic error messages prevent user enumeration
+5. **Input Validation**: Server-side validation for all inputs
+
+For production deployment, configure the JWT secret:
+```bash
+export JWT_SECRET="your-very-long-and-secure-secret-key-min-32-chars"
+```
 
 ### Messaging Features
 
