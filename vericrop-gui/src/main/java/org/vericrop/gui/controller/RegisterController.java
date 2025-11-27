@@ -220,13 +220,18 @@ public class RegisterController {
     }
     
     /**
-     * Get the selected role from toggle buttons
+     * Get the selected role from toggle buttons.
+     * Maps UI selection to database role names:
+     * - Farmer → PRODUCER (producer/farmer operations)
+     * - Consumer → CONSUMER (consumer operations)
+     * - Supplier → LOGISTICS (logistics/supplier operations)
+     * - Admin → ADMIN (access to all UIs)
      */
     private String getSelectedRole() {
         Toggle selected = roleGroup.getSelectedToggle();
-        if (selected == farmerToggle) return "FARMER";
+        if (selected == farmerToggle) return "PRODUCER";
         if (selected == consumerToggle) return "CONSUMER";
-        if (selected == supplierToggle) return "SUPPLIER";
+        if (selected == supplierToggle) return "LOGISTICS";
         if (selected == adminToggle) return "ADMIN";
         return null;
     }

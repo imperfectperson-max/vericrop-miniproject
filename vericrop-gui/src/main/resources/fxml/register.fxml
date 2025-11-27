@@ -74,11 +74,11 @@
         <VBox spacing="5">
             <Label text="Select Your Role *" style="-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #555;"/>
             <HBox spacing="10" alignment="CENTER">
-                <ToggleButton fx:id="farmerToggle" text="👨‍🌾 Farmer" 
+                <ToggleButton fx:id="farmerToggle" text="👨‍🌾 Producer" 
                               style="-fx-pref-width: 95px; -fx-pref-height: 40px;" toggleGroup="$roleGroup"/>
                 <ToggleButton fx:id="consumerToggle" text="👥 Consumer" 
                               style="-fx-pref-width: 95px; -fx-pref-height: 40px;" toggleGroup="$roleGroup"/>
-                <ToggleButton fx:id="supplierToggle" text="🏭 Supplier" 
+                <ToggleButton fx:id="supplierToggle" text="🚚 Logistics" 
                               style="-fx-pref-width: 95px; -fx-pref-height: 40px;" toggleGroup="$roleGroup"/>
                 <ToggleButton fx:id="adminToggle" text="🔧 Admin" 
                               style="-fx-pref-width: 95px; -fx-pref-height: 40px;" toggleGroup="$roleGroup"/>

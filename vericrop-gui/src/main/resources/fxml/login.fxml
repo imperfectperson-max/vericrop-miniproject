@@ -68,7 +68,9 @@
             <CheckBox fx:id="demoModeCheckbox" text="Enable Demo Mode (skip authentication)"
                       style="-fx-font-size: 11px; -fx-text-fill: #666;"
                       onAction="#handleDemoModeToggle"/>
-            <Label text="Demo: admin/admin123, farmer/farmer123, supplier/supplier123"
+            <Label text="Demo users: producer_demo, logistics_demo, consumer_demo, admin_demo"
+                   style="-fx-font-size: 9px; -fx-text-fill: #888; -fx-font-style: italic;"/>
+            <Label text="Password for all: DemoPass123!"
                    style="-fx-font-size: 9px; -fx-text-fill: #888; -fx-font-style: italic;"/>
         </VBox>
     </VBox>
