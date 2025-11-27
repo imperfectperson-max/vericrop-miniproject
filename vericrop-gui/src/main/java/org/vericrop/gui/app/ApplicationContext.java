@@ -4,7 +4,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.vericrop.gui.clients.MLClientService;
 import org.vericrop.gui.config.ConfigService;
-import org.vericrop.gui.dao.MessageDao;
 import org.vericrop.gui.dao.ParticipantDao;
 import org.vericrop.gui.dao.UserDao;
 import org.vericrop.gui.persistence.PostgresBatchRepository;
@@ -34,7 +33,6 @@ public class ApplicationContext {
     
     // DAO layer
     private final UserDao userDao;
-    private final MessageDao messageDao;
     private final ParticipantDao participantDao;
     
     // Business services
@@ -72,7 +70,6 @@ public class ApplicationContext {
         // Initialize DAO layer with shared DataSource
         DataSource dataSource = this.batchRepository.getDataSource();
         this.userDao = new UserDao(dataSource);
-        this.messageDao = new MessageDao(dataSource);
         this.participantDao = new ParticipantDao(dataSource);
         
         // Initialize business services
@@ -181,10 +178,6 @@ public class ApplicationContext {
 
     public UserDao getUserDao() {
         return userDao;
-    }
-
-    public MessageDao getMessageDao() {
-        return messageDao;
     }
     
     public ParticipantDao getParticipantDao() {

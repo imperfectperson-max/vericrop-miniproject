@@ -57,7 +57,7 @@
         <!-- Password Field -->
         <VBox spacing="5">
             <Label text="Password *" style="-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #555;"/>
-            <PasswordField fx:id="passwordField" promptText="Enter password (min 6 characters)" 
+            <PasswordField fx:id="passwordField" promptText="Min 8 chars, uppercase, lowercase, digit" 
                            style="-fx-pref-width: 400px; -fx-pref-height: 35px;"/>
             <Label fx:id="passwordError" style="-fx-text-fill: #d32f2f; -fx-font-size: 11px;" managed="false" visible="false"/>
         </VBox>

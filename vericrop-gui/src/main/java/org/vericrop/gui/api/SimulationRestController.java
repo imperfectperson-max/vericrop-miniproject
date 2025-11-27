@@ -4,21 +4,29 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import org.vericrop.gui.models.Simulation;
+import org.vericrop.gui.models.SimulationBatch;
 import org.vericrop.gui.services.SimulationAsyncService;
+import org.vericrop.gui.services.SimulationPersistenceService;
+import org.vericrop.gui.services.SimulationStateService;
 import org.vericrop.service.DeliverySimulator;
 import org.vericrop.service.MapSimulator;
 import org.vericrop.service.ScenarioManager;
 import org.vericrop.service.simulation.SimulationManager;
 
+import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 
 /**
  * REST API controller for simulation and map state access.
  * Provides endpoints to retrieve current map simulation state, scenario information,
- * and active shipments tracking.
+ * and active shipments tracking. Includes SSE for real-time state updates.
  */
 @RestController
 @RequestMapping("/api/simulation")
@@ -30,6 +38,11 @@ public class SimulationRestController {
     private final DeliverySimulator deliverySimulator;
     private final SimulationManager simulationManager;
     private final SimulationAsyncService simulationAsyncService;
+    private final SimulationPersistenceService simulationPersistenceService;
+    private final SimulationStateService simulationStateService;
+    
+    // SSE emitters for real-time state updates
+    private final List<SseEmitter> sseEmitters = new CopyOnWriteArrayList<>();
     
     /**
      * Constructor with Spring dependency injection.
@@ -39,13 +52,21 @@ public class SimulationRestController {
                                    ScenarioManager scenarioManager,
                                    DeliverySimulator deliverySimulator,
                                    SimulationManager simulationManager,
-                                   SimulationAsyncService simulationAsyncService) {
+                                   SimulationAsyncService simulationAsyncService,
+                                   SimulationPersistenceService simulationPersistenceService,
+                                   SimulationStateService simulationStateService) {
         this.mapSimulator = mapSimulator;
         this.scenarioManager = scenarioManager;
         this.deliverySimulator = deliverySimulator;
         this.simulationManager = simulationManager;
         this.simulationAsyncService = simulationAsyncService;
-        logger.info("SimulationRestController initialized with all dependencies including async service");
+        this.simulationPersistenceService = simulationPersistenceService;
+        this.simulationStateService = simulationStateService;
+        
+        // Register SSE broadcast callback with state service
+        this.simulationStateService.setStateBroadcastCallback(this::broadcastStateUpdate);
+        
+        logger.info("SimulationRestController initialized with all dependencies including SSE support");
     }
     
     /**
@@ -164,6 +185,132 @@ public class SimulationRestController {
         return ResponseEntity.ok(health);
     }
     
+    // ==================== Shared State API Endpoints ====================
+    
+    /**
+     * GET /api/simulation/state
+     * Get current shared simulation state.
+     * 
+     * @return Current simulation state from Kafka-backed store
+     */
+    @GetMapping("/state")
+    public ResponseEntity<Map<String, Object>> getSimulationState() {
+        try {
+            Map<String, Object> state = simulationStateService.getCurrentState();
+            return ResponseEntity.ok(state);
+        } catch (Exception e) {
+            logger.error("Error getting simulation state", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(createErrorResponse("Failed to get simulation state: " + e.getMessage()));
+        }
+    }
+    
+    /**
+     * POST /api/simulation/state/update
+     * Submit a state change event (authenticated).
+     * Publishes to Kafka and updates in-memory cache.
+     * 
+     * @param request State update request with event data
+     * @return Updated state
+     */
+    @PostMapping("/state/update")
+    public ResponseEntity<Map<String, Object>> updateSimulationState(@RequestBody Map<String, Object> request) {
+        try {
+            // Extract update type and data
+            String eventType = (String) request.getOrDefault("event_type", "STATE_UPDATE");
+            String role = (String) request.getOrDefault("role", "unknown");
+            Map<String, Object> data = (Map<String, Object>) request.getOrDefault("data", new HashMap<>());
+            
+            // Apply state update
+            Map<String, Object> updatedState = simulationStateService.applyStateUpdate(eventType, role, data);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "State updated successfully");
+            response.put("event_type", eventType);
+            response.put("state", updatedState);
+            response.put("timestamp", System.currentTimeMillis());
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            logger.error("Error updating simulation state", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(createErrorResponse("Failed to update state: " + e.getMessage()));
+        }
+    }
+    
+    /**
+     * GET /api/simulation/stream
+     * Server-Sent Events (SSE) endpoint for live state updates.
+     * Clients subscribe to receive real-time simulation state changes.
+     * 
+     * @return SSE emitter for streaming updates
+     */
+    @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter streamSimulationState() {
+        // Set timeout to 30 minutes to prevent resource leaks from dead connections
+        SseEmitter emitter = new SseEmitter(30 * 60 * 1000L);
+        
+        sseEmitters.add(emitter);
+        logger.info("SSE client connected. Total clients: {}", sseEmitters.size());
+        
+        // Send initial state on connect
+        try {
+            Map<String, Object> initialState = simulationStateService.getCurrentState();
+            initialState.put("event_type", "CONNECTED");
+            emitter.send(SseEmitter.event()
+                .name("state")
+                .data(initialState));
+        } catch (IOException e) {
+            logger.warn("Failed to send initial state to SSE client: {}", e.getMessage());
+        }
+        
+        // Handle client disconnect
+        emitter.onCompletion(() -> {
+            sseEmitters.remove(emitter);
+            logger.info("SSE client disconnected. Remaining clients: {}", sseEmitters.size());
+        });
+        
+        emitter.onTimeout(() -> {
+            sseEmitters.remove(emitter);
+            logger.info("SSE client timed out. Remaining clients: {}", sseEmitters.size());
+        });
+        
+        emitter.onError(e -> {
+            sseEmitters.remove(emitter);
+            logger.warn("SSE client error: {}. Remaining clients: {}", e.getMessage(), sseEmitters.size());
+        });
+        
+        return emitter;
+    }
+    
+    /**
+     * Broadcast state update to all connected SSE clients.
+     * Called by SimulationStateService when state changes.
+     */
+    private void broadcastStateUpdate(Map<String, Object> state) {
+        List<SseEmitter> deadEmitters = new ArrayList<>();
+        
+        for (SseEmitter emitter : sseEmitters) {
+            try {
+                emitter.send(SseEmitter.event()
+                    .name("state")
+                    .data(state));
+            } catch (IOException e) {
+                logger.debug("Failed to send to SSE client, marking for removal: {}", e.getMessage());
+                deadEmitters.add(emitter);
+            }
+        }
+        
+        // Clean up dead emitters
+        sseEmitters.removeAll(deadEmitters);
+        
+        if (!deadEmitters.isEmpty()) {
+            logger.debug("Removed {} dead SSE clients. Remaining: {}", deadEmitters.size(), sseEmitters.size());
+        }
+    }
+    
     /**
      * Get all active shipments currently in simulation.
      * Returns a list of active deliveries with their current status and location.
@@ -234,17 +381,34 @@ public class SimulationRestController {
     
     /**
      * Start a new simulation with a selected scenario.
+     * Requires supplier and consumer selection by username.
      * 
-     * @param request Simulation start request with scenario selection
-     * @return Simulation start response with batch ID
+     * @param request Simulation start request with scenario selection and supplier/consumer usernames
+     * @return Simulation start response with simulation ID, token, and batch ID
      */
     @PostMapping("/start")
     public ResponseEntity<Map<String, Object>> startSimulation(@RequestBody Map<String, Object> request) {
         try {
-            // Extract parameters
+            // Extract required parameters
+            String supplierUsername = (String) request.get("supplierUsername");
+            String consumerUsername = (String) request.get("consumerUsername");
+            
+            // Validate required supplier and consumer usernames
+            if (supplierUsername == null || supplierUsername.trim().isEmpty()) {
+                return ResponseEntity.badRequest()
+                    .body(createErrorResponse("supplierUsername is required"));
+            }
+            if (consumerUsername == null || consumerUsername.trim().isEmpty()) {
+                return ResponseEntity.badRequest()
+                    .body(createErrorResponse("consumerUsername is required"));
+            }
+            
+            // Extract optional parameters
             String scenarioId = (String) request.getOrDefault("scenario_id", "scenario-01");
             String batchId = (String) request.getOrDefault("batch_id", "BATCH_" + System.currentTimeMillis());
             String farmerId = (String) request.getOrDefault("farmer_id", "FARMER_DEFAULT");
+            String title = (String) request.getOrDefault("title", "Simulation " + System.currentTimeMillis());
+            Long ownerUserId = getLongValue(request, "owner_user_id", 1L); // Default to admin user
             
             // Validate scenario
             if (!scenarioManager.isValidScenario(scenarioId)) {
@@ -259,25 +423,455 @@ public class SimulationRestController {
                         simulationManager.getSimulationId()));
             }
             
-            // Start simulation (will be handled by SimulationManager if used from GUI)
-            // For REST API, we return instructions
+            // Start simulation with persistence (validates supplier/consumer exist)
+            SimulationPersistenceService.SimulationStartResult result = 
+                simulationPersistenceService.startSimulation(
+                    title, ownerUserId, supplierUsername.trim(), consumerUsername.trim(), null);
+            
+            if (!result.isSuccess()) {
+                return ResponseEntity.badRequest()
+                    .body(createErrorResponse(result.getError()));
+            }
+            
+            Simulation simulation = result.getSimulation();
+            
+            // Build success response
             Map<String, Object> response = new HashMap<>();
-            response.put("message", "Simulation start requested");
+            response.put("success", true);
+            response.put("message", "Simulation started successfully");
+            response.put("simulation_id", simulation.getId().toString());
+            response.put("simulation_token", simulation.getSimulationToken());
             response.put("batch_id", batchId);
             response.put("scenario_id", scenarioId);
             response.put("farmer_id", farmerId);
-            response.put("note", "Use GUI producer screen or LogisticsController to start full simulation");
+            response.put("title", simulation.getTitle());
+            response.put("status", simulation.getStatus());
+            response.put("owner_username", simulation.getOwnerUsername());
+            response.put("supplier_username", simulation.getSupplierUsername());
+            response.put("consumer_username", simulation.getConsumerUsername());
+            response.put("started_at", simulation.getStartedAt().toString());
             response.put("scenario_info", scenarioManager.getScenarioInfo(scenarioId));
+            response.put("timestamp", System.currentTimeMillis());
             
-            logger.info("Simulation start requested: batch={}, scenario={}", batchId, scenarioId);
+            logger.info("✅ Simulation started: {} (supplier={}, consumer={})", 
+                       simulation.getId(), supplierUsername, consumerUsername);
             
-            return ResponseEntity.ok(response);
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
             
         } catch (Exception e) {
             logger.error("Error starting simulation", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(createErrorResponse("Failed to start simulation: " + e.getMessage()));
         }
+    }
+    
+    /**
+     * Get simulation by ID with access control.
+     * Only returns simulation if requesting user is owner, supplier, or consumer.
+     * 
+     * @param simulationId Simulation UUID
+     * @param userId User ID for access control (from header or query param)
+     * @return Simulation details if accessible
+     */
+    @GetMapping("/{simulationId}")
+    public ResponseEntity<Map<String, Object>> getSimulation(
+            @PathVariable String simulationId,
+            @RequestHeader(value = "X-User-Id", required = false) Long headerUserId,
+            @RequestParam(value = "userId", required = false) Long queryUserId) {
+        try {
+            UUID simId = UUID.fromString(simulationId);
+            Long userId = headerUserId != null ? headerUserId : queryUserId;
+            
+            Optional<Simulation> simOpt = simulationPersistenceService.getSimulation(simId);
+            if (simOpt.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(createErrorResponse("Simulation not found: " + simulationId));
+            }
+            
+            Simulation simulation = simOpt.get();
+            
+            // Check access control if userId provided
+            if (userId != null && !simulation.canUserAccess(userId)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(createErrorResponse("Access denied: user cannot view this simulation"));
+            }
+            
+            return ResponseEntity.ok(simulationToMap(simulation));
+            
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest()
+                .body(createErrorResponse("Invalid simulation ID format: " + simulationId));
+        } catch (Exception e) {
+            logger.error("Error getting simulation {}", simulationId, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(createErrorResponse("Failed to get simulation: " + e.getMessage()));
+        }
+    }
+    
+    /**
+     * Get simulation by token for multi-device access.
+     * 
+     * @param token Simulation token
+     * @return Simulation details if token is valid
+     */
+    @GetMapping("/by-token/{token}")
+    public ResponseEntity<Map<String, Object>> getSimulationByToken(@PathVariable String token) {
+        try {
+            Optional<Simulation> simOpt = simulationPersistenceService.getSimulationByToken(token);
+            if (simOpt.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(createErrorResponse("Simulation not found for token"));
+            }
+            
+            return ResponseEntity.ok(simulationToMap(simOpt.get()));
+            
+        } catch (Exception e) {
+            logger.error("Error getting simulation by token", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(createErrorResponse("Failed to get simulation: " + e.getMessage()));
+        }
+    }
+    
+    /**
+     * List simulations accessible by a user.
+     * Returns simulations where user is owner, supplier, or consumer.
+     * 
+     * @param userId User ID
+     * @param activeOnly If true, only return active simulations
+     * @return List of accessible simulations
+     */
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<Map<String, Object>> getUserSimulations(
+            @PathVariable Long userId,
+            @RequestParam(value = "activeOnly", defaultValue = "false") boolean activeOnly) {
+        try {
+            List<Simulation> simulations = activeOnly ?
+                simulationPersistenceService.getActiveSimulationsForUser(userId) :
+                simulationPersistenceService.getSimulationsForUser(userId);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("simulations", simulations.stream()
+                .map(this::simulationToMap)
+                .collect(Collectors.toList()));
+            response.put("count", simulations.size());
+            response.put("user_id", userId);
+            response.put("active_only", activeOnly);
+            response.put("timestamp", System.currentTimeMillis());
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            logger.error("Error getting user simulations for {}", userId, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(createErrorResponse("Failed to get simulations: " + e.getMessage()));
+        }
+    }
+    
+    /**
+     * Get simulation report with batches.
+     * 
+     * @param simulationId Simulation UUID
+     * @param userId User ID for access control
+     * @return Report data with batch details
+     */
+    @GetMapping("/{simulationId}/report")
+    public ResponseEntity<Map<String, Object>> getSimulationReport(
+            @PathVariable String simulationId,
+            @RequestHeader(value = "X-User-Id", required = false) Long headerUserId,
+            @RequestParam(value = "userId", required = false) Long queryUserId) {
+        try {
+            UUID simId = UUID.fromString(simulationId);
+            Long userId = headerUserId != null ? headerUserId : queryUserId;
+            
+            // Check access control if userId provided
+            if (userId != null && !simulationPersistenceService.canUserAccess(simId, userId)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(createErrorResponse("Access denied: user cannot view this simulation report"));
+            }
+            
+            Map<String, Object> report = simulationPersistenceService.generateReport(simId);
+            if (report.containsKey("error")) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(report);
+            }
+            
+            return ResponseEntity.ok(report);
+            
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest()
+                .body(createErrorResponse("Invalid simulation ID format: " + simulationId));
+        } catch (Exception e) {
+            logger.error("Error getting simulation report {}", simulationId, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(createErrorResponse("Failed to get report: " + e.getMessage()));
+        }
+    }
+    
+    /**
+     * Get batches for a simulation.
+     * 
+     * @param simulationId Simulation UUID
+     * @return List of batches
+     */
+    @GetMapping("/{simulationId}/batches")
+    public ResponseEntity<Map<String, Object>> getSimulationBatches(
+            @PathVariable String simulationId,
+            @RequestHeader(value = "X-User-Id", required = false) Long headerUserId,
+            @RequestParam(value = "userId", required = false) Long queryUserId) {
+        try {
+            UUID simId = UUID.fromString(simulationId);
+            Long userId = headerUserId != null ? headerUserId : queryUserId;
+            
+            // Check access control if userId provided
+            if (userId != null && !simulationPersistenceService.canUserAccess(simId, userId)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(createErrorResponse("Access denied: user cannot view these batches"));
+            }
+            
+            List<SimulationBatch> batches = simulationPersistenceService.getBatches(simId);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("simulation_id", simulationId);
+            response.put("batches", batches.stream()
+                .map(this::batchToMap)
+                .collect(Collectors.toList()));
+            response.put("count", batches.size());
+            response.put("timestamp", System.currentTimeMillis());
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest()
+                .body(createErrorResponse("Invalid simulation ID format: " + simulationId));
+        } catch (Exception e) {
+            logger.error("Error getting simulation batches {}", simulationId, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(createErrorResponse("Failed to get batches: " + e.getMessage()));
+        }
+    }
+    
+    /**
+     * Create a batch within a simulation.
+     * 
+     * @param simulationId Simulation UUID
+     * @param request Batch creation request
+     * @return Created batch details
+     */
+    @PostMapping("/{simulationId}/batches")
+    public ResponseEntity<Map<String, Object>> createBatch(
+            @PathVariable String simulationId,
+            @RequestBody Map<String, Object> request) {
+        try {
+            UUID simId = UUID.fromString(simulationId);
+            int quantity = getIntValue(request, "quantity", 100);
+            
+            SimulationBatch batch = simulationPersistenceService.createBatch(simId, quantity, null);
+            if (batch == null) {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(createErrorResponse("Failed to create batch"));
+            }
+            
+            Map<String, Object> response = batchToMap(batch);
+            response.put("success", true);
+            response.put("message", "Batch created successfully");
+            
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+            
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest()
+                .body(createErrorResponse("Invalid simulation ID format: " + simulationId));
+        } catch (Exception e) {
+            logger.error("Error creating batch for simulation {}", simulationId, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(createErrorResponse("Failed to create batch: " + e.getMessage()));
+        }
+    }
+    
+    /**
+     * Update batch progress.
+     * 
+     * @param batchId Batch UUID
+     * @param request Progress update data
+     * @return Updated batch details
+     */
+    @PatchMapping("/batches/{batchId}/progress")
+    public ResponseEntity<Map<String, Object>> updateBatchProgress(
+            @PathVariable String batchId,
+            @RequestBody Map<String, Object> request) {
+        try {
+            UUID id = UUID.fromString(batchId);
+            Double temperature = getNullableDoubleValue(request, "temperature");
+            Double humidity = getNullableDoubleValue(request, "humidity");
+            String location = (String) request.get("location");
+            Double progress = getNullableDoubleValue(request, "progress");
+            
+            simulationPersistenceService.updateBatchProgress(id, temperature, humidity, location, progress);
+            
+            Optional<SimulationBatch> batchOpt = simulationPersistenceService.getBatch(id);
+            if (batchOpt.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(createErrorResponse("Batch not found: " + batchId));
+            }
+            
+            Map<String, Object> response = batchToMap(batchOpt.get());
+            response.put("success", true);
+            response.put("message", "Batch progress updated");
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest()
+                .body(createErrorResponse("Invalid batch ID format: " + batchId));
+        } catch (Exception e) {
+            logger.error("Error updating batch progress {}", batchId, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(createErrorResponse("Failed to update batch: " + e.getMessage()));
+        }
+    }
+    
+    /**
+     * Complete a simulation.
+     * 
+     * @param simulationId Simulation UUID
+     * @return Updated simulation status
+     */
+    @PostMapping("/{simulationId}/complete")
+    public ResponseEntity<Map<String, Object>> completeSimulation(@PathVariable String simulationId) {
+        try {
+            UUID simId = UUID.fromString(simulationId);
+            simulationPersistenceService.completeSimulation(simId);
+            
+            Optional<Simulation> simOpt = simulationPersistenceService.getSimulation(simId);
+            if (simOpt.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(createErrorResponse("Simulation not found: " + simulationId));
+            }
+            
+            Map<String, Object> response = simulationToMap(simOpt.get());
+            response.put("success", true);
+            response.put("message", "Simulation completed");
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest()
+                .body(createErrorResponse("Invalid simulation ID format: " + simulationId));
+        } catch (Exception e) {
+            logger.error("Error completing simulation {}", simulationId, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(createErrorResponse("Failed to complete simulation: " + e.getMessage()));
+        }
+    }
+    
+    /**
+     * Stop a simulation.
+     * 
+     * @param simulationId Simulation UUID
+     * @return Updated simulation status
+     */
+    @PostMapping("/{simulationId}/stop")
+    public ResponseEntity<Map<String, Object>> stopSimulation(@PathVariable String simulationId) {
+        try {
+            UUID simId = UUID.fromString(simulationId);
+            simulationPersistenceService.stopSimulation(simId);
+            
+            Optional<Simulation> simOpt = simulationPersistenceService.getSimulation(simId);
+            if (simOpt.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(createErrorResponse("Simulation not found: " + simulationId));
+            }
+            
+            Map<String, Object> response = simulationToMap(simOpt.get());
+            response.put("success", true);
+            response.put("message", "Simulation stopped");
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest()
+                .body(createErrorResponse("Invalid simulation ID format: " + simulationId));
+        } catch (Exception e) {
+            logger.error("Error stopping simulation {}", simulationId, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(createErrorResponse("Failed to stop simulation: " + e.getMessage()));
+        }
+    }
+    
+    /**
+     * Validate simulation token for multi-device access.
+     * 
+     * @param simulationId Simulation UUID
+     * @param token Simulation token
+     * @return Validation result
+     */
+    @GetMapping("/{simulationId}/validate-token")
+    public ResponseEntity<Map<String, Object>> validateToken(
+            @PathVariable String simulationId,
+            @RequestParam String token) {
+        try {
+            UUID simId = UUID.fromString(simulationId);
+            boolean valid = simulationPersistenceService.validateToken(simId, token);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("valid", valid);
+            response.put("simulation_id", simulationId);
+            response.put("timestamp", System.currentTimeMillis());
+            
+            if (!valid) {
+                response.put("message", "Invalid token for this simulation");
+            }
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest()
+                .body(createErrorResponse("Invalid simulation ID format: " + simulationId));
+        } catch (Exception e) {
+            logger.error("Error validating token for simulation {}", simulationId, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(createErrorResponse("Failed to validate token: " + e.getMessage()));
+        }
+    }
+    
+    /**
+     * Convert Simulation to map for JSON response.
+     */
+    private Map<String, Object> simulationToMap(Simulation simulation) {
+        Map<String, Object> map = new HashMap<>();
+        map.put("id", simulation.getId().toString());
+        map.put("title", simulation.getTitle());
+        map.put("status", simulation.getStatus());
+        map.put("started_at", simulation.getStartedAt().toString());
+        if (simulation.getEndedAt() != null) {
+            map.put("ended_at", simulation.getEndedAt().toString());
+        }
+        map.put("owner_user_id", simulation.getOwnerUserId());
+        map.put("supplier_user_id", simulation.getSupplierUserId());
+        map.put("consumer_user_id", simulation.getConsumerUserId());
+        map.put("owner_username", simulation.getOwnerUsername());
+        map.put("supplier_username", simulation.getSupplierUsername());
+        map.put("consumer_username", simulation.getConsumerUsername());
+        map.put("simulation_token", simulation.getSimulationToken());
+        map.put("created_at", simulation.getCreatedAt().toString());
+        return map;
+    }
+    
+    /**
+     * Convert SimulationBatch to map for JSON response.
+     */
+    private Map<String, Object> batchToMap(SimulationBatch batch) {
+        Map<String, Object> map = new HashMap<>();
+        map.put("id", batch.getId().toString());
+        map.put("simulation_id", batch.getSimulationId().toString());
+        map.put("batch_index", batch.getBatchIndex());
+        map.put("quantity", batch.getQuantity());
+        map.put("status", batch.getStatus());
+        map.put("quality_score", batch.getQualityScore());
+        map.put("temperature", batch.getTemperature());
+        map.put("humidity", batch.getHumidity());
+        map.put("current_location", batch.getCurrentLocation());
+        map.put("progress", batch.getProgress());
+        map.put("created_at", batch.getCreatedAt().toString());
+        return map;
     }
     
     /**
@@ -420,6 +1014,20 @@ public class SimulationRestController {
             return Double.parseDouble(value.toString());
         } catch (NumberFormatException e) {
             return defaultValue;
+        }
+    }
+    
+    /**
+     * Safely extract a nullable Double value from a map.
+     */
+    private Double getNullableDoubleValue(Map<String, Object> map, String key) {
+        Object value = map.get(key);
+        if (value == null) return null;
+        if (value instanceof Number) return ((Number) value).doubleValue();
+        try {
+            return Double.parseDouble(value.toString());
+        } catch (NumberFormatException e) {
+            return null;
         }
     }
     

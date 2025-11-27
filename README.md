@@ -150,10 +150,107 @@ curl http://localhost:8080/api/simulation/status
 # Get all active shipments with real-time tracking
 curl http://localhost:8080/api/simulation/active-shipments
 
-# Start a simulation with a specific scenario (via REST API)
+# Start a simulation with supplier and consumer selection (required)
 curl -X POST http://localhost:8080/api/simulation/start \
   -H "Content-Type: application/json" \
-  -d '{"scenario_id": "scenario-02", "batch_id": "BATCH_TEST_001", "farmer_id": "FARMER_A"}'
+  -d '{
+    "supplierUsername": "supplier",
+    "consumerUsername": "farmer",
+    "title": "Apple Delivery Simulation",
+    "scenario_id": "scenario-02",
+    "batch_id": "BATCH_TEST_001"
+  }'
+```
+
+**Required Parameters for Starting Simulation:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `supplierUsername` | string | Username of the supplier user (must exist in users table) |
+| `consumerUsername` | string | Username of the consumer user (must exist in users table) |
+
+**Optional Parameters:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `title` | string | Auto-generated | Simulation title |
+| `scenario_id` | string | "scenario-01" | Delivery scenario ID |
+| `batch_id` | string | Auto-generated | Batch identifier |
+| `owner_user_id` | long | 1 | Owner user ID |
+
+**Start Simulation Response:**
+```json
+{
+  "success": true,
+  "message": "Simulation started successfully",
+  "simulation_id": "550e8400-e29b-41d4-a716-446655440000",
+  "simulation_token": "abc123def456...",
+  "batch_id": "BATCH_TEST_001",
+  "scenario_id": "scenario-02",
+  "title": "Apple Delivery Simulation",
+  "status": "running",
+  "owner_username": "admin",
+  "supplier_username": "supplier",
+  "consumer_username": "farmer",
+  "started_at": "2024-01-15T10:30:00"
+}
+```
+
+**Multi-Device Access with Simulation Token:**
+
+The `simulation_token` returned when starting a simulation allows multiple devices or instances to access the same simulation. Use the token to:
+
+```bash
+# Get simulation by token
+curl http://localhost:8080/api/simulation/by-token/{token}
+
+# Validate token for a simulation
+curl "http://localhost:8080/api/simulation/{simulationId}/validate-token?token={token}"
+```
+
+**Access Control:**
+
+Simulations are only accessible to:
+- The **owner** who created the simulation
+- The selected **supplier** user
+- The selected **consumer** user
+
+Pass `userId` via header or query param to enforce access control:
+```bash
+# Get simulation with access control
+curl -H "X-User-Id: 2" http://localhost:8080/api/simulation/{simulationId}
+
+# Get simulation report with access control
+curl "http://localhost:8080/api/simulation/{simulationId}/report?userId=2"
+```
+
+**Batch Management:**
+```bash
+# Create a batch within a simulation
+curl -X POST http://localhost:8080/api/simulation/{simulationId}/batches \
+  -H "Content-Type: application/json" \
+  -d '{"quantity": 100}'
+
+# Get batches for a simulation
+curl http://localhost:8080/api/simulation/{simulationId}/batches
+
+# Update batch progress
+curl -X PATCH http://localhost:8080/api/simulation/batches/{batchId}/progress \
+  -H "Content-Type: application/json" \
+  -d '{"temperature": 4.5, "humidity": 65.0, "location": "Highway Mile 50", "progress": 50.0}'
+```
+
+**Simulation Lifecycle:**
+```bash
+# Complete a simulation
+curl -X POST http://localhost:8080/api/simulation/{simulationId}/complete
+
+# Stop a simulation
+curl -X POST http://localhost:8080/api/simulation/{simulationId}/stop
+
+# List simulations for a user
+curl http://localhost:8080/api/simulation/user/{userId}
+
+# List only active simulations
+curl "http://localhost:8080/api/simulation/user/{userId}?activeOnly=true"
 ```
 
 **Example Map Snapshot Response:**
@@ -228,6 +325,125 @@ curl -X POST http://localhost:8080/api/simulation/start \
    - Use POST `/api/simulation/start` with scenario selection
    - Monitor progress via GET `/api/simulation/active-shipments`
    - Check map state via GET `/api/simulation/map`
+
+### Kafka-Backed Shared Simulation State (NEW)
+
+VeriCrop now supports **shared simulation state** across multiple running instances. This enables different users (farmer, supplier, admin, consumer) to observe and modify the same simulation state in real time.
+
+**Key Features:**
+- 📡 **Server-Sent Events (SSE)**: Real-time state streaming to connected clients
+- 🔄 **Kafka Event Sourcing**: State changes are published to Kafka for multi-instance synchronization
+- 👥 **Multi-Role Support**: Different users with different roles can participate in the same simulation
+- 🔐 **Role-Based Actions**: Each role can perform specific state modifications
+
+**REST API Endpoints:**
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/simulation/state` | GET | Get current shared simulation state |
+| `/api/simulation/state/update` | POST | Submit a state change event |
+| `/api/simulation/stream` | GET (SSE) | Subscribe to real-time state updates |
+
+**Getting Current State:**
+
+```bash
+curl http://localhost:8080/api/simulation/state
+```
+
+**Response:**
+```json
+{
+  "simulation_active": false,
+  "current_step": 0,
+  "temperature": 4.0,
+  "humidity": 85.0,
+  "location": "Origin",
+  "quality_score": 100.0,
+  "participants": {},
+  "batches": [],
+  "alerts": [],
+  "last_updated": 1700000000000,
+  "version": 1
+}
+```
+
+**Updating State (Role-Based):**
+
+```bash
+curl -X POST http://localhost:8080/api/simulation/state/update \
+  -H "Content-Type: application/json" \
+  -d '{
+    "event_type": "STEP_UPDATE",
+    "role": "supplier",
+    "data": {
+      "step": 5,
+      "temperature": 4.5,
+      "location": "Highway Mile 20"
+    }
+  }'
+```
+
+**Subscribing to State Updates (SSE):**
+
+```bash
+# Connect to SSE stream
+curl -N http://localhost:8080/api/simulation/stream
+```
+
+**JavaScript Client Example:**
+```javascript
+const eventSource = new EventSource('/api/simulation/stream');
+
+eventSource.addEventListener('state', (event) => {
+  const state = JSON.parse(event.data);
+  console.log('State update:', state);
+  // Update UI with new state
+  updateDashboard(state);
+});
+
+eventSource.onerror = (error) => {
+  console.error('SSE connection error:', error);
+};
+```
+
+**Supported Event Types:**
+- `SIMULATION_STARTED`: Simulation has started
+- `SIMULATION_STOPPED`: Simulation has stopped
+- `STEP_UPDATE`: Environmental data update (temperature, humidity, location)
+- `PARTICIPANT_JOINED`: A user joined the simulation
+- `PARTICIPANT_LEFT`: A user left the simulation
+- `ALERT_ADDED`: A new alert was generated
+- `BATCH_ADDED`: A new batch was created
+- `STATE_UPDATE`: Generic state modification
+
+**Running Kafka Locally:**
+
+Use Docker Compose to start Kafka and Zookeeper:
+
+```bash
+docker-compose -f docker-compose-kafka.yml up -d
+```
+
+Or use the full stack:
+
+```bash
+docker-compose up -d kafka zookeeper
+```
+
+**Environment Variables:**
+
+```bash
+# Enable Kafka for state synchronization
+KAFKA_ENABLED=true
+KAFKA_BOOTSTRAP_SERVERS=localhost:9092
+```
+
+**Multi-Instance Setup:**
+
+1. Start Kafka: `docker-compose up -d kafka zookeeper`
+2. Start first instance: `./gradlew :vericrop-gui:run` (port 8080)
+3. Start second instance: `SERVER_PORT=8081 ./gradlew :vericrop-gui:run` (port 8081)
+4. Both instances will share simulation state through Kafka
 
 ### Realtime Simulation Updates (NEW)
 
@@ -722,6 +938,25 @@ Database schema is managed through Flyway migrations located in `vericrop-gui/sr
 - **V1__create_batches_table.sql**: Batches and quality tracking tables
 - **V2__create_users_table.sql**: User authentication with BCrypt hashing
 - **V3__create_shipments_table.sql**: Shipment tracking with blockchain integration
+- **V7__create_simulations_table.sql**: Simulation persistence with supplier/consumer relationships
+
+**V7 Migration Details:**
+The V7 migration adds two new tables for simulation persistence:
+
+| Table | Description |
+|-------|-------------|
+| `simulations` | Stores simulation metadata with supplier/consumer relationships and unique simulation_token for multi-device access |
+| `simulation_batches` | Stores batch records created during simulation for report generation |
+
+**Simulations Table Fields:**
+- `id` (UUID): Primary key
+- `title` (string): Simulation title
+- `status` (string): created, running, completed, failed, stopped
+- `owner_user_id` (references users): User who created the simulation
+- `supplier_user_id` (references users): Supplier who can view this simulation
+- `consumer_user_id` (references users): Consumer who can view this simulation
+- `simulation_token` (string, unique): Secure token for multi-device access
+- `meta` (JSONB): Optional metadata
 
 Migrations run automatically on application startup when `spring.flyway.enabled=true` (default).
 
@@ -1396,18 +1631,94 @@ nano .env
 
 ## Authentication and Messaging
 
-VeriCrop now includes a complete user authentication and messaging system with PostgreSQL backend.
+VeriCrop includes a complete user authentication and messaging system with PostgreSQL backend and REST API support.
 
 ### Features
 
 - **User Registration**: Create accounts with username, email, password, and role selection
 - **Secure Authentication**: BCrypt password hashing, account lockout protection
-- **Role-Based Access**: Four role types (FARMER, CONSUMER, ADMIN, SUPPLIER)
+- **JWT Token Authentication**: REST API endpoints secured with JWT tokens
+- **Role-Based Access**: Four role types (PRODUCER, CONSUMER, ADMIN, LOGISTICS)
 - **User Messaging**: Send and receive messages between users
 - **Inbox/Sent Items**: Manage messages with read/unread status
 - **Session Management**: Secure session handling with role-based navigation
 
-### Quick Start
+### REST API Endpoints
+
+VeriCrop provides REST API endpoints for authentication:
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/auth/register` | POST | Register a new user account |
+| `/api/auth/login` | POST | Authenticate and receive JWT token |
+| `/api/auth/validate` | GET | Validate a JWT token |
+| `/api/auth/me` | GET | Get current user info from token |
+| `/api/auth/health` | GET | Health check for auth service |
+
+#### Registration Example
+
+```bash
+curl -X POST http://localhost:8080/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "newuser",
+    "email": "newuser@example.com",
+    "password": "SecurePass123",
+    "fullName": "New User",
+    "role": "PRODUCER"
+  }'
+```
+
+**Password Requirements:**
+- Minimum 8 characters
+- At least one uppercase letter (A-Z)
+- At least one lowercase letter (a-z)
+- At least one digit (0-9)
+
+**Response (HTTP 201 Created):**
+```json
+{
+  "success": true,
+  "message": "User registered successfully",
+  "username": "newuser",
+  "role": "PRODUCER"
+}
+```
+
+#### Login Example
+
+```bash
+curl -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "newuser",
+    "password": "SecurePass123"
+  }'
+```
+
+**Response (HTTP 200 OK):**
+```json
+{
+  "success": true,
+  "message": "Login successful",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "username": "newuser",
+  "role": "PRODUCER",
+  "fullName": "New User",
+  "expiresIn": 86400
+}
+```
+
+#### Using JWT Token
+
+Include the JWT token in the Authorization header for authenticated requests:
+
+```bash
+curl -X GET http://localhost:8080/api/auth/me \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+### Quick Start (GUI)
 
 1. **Start the application** - Login screen appears automatically
 2. **Use demo accounts** or register a new account:
@@ -1430,10 +1741,24 @@ Migrations run automatically on application startup. No manual setup required!
 ### Authentication Features
 
 - **BCrypt Password Hashing**: Secure password storage (never plaintext)
+- **JWT Token Authentication**: Stateless authentication for REST API (24-hour expiration)
 - **Failed Login Tracking**: Account locks after 5 failed attempts
 - **Lockout Duration**: 30 minutes automatic unlock
 - **Role-Based Access**: Different dashboards for each role
 - **Session Persistence**: Sessions maintained until application close
+
+### Security Considerations
+
+1. **Password Security**: Passwords are hashed with BCrypt (cost factor 10)
+2. **Token Security**: JWT tokens are signed with HMAC-SHA256
+3. **Account Protection**: Automatic lockout after failed attempts
+4. **Error Messages**: Generic error messages prevent user enumeration
+5. **Input Validation**: Server-side validation for all inputs
+
+For production deployment, configure the JWT secret:
+```bash
+export JWT_SECRET="your-very-long-and-secure-secret-key-min-32-chars"
+```
 
 ### Messaging Features
 
