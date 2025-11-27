@@ -10,6 +10,7 @@ import org.mockito.quality.Strictness;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.vericrop.gui.dao.UserDao;
+import org.vericrop.gui.exception.UserCreationException;
 import org.vericrop.gui.models.User;
 import org.vericrop.gui.services.JwtService;
 
@@ -64,7 +65,7 @@ class AuthRestControllerTest {
     // ==================== Registration Tests ====================
     
     @Test
-    void testRegister_Success() {
+    void testRegister_Success() throws Exception {
         // Given
         AuthRestController.RegisterRequest request = new AuthRestController.RegisterRequest();
         request.setUsername("newuser");

@@ -9,7 +9,13 @@ import org.slf4j.LoggerFactory;
 import org.vericrop.gui.MainApp;
 import org.vericrop.gui.app.ApplicationContext;
 import org.vericrop.gui.dao.UserDao;
+import org.vericrop.gui.exception.DataAccessException;
+import org.vericrop.gui.exception.UserCreationException;
 import org.vericrop.gui.models.User;
+
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Controller for the user registration screen.
@@ -102,79 +108,146 @@ public class RegisterController {
         Task<RegistrationResult> registrationTask = new Task<>() {
             @Override
             protected RegistrationResult call() {
-                // Check for duplicates first to provide better error messages to users.
-                // Note: The database has UNIQUE constraints on username and email columns,
-                // which handle race conditions. If a duplicate is inserted between check and
-                // create, the database will reject it and UserDao.createUser() returns null.
-                if (userDao.usernameExists(finalUsername)) {
-                    return new RegistrationResult(null, "Username '" + finalUsername + "' is already taken");
-                }
-                if (userDao.emailExists(finalEmail)) {
-                    return new RegistrationResult(null, "Email '" + finalEmail + "' is already registered");
+                logger.debug("Starting registration process for user: {}", finalUsername);
+                
+                // Optimistic duplicate checks - advisory only, not authoritative
+                // The database constraint is the final arbiter to avoid race conditions
+                try {
+                    if (userDao.usernameExists(finalUsername)) {
+                        logger.debug("Advisory check: username '{}' already exists", finalUsername);
+                        return RegistrationResult.usernameError("Username '" + finalUsername + "' is already taken");
+                    }
+                    if (userDao.emailExists(finalEmail)) {
+                        logger.debug("Advisory check: email already exists");
+                        return RegistrationResult.emailError("Email is already registered");
+                    }
+                } catch (DataAccessException e) {
+                    logger.error("Database error during duplicate check: {}", e.getMessage());
+                    return RegistrationResult.generalError("Unable to verify availability. Please try again.");
                 }
                 
-                // Try to create the user (database constraints provide final protection)
-                User user = userDao.createUser(finalUsername, finalPassword, finalEmail, finalFullName, finalRole);
-                if (user != null) {
-                    return new RegistrationResult(user, null);
-                } else {
-                    // Could fail due to race condition with another registration
-                    return new RegistrationResult(null, "Could not create account. Username or email may already be taken. Please try again.");
+                // Try to create the user - database constraints provide final protection
+                try {
+                    User user = userDao.createUser(finalUsername, finalPassword, finalEmail, finalFullName, finalRole);
+                    logger.info("✅ Registration successful for user: {}", finalUsername);
+                    return RegistrationResult.success(user);
+                } catch (UserCreationException e) {
+                    logger.warn("Registration failed for user '{}': {}", finalUsername, e.getMessage());
+                    
+                    // Map exception to specific field error
+                    if (e.isDuplicateUsername()) {
+                        return RegistrationResult.usernameError(e.getMessage());
+                    } else if (e.isDuplicateEmail()) {
+                        return RegistrationResult.emailError(e.getMessage());
+                    } else {
+                        // General database error - provide user-friendly message
+                        return RegistrationResult.generalError(
+                            "Could not create account. Please try again or contact support.");
+                    }
                 }
             }
             
             @Override
             protected void succeeded() {
                 RegistrationResult result = getValue();
-                setFormDisabled(false);
-                
-                if (result.user != null) {
-                    logger.info("✅ Registration successful for user: {}", finalUsername);
-                    showStatus("✅ Account created successfully! Redirecting to login...", "success");
-                    
-                    // Navigate to login screen after 2 seconds
-                    new Thread(() -> {
-                        try {
-                            Thread.sleep(2000);
-                            Platform.runLater(() -> {
-                                MainApp mainApp = MainApp.getInstance();
-                                if (mainApp != null) {
-                                    mainApp.switchToScreen("login.fxml");
-                                }
-                            });
-                        } catch (InterruptedException e) {
-                            logger.error("Sleep interrupted", e);
-                            Thread.currentThread().interrupt();
-                        }
-                    }).start();
-                } else {
-                    logger.error("Registration failed: {}", result.errorMessage);
-                    showStatus("❌ " + result.errorMessage, "error");
-                }
+                handleRegistrationResult(result, finalUsername);
             }
             
             @Override
             protected void failed() {
                 setFormDisabled(false);
                 Throwable exception = getException();
-                logger.error("Registration failed with exception", exception);
-                showStatus("❌ Registration failed: " + exception.getMessage(), "error");
+                logger.error("Registration task failed with unexpected exception", exception);
+                showStatus("❌ Registration failed. Please try again.", "error");
             }
         };
         
         // Run task in background
-        new Thread(registrationTask).start();
+        new Thread(registrationTask, "RegistrationTask").start();
     }
     
-    /** Helper class to carry registration result */
-    private static class RegistrationResult {
-        final User user;
-        final String errorMessage;
+    /**
+     * Handle the registration result on the JavaFX Application Thread.
+     * This method is called from Task.succeeded() which runs on the JavaFX thread.
+     */
+    private void handleRegistrationResult(RegistrationResult result, String username) {
+        setFormDisabled(false);
         
-        RegistrationResult(User user, String errorMessage) {
+        if (result.isSuccess()) {
+            logger.info("✅ Registration successful for user: {}", username);
+            showStatus("✅ Account created successfully! Redirecting to login...", "success");
+            
+            // Navigate to login screen after 2 seconds using ScheduledExecutorService
+            // This keeps the delay off the JavaFX thread
+            ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread t = new Thread(r, "LoginRedirectTimer");
+                t.setDaemon(true);
+                return t;
+            });
+            
+            scheduler.schedule(() -> {
+                Platform.runLater(() -> {
+                    MainApp mainApp = MainApp.getInstance();
+                    if (mainApp != null) {
+                        mainApp.switchToScreen("login.fxml");
+                    }
+                });
+                scheduler.shutdown();
+            }, 2, TimeUnit.SECONDS);
+        } else {
+            // Show field-specific error if applicable
+            if (result.isUsernameError()) {
+                showError(usernameError, result.getErrorMessage());
+                logger.debug("Showing username error: {}", result.getErrorMessage());
+            } else if (result.isEmailError()) {
+                showError(emailError, result.getErrorMessage());
+                logger.debug("Showing email error: {}", result.getErrorMessage());
+            } else {
+                // General error - show in status label
+                showStatus("❌ " + result.getErrorMessage(), "error");
+                logger.debug("Showing general error: {}", result.getErrorMessage());
+            }
+        }
+    }
+    
+    /** 
+     * Helper class to carry registration result with field-specific error information.
+     */
+    private static class RegistrationResult {
+        private final User user;
+        private final String errorMessage;
+        private final ErrorType errorType;
+        
+        private enum ErrorType {
+            NONE, USERNAME, EMAIL, GENERAL
+        }
+        
+        private RegistrationResult(User user, String errorMessage, ErrorType errorType) {
             this.user = user;
             this.errorMessage = errorMessage;
+            this.errorType = errorType;
         }
+        
+        static RegistrationResult success(User user) {
+            return new RegistrationResult(user, null, ErrorType.NONE);
+        }
+        
+        static RegistrationResult usernameError(String message) {
+            return new RegistrationResult(null, message, ErrorType.USERNAME);
+        }
+        
+        static RegistrationResult emailError(String message) {
+            return new RegistrationResult(null, message, ErrorType.EMAIL);
+        }
+        
+        static RegistrationResult generalError(String message) {
+            return new RegistrationResult(null, message, ErrorType.GENERAL);
+        }
+        
+        boolean isSuccess() { return user != null; }
+        boolean isUsernameError() { return errorType == ErrorType.USERNAME; }
+        boolean isEmailError() { return errorType == ErrorType.EMAIL; }
+        String getErrorMessage() { return errorMessage; }
     }
     
     @FXML
