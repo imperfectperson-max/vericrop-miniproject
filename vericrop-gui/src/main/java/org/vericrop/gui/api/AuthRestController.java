@@ -13,6 +13,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.vericrop.gui.dao.UserDao;
+import org.vericrop.gui.exception.DataAccessException;
+import org.vericrop.gui.exception.UserCreationException;
 import org.vericrop.gui.models.User;
 import org.vericrop.gui.services.JwtService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -148,24 +150,29 @@ public class AuthRestController {
                     .body(createErrorResponse("Validation failed", validation.getError()));
             }
             
-            // Check for duplicate username
-            if (userDao.usernameExists(request.getUsername())) {
-                logger.warn("Registration failed: username already exists: {}", request.getUsername());
-                return ResponseEntity.badRequest()
-                    .body(createErrorResponse("Registration failed", "Username already exists"));
-            }
-            
-            // Check for duplicate email
-            if (userDao.emailExists(request.getEmail())) {
-                logger.warn("Registration failed: email already exists: {}", request.getEmail());
-                return ResponseEntity.badRequest()
-                    .body(createErrorResponse("Registration failed", "Email already exists"));
+            // Optimistic duplicate checks - advisory only
+            // These provide fast feedback but the database constraint is the final arbiter
+            try {
+                if (userDao.usernameExists(request.getUsername())) {
+                    logger.warn("Registration failed: username already exists: {}", request.getUsername());
+                    return ResponseEntity.badRequest()
+                        .body(createFieldErrorResponse("Registration failed", "Username already exists", "username"));
+                }
+                
+                if (userDao.emailExists(request.getEmail())) {
+                    logger.warn("Registration failed: email already exists for username attempt: {}", request.getUsername());
+                    return ResponseEntity.badRequest()
+                        .body(createFieldErrorResponse("Registration failed", "Email already exists", "email"));
+                }
+            } catch (DataAccessException e) {
+                logger.error("Database error during duplicate check: {}", e.getMessage());
+                // Continue to try creating the user - the DB constraint will catch duplicates
             }
             
             // Normalize role
             String role = normalizeRole(request.getRole());
             
-            // Create user (UserDao handles password hashing)
+            // Create user (UserDao handles password hashing and throws specific exceptions)
             User newUser = userDao.createUser(
                 request.getUsername(),
                 request.getPassword(),
@@ -173,13 +180,6 @@ public class AuthRestController {
                 request.getFullName(),
                 role
             );
-            
-            if (newUser == null) {
-                logger.error("Registration failed: user creation returned null");
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(createErrorResponse("Registration failed", 
-                          "Could not create user. Please try again."));
-            }
             
             // Build success response (don't return sensitive data)
             Map<String, Object> response = new HashMap<>();
@@ -193,6 +193,24 @@ public class AuthRestController {
             
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
             
+        } catch (UserCreationException e) {
+            // Handle specific user creation failures
+            logger.warn("Registration failed for user '{}': {}", 
+                       request != null ? request.getUsername() : "unknown", e.getMessage());
+            
+            String fieldName = e.getFieldName();
+            if (e.isDuplicateUsername()) {
+                return ResponseEntity.badRequest()
+                    .body(createFieldErrorResponse("Registration failed", e.getMessage(), "username"));
+            } else if (e.isDuplicateEmail()) {
+                return ResponseEntity.badRequest()
+                    .body(createFieldErrorResponse("Registration failed", e.getMessage(), "email"));
+            } else {
+                // General database error
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(createErrorResponse("Registration failed", 
+                          "Could not create user. Please try again."));
+            }
         } catch (Exception e) {
             logger.error("Registration error: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -658,6 +676,15 @@ public class AuthRestController {
         response.put("error", error);
         response.put("details", details);
         response.put("timestamp", System.currentTimeMillis());
+        return response;
+    }
+    
+    /**
+     * Create error response map with field information for field-specific errors.
+     */
+    private Map<String, Object> createFieldErrorResponse(String error, String details, String field) {
+        Map<String, Object> response = createErrorResponse(error, details);
+        response.put("field", field);
         return response;
     }
     
