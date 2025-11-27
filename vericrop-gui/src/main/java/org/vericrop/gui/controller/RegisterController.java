@@ -89,22 +89,43 @@ public class RegisterController {
         
         // Disable form during registration
         setFormDisabled(true);
-        showStatus("Creating account...", "info");
+        showStatus("Checking availability...", "info");
+        
+        // Store for use in inner class
+        final String finalUsername = username;
+        final String finalEmail = email;
+        final String finalFullName = fullName;
+        final String finalPassword = password;
+        final String finalRole = role.toUpperCase();
         
         // Run registration in background thread
-        Task<User> registrationTask = new Task<>() {
+        Task<RegistrationResult> registrationTask = new Task<>() {
             @Override
-            protected User call() {
-                return userDao.createUser(username, password, email, fullName, role.toUpperCase());
+            protected RegistrationResult call() {
+                // First check for duplicates
+                if (userDao.usernameExists(finalUsername)) {
+                    return new RegistrationResult(null, "Username '" + finalUsername + "' is already taken");
+                }
+                if (userDao.emailExists(finalEmail)) {
+                    return new RegistrationResult(null, "Email '" + finalEmail + "' is already registered");
+                }
+                
+                // Try to create the user
+                User user = userDao.createUser(finalUsername, finalPassword, finalEmail, finalFullName, finalRole);
+                if (user != null) {
+                    return new RegistrationResult(user, null);
+                } else {
+                    return new RegistrationResult(null, "Could not create account. Please try again.");
+                }
             }
             
             @Override
             protected void succeeded() {
-                User user = getValue();
+                RegistrationResult result = getValue();
                 setFormDisabled(false);
                 
-                if (user != null) {
-                    logger.info("✅ Registration successful for user: {}", username);
+                if (result.user != null) {
+                    logger.info("✅ Registration successful for user: {}", finalUsername);
                     showStatus("✅ Account created successfully! Redirecting to login...", "success");
                     
                     // Navigate to login screen after 2 seconds
@@ -119,11 +140,12 @@ public class RegisterController {
                             });
                         } catch (InterruptedException e) {
                             logger.error("Sleep interrupted", e);
+                            Thread.currentThread().interrupt();
                         }
                     }).start();
                 } else {
-                    logger.error("Registration failed - user creation returned null");
-                    showStatus("❌ Registration failed. Username or email may already exist.", "error");
+                    logger.error("Registration failed: {}", result.errorMessage);
+                    showStatus("❌ " + result.errorMessage, "error");
                 }
             }
             
@@ -138,6 +160,17 @@ public class RegisterController {
         
         // Run task in background
         new Thread(registrationTask).start();
+    }
+    
+    /** Helper class to carry registration result */
+    private static class RegistrationResult {
+        final User user;
+        final String errorMessage;
+        
+        RegistrationResult(User user, String errorMessage) {
+            this.user = user;
+            this.errorMessage = errorMessage;
+        }
     }
     
     @FXML

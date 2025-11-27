@@ -12,15 +12,20 @@ import java.util.Map;
 
 /**
  * Authentication Service for handling user login and session management.
- * Supports both database-backed authentication with BCrypt and simple mode.
+ * Supports both database-backed authentication with BCrypt and demo mode.
  * 
  * Database mode: Validates against PostgreSQL users table with BCrypt hashing
- * Simple mode: Used when database is unavailable (fallback for development)
+ * Demo mode: ONLY enabled when vericrop.demoMode system property is "true" - accepts demo credentials
+ * 
+ * SECURITY NOTE: Demo mode must be explicitly enabled and should never be used in production.
  */
 public class AuthenticationService {
     private static final Logger logger = LoggerFactory.getLogger(AuthenticationService.class);
     private static final int MAX_FAILED_ATTEMPTS = 5;
     private static final int LOCKOUT_DURATION_MINUTES = 30;
+    
+    /** System property to enable demo mode. Must be explicitly set to "true". */
+    private static final String DEMO_MODE_PROPERTY = "vericrop.demoMode";
     
     private String currentUser;
     private String currentRole;
@@ -31,6 +36,7 @@ public class AuthenticationService {
     private DataSource dataSource;
     private BCryptPasswordEncoder passwordEncoder;
     private boolean useDatabaseAuth;
+    private boolean demoModeEnabled;
 
     /**
      * Constructor for database-backed authentication (production)
@@ -41,21 +47,69 @@ public class AuthenticationService {
         this.sessionData = new HashMap<>();
         this.authenticated = false;
         this.useDatabaseAuth = true;
-        logger.info("✅ AuthenticationService initialized with database authentication");
+        this.demoModeEnabled = isDemoModeExplicitlyEnabled();
+        
+        if (demoModeEnabled) {
+            logger.warn("⚠️  DEMO MODE ENABLED - Authentication is relaxed. DO NOT use in production!");
+        }
+        logger.info("✅ AuthenticationService initialized with database authentication (demoMode={})", demoModeEnabled);
     }
 
     /**
-     * Constructor for simple mode (development/testing)
+     * Constructor for demo mode (development/testing only)
+     * Demo mode MUST be explicitly enabled via system property.
      */
     public AuthenticationService() {
         this.sessionData = new HashMap<>();
         this.authenticated = false;
         this.useDatabaseAuth = false;
-        logger.info("✅ AuthenticationService initialized in simple mode (no database)");
+        this.demoModeEnabled = isDemoModeExplicitlyEnabled();
+        
+        if (!demoModeEnabled) {
+            logger.error("❌ AuthenticationService initialized without database and demo mode is not enabled. " +
+                        "Authentication will fail. Set -Dvericrop.demoMode=true to enable demo mode.");
+        } else {
+            logger.warn("⚠️  DEMO MODE ENABLED - Authentication is relaxed. DO NOT use in production!");
+        }
+        logger.info("✅ AuthenticationService initialized (demoMode={}, databaseAuth={})", demoModeEnabled, useDatabaseAuth);
+    }
+    
+    /**
+     * Check if demo mode is explicitly enabled via system property.
+     * Demo mode must be explicitly requested by setting vericrop.demoMode=true
+     */
+    private static boolean isDemoModeExplicitlyEnabled() {
+        String demoMode = System.getProperty(DEMO_MODE_PROPERTY, "false");
+        return "true".equalsIgnoreCase(demoMode.trim());
+    }
+    
+    /**
+     * Check if demo mode is enabled
+     */
+    public boolean isDemoMode() {
+        return demoModeEnabled;
+    }
+    
+    /**
+     * Enable or disable demo mode programmatically.
+     * This should only be called from the UI toggle.
+     */
+    public void setDemoMode(boolean enabled) {
+        this.demoModeEnabled = enabled;
+        System.setProperty(DEMO_MODE_PROPERTY, String.valueOf(enabled));
+        if (enabled) {
+            logger.warn("⚠️  DEMO MODE ENABLED via UI toggle");
+        } else {
+            logger.info("Demo mode disabled via UI toggle");
+        }
     }
 
     /**
-     * Authenticate a user with username and password
+     * Authenticate a user with username and password.
+     * 
+     * In database mode: Validates credentials against the database with BCrypt.
+     * In demo mode (explicitly enabled): Accepts demo credentials for testing.
+     * 
      * @param username Username
      * @param password Password (plaintext)
      * @return true if authentication successful
@@ -66,12 +120,26 @@ public class AuthenticationService {
             return false;
         }
         
+        if (password == null || password.trim().isEmpty()) {
+            logger.warn("Login failed: empty password");
+            return false;
+        }
+        
+        // If database auth is available, use it
         if (useDatabaseAuth && dataSource != null) {
             return authenticateWithDatabase(username, password);
-        } else {
-            // Fallback to simple mode (for demo or when database unavailable)
-            return authenticateSimple(username, password);
         }
+        
+        // Only allow demo mode if explicitly enabled
+        if (demoModeEnabled) {
+            logger.warn("Using demo authentication for user: {}", username);
+            return authenticateDemoMode(username, password);
+        }
+        
+        // No database and demo mode not enabled - authentication fails
+        logger.error("Authentication failed: Database not available and demo mode not enabled. " +
+                    "Set -Dvericrop.demoMode=true to enable demo mode or configure database connection.");
+        return false;
     }
 
     /**
@@ -126,42 +194,81 @@ public class AuthenticationService {
             }
         } catch (SQLException e) {
             logger.error("Database authentication error: {}", e.getMessage());
-            // Fallback to simple mode on database error
-            logger.warn("Falling back to simple authentication mode");
-            return authenticateSimple(username, password);
+            
+            // Only fall back to demo mode if explicitly enabled
+            if (demoModeEnabled) {
+                logger.warn("Database error - falling back to demo authentication mode");
+                return authenticateDemoMode(username, password);
+            }
+            
+            // Don't fallback to simple mode - this was the security issue
+            logger.error("Authentication failed due to database error. Demo mode is not enabled.");
+            return false;
         }
     }
 
     /**
-     * Simple authentication (development/demo mode)
+     * Demo mode authentication (ONLY for testing/development).
+     * This accepts predefined demo credentials when demo mode is explicitly enabled.
+     * 
+     * SECURITY: This should NEVER be used in production. Demo mode must be explicitly enabled.
      */
-    private boolean authenticateSimple(String username, String password) {
-        // Simple validation for demo purposes
+    private boolean authenticateDemoMode(String username, String password) {
+        // In demo mode, we still require non-empty credentials
         if (password == null || password.trim().isEmpty()) {
-            logger.warn("Login failed: empty password");
+            logger.warn("Demo login failed: empty password");
             return false;
         }
         
-        // Determine role from username for demo
-        String role = "USER";
-        if (username.equalsIgnoreCase("admin")) {
-            role = "ADMIN";
-        } else if (username.equalsIgnoreCase("farmer")) {
-            role = "FARMER";
-        } else if (username.equalsIgnoreCase("supplier")) {
-            role = "SUPPLIER";
-        } else if (username.equalsIgnoreCase("consumer")) {
-            role = "CONSUMER";
+        // Validate against predefined demo accounts for security
+        // Only allow specific demo usernames with their expected passwords
+        String normalizedUsername = username.trim().toLowerCase();
+        String role;
+        
+        switch (normalizedUsername) {
+            case "admin":
+                if (!"admin123".equals(password)) {
+                    logger.warn("Demo login failed: incorrect password for demo admin account");
+                    return false;
+                }
+                role = "ADMIN";
+                break;
+            case "farmer":
+                if (!"farmer123".equals(password)) {
+                    logger.warn("Demo login failed: incorrect password for demo farmer account");
+                    return false;
+                }
+                role = "FARMER";
+                break;
+            case "supplier":
+                if (!"supplier123".equals(password)) {
+                    logger.warn("Demo login failed: incorrect password for demo supplier account");
+                    return false;
+                }
+                role = "SUPPLIER";
+                break;
+            case "consumer":
+                if (!"consumer123".equals(password)) {
+                    logger.warn("Demo login failed: incorrect password for demo consumer account");
+                    return false;
+                }
+                role = "CONSUMER";
+                break;
+            default:
+                // Don't allow arbitrary users in demo mode
+                logger.warn("Demo login failed: unknown demo account '{}'. " +
+                           "Valid demo accounts: admin, farmer, supplier, consumer", username);
+                return false;
         }
         
         this.currentUser = username;
         this.currentRole = role;
-        this.currentEmail = username + "@vericrop.local";
-        this.currentFullName = username;
+        this.currentEmail = username + "@vericrop.demo";
+        this.currentFullName = username.substring(0, 1).toUpperCase() + username.substring(1) + " (Demo)";
         this.authenticated = true;
         this.sessionData.clear();
         
-        logger.info("✅ User logged in (simple mode): {} (role: {})", username, role);
+        logger.info("✅ User logged in (DEMO MODE): {} (role: {})", username, role);
         return true;
     }
 
