@@ -123,14 +123,15 @@ public class RegisterController {
                         return RegistrationResult.emailError(e.getMessage());
                     } else {
                         // General database error - provide user-friendly message with exception detail
-                        String errorDetail = e.getMessage() != null ? e.getMessage() : "Unknown error";
+                        // UserCreationException messages are already sanitized in UserDao
+                        String errorDetail = e.getMessage() != null ? e.getMessage() : "Please try again or contact support.";
                         return RegistrationResult.generalError(
                             "Could not create account. " + errorDetail);
                     }
                 } catch (DataAccessException e) {
                     logger.error("Database error during registration for user '{}': {}", finalUsername, e.getMessage(), e);
-                    // Provide user-friendly message with exception detail
-                    String errorDetail = e.getMessage() != null ? e.getMessage() : "Unknown error";
+                    // DataAccessException messages are already sanitized in UserDao
+                    String errorDetail = e.getMessage() != null ? e.getMessage() : "Please try again or contact support.";
                     return RegistrationResult.generalError(
                         "Could not create account. " + errorDetail);
                 }
