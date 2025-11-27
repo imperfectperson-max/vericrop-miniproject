@@ -192,12 +192,21 @@ public class RegisterController {
             valid = false;
         }
         
-        // Validate password
+        // Validate password (at least 8 chars, uppercase, lowercase, digit)
         if (password.isEmpty()) {
             showError(passwordError, "Password is required");
             valid = false;
-        } else if (password.length() < 6) {
-            showError(passwordError, "Password must be at least 6 characters");
+        } else if (password.length() < 8) {
+            showError(passwordError, "Password must be at least 8 characters");
+            valid = false;
+        } else if (!password.matches(".*[A-Z].*")) {
+            showError(passwordError, "Password must contain at least one uppercase letter");
+            valid = false;
+        } else if (!password.matches(".*[a-z].*")) {
+            showError(passwordError, "Password must contain at least one lowercase letter");
+            valid = false;
+        } else if (!password.matches(".*\\d.*")) {
+            showError(passwordError, "Password must contain at least one digit");
             valid = false;
         }
         

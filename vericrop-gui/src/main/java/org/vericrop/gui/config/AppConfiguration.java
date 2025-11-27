@@ -1,13 +1,19 @@
 package org.vericrop.gui.config;
 
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import org.vericrop.gui.dao.UserDao;
+import org.vericrop.gui.services.JwtService;
 import org.vericrop.kafka.messaging.KafkaProducerService;
 import org.vericrop.service.QualityEvaluationService;
 import org.vericrop.service.impl.FileLedgerService;
+
+import javax.sql.DataSource;
 
 /**
  * Application configuration for VeriCrop services.
@@ -20,6 +26,21 @@ public class AppConfiguration {
     
     @Value("${ledger.path:ledger}")
     private String ledgerPath;
+    
+    @Value("${spring.datasource.url:jdbc:postgresql://localhost:5432/vericrop}")
+    private String dbUrl;
+    
+    @Value("${spring.datasource.username:vericrop}")
+    private String dbUsername;
+    
+    @Value("${spring.datasource.password:vericrop123}")
+    private String dbPassword;
+    
+    @Value("${jwt.secret:}")
+    private String jwtSecret;
+    
+    @Value("${jwt.expiration:86400000}")
+    private long jwtExpiration;
     
     /**
      * Configure CORS to allow requests from any origin.
@@ -137,5 +158,39 @@ public class AppConfiguration {
             deliverySimulator, mapService, temperatureService, alertService,
             mapSimulator, scenarioManager);
         return org.vericrop.service.simulation.SimulationManager.getInstance();
+    }
+    
+    /**
+     * Create DataSource bean for database connections.
+     * Used by authentication and user management services.
+     */
+    @Bean
+    public DataSource dataSource() {
+        HikariConfig config = new HikariConfig();
+        config.setJdbcUrl(dbUrl);
+        config.setUsername(dbUsername);
+        config.setPassword(dbPassword);
+        config.setMaximumPoolSize(10);
+        config.setMinimumIdle(2);
+        config.setConnectionTimeout(30000);
+        config.setIdleTimeout(600000);
+        config.setMaxLifetime(1800000);
+        return new HikariDataSource(config);
+    }
+    
+    /**
+     * Create UserDao bean for user database operations.
+     */
+    @Bean
+    public UserDao userDao(DataSource dataSource) {
+        return new UserDao(dataSource);
+    }
+    
+    /**
+     * Create JwtService bean for token generation and validation.
+     */
+    @Bean
+    public JwtService jwtService() {
+        return new JwtService(jwtSecret, jwtExpiration);
     }
 }
