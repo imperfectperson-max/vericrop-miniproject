@@ -102,7 +102,10 @@ public class RegisterController {
         Task<RegistrationResult> registrationTask = new Task<>() {
             @Override
             protected RegistrationResult call() {
-                // First check for duplicates
+                // Check for duplicates first to provide better error messages to users.
+                // Note: The database has UNIQUE constraints on username and email columns,
+                // which handle race conditions. If a duplicate is inserted between check and
+                // create, the database will reject it and UserDao.createUser() returns null.
                 if (userDao.usernameExists(finalUsername)) {
                     return new RegistrationResult(null, "Username '" + finalUsername + "' is already taken");
                 }
@@ -110,12 +113,13 @@ public class RegisterController {
                     return new RegistrationResult(null, "Email '" + finalEmail + "' is already registered");
                 }
                 
-                // Try to create the user
+                // Try to create the user (database constraints provide final protection)
                 User user = userDao.createUser(finalUsername, finalPassword, finalEmail, finalFullName, finalRole);
                 if (user != null) {
                     return new RegistrationResult(user, null);
                 } else {
-                    return new RegistrationResult(null, "Could not create account. Please try again.");
+                    // Could fail due to race condition with another registration
+                    return new RegistrationResult(null, "Could not create account. Username or email may already be taken. Please try again.");
                 }
             }
             

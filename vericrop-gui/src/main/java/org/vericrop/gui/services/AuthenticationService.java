@@ -93,10 +93,11 @@ public class AuthenticationService {
     /**
      * Enable or disable demo mode programmatically.
      * This should only be called from the UI toggle.
+     * Note: Does not modify system property to avoid side effects.
+     * The state is stored only in this instance.
      */
     public void setDemoMode(boolean enabled) {
         this.demoModeEnabled = enabled;
-        System.setProperty(DEMO_MODE_PROPERTY, String.valueOf(enabled));
         if (enabled) {
             logger.warn("⚠️  DEMO MODE ENABLED via UI toggle");
         } else {

@@ -86,11 +86,19 @@ class AuthenticationServiceTest {
 
     @Test
     void testSetDemoModeProgrammatically() {
+        // Clear any existing demo mode property
+        System.clearProperty("vericrop.demoMode");
+        
         AuthenticationService service = new AuthenticationService(dataSource);
         assertFalse(service.isDemoMode());
         
         service.setDemoMode(true);
         assertTrue(service.isDemoMode());
+        
+        // Verify that setting demo mode programmatically does NOT modify system property
+        // (this was changed to avoid side effects)
+        assertNull(System.getProperty("vericrop.demoMode"), 
+            "setDemoMode() should not modify system property");
         
         service.setDemoMode(false);
         assertFalse(service.isDemoMode());
