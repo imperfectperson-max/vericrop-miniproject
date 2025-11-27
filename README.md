@@ -150,10 +150,107 @@ curl http://localhost:8080/api/simulation/status
 # Get all active shipments with real-time tracking
 curl http://localhost:8080/api/simulation/active-shipments
 
-# Start a simulation with a specific scenario (via REST API)
+# Start a simulation with supplier and consumer selection (required)
 curl -X POST http://localhost:8080/api/simulation/start \
   -H "Content-Type: application/json" \
-  -d '{"scenario_id": "scenario-02", "batch_id": "BATCH_TEST_001", "farmer_id": "FARMER_A"}'
+  -d '{
+    "supplierUsername": "supplier",
+    "consumerUsername": "farmer",
+    "title": "Apple Delivery Simulation",
+    "scenario_id": "scenario-02",
+    "batch_id": "BATCH_TEST_001"
+  }'
+```
+
+**Required Parameters for Starting Simulation:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `supplierUsername` | string | Username of the supplier user (must exist in users table) |
+| `consumerUsername` | string | Username of the consumer user (must exist in users table) |
+
+**Optional Parameters:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `title` | string | Auto-generated | Simulation title |
+| `scenario_id` | string | "scenario-01" | Delivery scenario ID |
+| `batch_id` | string | Auto-generated | Batch identifier |
+| `owner_user_id` | long | 1 | Owner user ID |
+
+**Start Simulation Response:**
+```json
+{
+  "success": true,
+  "message": "Simulation started successfully",
+  "simulation_id": "550e8400-e29b-41d4-a716-446655440000",
+  "simulation_token": "abc123def456...",
+  "batch_id": "BATCH_TEST_001",
+  "scenario_id": "scenario-02",
+  "title": "Apple Delivery Simulation",
+  "status": "running",
+  "owner_username": "admin",
+  "supplier_username": "supplier",
+  "consumer_username": "farmer",
+  "started_at": "2024-01-15T10:30:00"
+}
+```
+
+**Multi-Device Access with Simulation Token:**
+
+The `simulation_token` returned when starting a simulation allows multiple devices or instances to access the same simulation. Use the token to:
+
+```bash
+# Get simulation by token
+curl http://localhost:8080/api/simulation/by-token/{token}
+
+# Validate token for a simulation
+curl "http://localhost:8080/api/simulation/{simulationId}/validate-token?token={token}"
+```
+
+**Access Control:**
+
+Simulations are only accessible to:
+- The **owner** who created the simulation
+- The selected **supplier** user
+- The selected **consumer** user
+
+Pass `userId` via header or query param to enforce access control:
+```bash
+# Get simulation with access control
+curl -H "X-User-Id: 2" http://localhost:8080/api/simulation/{simulationId}
+
+# Get simulation report with access control
+curl "http://localhost:8080/api/simulation/{simulationId}/report?userId=2"
+```
+
+**Batch Management:**
+```bash
+# Create a batch within a simulation
+curl -X POST http://localhost:8080/api/simulation/{simulationId}/batches \
+  -H "Content-Type: application/json" \
+  -d '{"quantity": 100}'
+
+# Get batches for a simulation
+curl http://localhost:8080/api/simulation/{simulationId}/batches
+
+# Update batch progress
+curl -X PATCH http://localhost:8080/api/simulation/batches/{batchId}/progress \
+  -H "Content-Type: application/json" \
+  -d '{"temperature": 4.5, "humidity": 65.0, "location": "Highway Mile 50", "progress": 50.0}'
+```
+
+**Simulation Lifecycle:**
+```bash
+# Complete a simulation
+curl -X POST http://localhost:8080/api/simulation/{simulationId}/complete
+
+# Stop a simulation
+curl -X POST http://localhost:8080/api/simulation/{simulationId}/stop
+
+# List simulations for a user
+curl http://localhost:8080/api/simulation/user/{userId}
+
+# List only active simulations
+curl "http://localhost:8080/api/simulation/user/{userId}?activeOnly=true"
 ```
 
 **Example Map Snapshot Response:**
@@ -722,6 +819,25 @@ Database schema is managed through Flyway migrations located in `vericrop-gui/sr
 - **V1__create_batches_table.sql**: Batches and quality tracking tables
 - **V2__create_users_table.sql**: User authentication with BCrypt hashing
 - **V3__create_shipments_table.sql**: Shipment tracking with blockchain integration
+- **V7__create_simulations_table.sql**: Simulation persistence with supplier/consumer relationships
+
+**V7 Migration Details:**
+The V7 migration adds two new tables for simulation persistence:
+
+| Table | Description |
+|-------|-------------|
+| `simulations` | Stores simulation metadata with supplier/consumer relationships and unique simulation_token for multi-device access |
+| `simulation_batches` | Stores batch records created during simulation for report generation |
+
+**Simulations Table Fields:**
+- `id` (UUID): Primary key
+- `title` (string): Simulation title
+- `status` (string): created, running, completed, failed, stopped
+- `owner_user_id` (references users): User who created the simulation
+- `supplier_user_id` (references users): Supplier who can view this simulation
+- `consumer_user_id` (references users): Consumer who can view this simulation
+- `simulation_token` (string, unique): Secure token for multi-device access
+- `meta` (JSONB): Optional metadata
 
 Migrations run automatically on application startup when `spring.flyway.enabled=true` (default).
 
