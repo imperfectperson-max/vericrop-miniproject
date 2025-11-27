@@ -737,6 +737,23 @@ The V2 migration creates demo users for testing:
 
 **⚠️ Security Note**: Change these passwords in production! Passwords are BCrypt hashed with cost factor 10.
 
+### Demo Users (Auto-Created on Startup)
+
+When the application starts, **DemoUserDataLoader** automatically seeds additional demo users with standardized roles for testing. These users are only created if they don't already exist (idempotent):
+
+| Username | Password | Role | Description |
+|----------|----------|------|-------------|
+| **producer_demo** | DemoPass123! | PRODUCER | Producer/farmer operations |
+| **logistics_demo** | DemoPass123! | LOGISTICS | Logistics/supplier operations |
+| **consumer_demo** | DemoPass123! | CONSUMER | Consumer verification |
+| **admin_demo** | DemoPass123! | ADMIN | Admin access (producer + logistics UIs) |
+
+**Role-Based Redirects After Login:**
+- **PRODUCER** → Producer screen (batch creation, quality assessment)
+- **LOGISTICS** → Logistics screen (shipment tracking, temperature monitoring)
+- **CONSUMER** → Consumer screen (product verification)
+- **ADMIN** → Producer screen (with access to both producer and logistics UIs)
+
 ### Adding New Users
 
 To add users manually:
