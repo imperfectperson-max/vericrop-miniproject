@@ -145,7 +145,13 @@ public class EnhancedLoginController {
     }
     
     /**
-     * Navigate to the appropriate screen based on user role
+     * Navigate to the appropriate screen based on user role.
+     * 
+     * Role mappings:
+     * - PRODUCER/FARMER → Producer screen (producer operations)
+     * - LOGISTICS/SUPPLIER → Logistics screen (logistics operations)  
+     * - CONSUMER → Consumer screen (consumer operations)
+     * - ADMIN → Producer screen (has access to both producer and logistics UIs)
      */
     private void navigateToRoleBasedScreen() {
         MainApp mainApp = MainApp.getInstance();
@@ -164,9 +170,11 @@ public class EnhancedLoginController {
         logger.info("Navigating to screen for role: {}", role);
         
         switch (role.toUpperCase()) {
+            case "PRODUCER":
             case "FARMER":
                 mainApp.showProducerScreen();
                 break;
+            case "LOGISTICS":
             case "SUPPLIER":
                 mainApp.showLogisticsScreen();
                 break;
@@ -174,6 +182,8 @@ public class EnhancedLoginController {
                 mainApp.showConsumerScreen();
                 break;
             case "ADMIN":
+                // Admin has access to both producer and logistics UIs
+                // Redirect to producer screen as the landing page
                 mainApp.showProducerScreen();
                 break;
             default:

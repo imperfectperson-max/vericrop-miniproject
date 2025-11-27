@@ -174,6 +174,69 @@ public class UserDao {
     }
     
     /**
+     * Search for active users by username or full name (partial match).
+     * Useful for contact search in messaging.
+     * 
+     * @param searchTerm Search term to match against username or full name
+     * @return List of matching users (excluding the current user if specified)
+     */
+    public List<User> searchUsers(String searchTerm) {
+        String sql = "SELECT id, username, email, full_name, role, status, last_login, " +
+                     "failed_login_attempts, locked_until, created_at, updated_at " +
+                     "FROM users WHERE status = 'active' " +
+                     "AND (LOWER(username) LIKE LOWER(?) OR LOWER(full_name) LIKE LOWER(?)) " +
+                     "ORDER BY username";
+        
+        List<User> users = new ArrayList<>();
+        String pattern = "%" + searchTerm + "%";
+        
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setString(1, pattern);
+            stmt.setString(2, pattern);
+            
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    users.add(mapResultSetToUser(rs));
+                }
+            }
+        } catch (SQLException e) {
+            logger.error("Error searching users: {}", e.getMessage());
+        }
+        return users;
+    }
+    
+    /**
+     * Get all active users except the specified user (for contact list).
+     * 
+     * @param excludeUsername Username to exclude from results
+     * @return List of all active users except the specified one
+     */
+    public List<User> findAllActiveExcluding(String excludeUsername) {
+        String sql = "SELECT id, username, email, full_name, role, status, last_login, " +
+                     "failed_login_attempts, locked_until, created_at, updated_at " +
+                     "FROM users WHERE status = 'active' AND username != ? ORDER BY username";
+        
+        List<User> users = new ArrayList<>();
+        
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setString(1, excludeUsername);
+            
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    users.add(mapResultSetToUser(rs));
+                }
+            }
+        } catch (SQLException e) {
+            logger.error("Error finding all active users excluding {}: {}", excludeUsername, e.getMessage());
+        }
+        return users;
+    }
+    
+    /**
      * Check if a username already exists
      * @param username Username to check
      * @return true if username exists

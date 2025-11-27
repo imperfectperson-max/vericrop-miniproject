@@ -59,10 +59,132 @@ public class MessageDao {
     }
     
     /**
-     * Get inbox messages for a user (messages received)
-     * @param userId User ID
-     * @return List of messages received by the user
+     * Send a new message from one user to another using usernames.
+     * This method looks up user IDs from usernames and then sends the message.
+     * 
+     * @param senderUsername Sender's username
+     * @param recipientUsername Recipient's username  
+     * @param subject Message subject
+     * @param body Message body
+     * @return Created Message object with ID and usernames set, or null if creation failed
      */
+    public Message sendMessageByUsername(String senderUsername, String recipientUsername, String subject, String body) {
+        String lookupSql = "SELECT id FROM users WHERE username = ? AND status = 'active'";
+        String insertSql = "INSERT INTO messages (sender_id, recipient_id, subject, body, sent_at, is_read) " +
+                          "VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, FALSE) " +
+                          "RETURNING id, sent_at";
+        
+        try (Connection conn = dataSource.getConnection()) {
+            // Look up sender ID
+            Long senderId = null;
+            try (PreparedStatement stmt = conn.prepareStatement(lookupSql)) {
+                stmt.setString(1, senderUsername);
+                try (ResultSet rs = stmt.executeQuery()) {
+                    if (rs.next()) {
+                        senderId = rs.getLong("id");
+                    } else {
+                        logger.warn("Sender not found: {}", senderUsername);
+                        return null;
+                    }
+                }
+            }
+            
+            // Look up recipient ID
+            Long recipientId = null;
+            try (PreparedStatement stmt = conn.prepareStatement(lookupSql)) {
+                stmt.setString(1, recipientUsername);
+                try (ResultSet rs = stmt.executeQuery()) {
+                    if (rs.next()) {
+                        recipientId = rs.getLong("id");
+                    } else {
+                        logger.warn("Recipient not found: {}", recipientUsername);
+                        return null;
+                    }
+                }
+            }
+            
+            // Send the message
+            try (PreparedStatement stmt = conn.prepareStatement(insertSql)) {
+                stmt.setLong(1, senderId);
+                stmt.setLong(2, recipientId);
+                stmt.setString(3, subject);
+                stmt.setString(4, body);
+                
+                try (ResultSet rs = stmt.executeQuery()) {
+                    if (rs.next()) {
+                        Message message = new Message(senderId, recipientId, subject, body);
+                        message.setId(rs.getLong("id"));
+                        message.setSentAt(rs.getTimestamp("sent_at").toLocalDateTime());
+                        message.setSenderUsername(senderUsername);
+                        message.setRecipientUsername(recipientUsername);
+                        logger.info("✅ Message sent successfully from {} to {}", senderUsername, recipientUsername);
+                        return message;
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            logger.error("Failed to send message by username: {}", e.getMessage());
+        }
+        return null;
+    }
+    
+    /**
+     * Get conversation thread between two users identified by username.
+     * Returns all messages exchanged between sender and recipient, sorted by sent time.
+     * 
+     * @param username1 First user's username
+     * @param username2 Second user's username
+     * @return List of messages in the conversation thread
+     */
+    public List<Message> getConversationByUsername(String username1, String username2) {
+        String sql = "SELECT m.id, m.sender_id, m.recipient_id, m.subject, m.body, m.sent_at, " +
+                    "m.read_at, m.is_read, m.deleted_by_sender, m.deleted_by_recipient, " +
+                    "s.username as sender_username, s.full_name as sender_fullname, " +
+                    "r.username as recipient_username, r.full_name as recipient_fullname " +
+                    "FROM messages m " +
+                    "JOIN users s ON m.sender_id = s.id " +
+                    "JOIN users r ON m.recipient_id = r.id " +
+                    "WHERE (s.username = ? AND r.username = ?) OR (s.username = ? AND r.username = ?) " +
+                    "ORDER BY m.sent_at ASC";
+        
+        List<Message> messages = new ArrayList<>();
+        
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setString(1, username1);
+            stmt.setString(2, username2);
+            stmt.setString(3, username2);
+            stmt.setString(4, username1);
+            
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    Message message = new Message();
+                    message.setId(rs.getLong("id"));
+                    message.setSenderId(rs.getLong("sender_id"));
+                    message.setRecipientId(rs.getLong("recipient_id"));
+                    message.setSubject(rs.getString("subject"));
+                    message.setBody(rs.getString("body"));
+                    message.setSentAt(rs.getTimestamp("sent_at").toLocalDateTime());
+                    message.setRead(rs.getBoolean("is_read"));
+                    message.setDeletedBySender(rs.getBoolean("deleted_by_sender"));
+                    message.setDeletedByRecipient(rs.getBoolean("deleted_by_recipient"));
+                    message.setSenderUsername(rs.getString("sender_username"));
+                    message.setRecipientUsername(rs.getString("recipient_username"));
+                    
+                    Timestamp readAt = rs.getTimestamp("read_at");
+                    if (readAt != null) {
+                        message.setReadAt(readAt.toLocalDateTime());
+                    }
+                    
+                    messages.add(message);
+                }
+            }
+        } catch (SQLException e) {
+            logger.error("Error getting conversation by username: {}", e.getMessage());
+        }
+        return messages;
+    }
     public List<Message> getInboxMessages(Long userId) {
         String sql = "SELECT m.id, m.sender_id, m.recipient_id, m.subject, m.body, m.sent_at, " +
                      "m.read_at, m.is_read, m.deleted_by_sender, m.deleted_by_recipient, " +
