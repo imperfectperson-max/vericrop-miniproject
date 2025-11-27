@@ -45,11 +45,8 @@ public class EnhancedLoginController {
         usernameField.textProperty().addListener((obs, oldVal, newVal) -> clearError(usernameError));
         passwordField.textProperty().addListener((obs, oldVal, newVal) -> clearError(passwordError));
         
-        // Initialize demo mode checkbox
-        String loadDemo = System.getProperty("vericrop.loadDemo");
-        if ("true".equalsIgnoreCase(loadDemo)) {
-            demoModeCheckbox.setSelected(true);
-        }
+        // Initialize demo mode checkbox based on auth service state
+        demoModeCheckbox.setSelected(authService.isDemoMode());
         
         // Enable Enter key to submit
         usernameField.setOnAction(e -> passwordField.requestFocus());
@@ -135,12 +132,21 @@ public class EnhancedLoginController {
     @FXML
     private void handleDemoModeToggle() {
         boolean demoMode = demoModeCheckbox.isSelected();
-        System.setProperty("vericrop.loadDemo", String.valueOf(demoMode));
+        
+        // Update the authentication service demo mode setting
+        authService.setDemoMode(demoMode);
+        
         logger.info("Demo mode: {}", demoMode ? "ENABLED" : "DISABLED");
         
         if (demoMode) {
-            showAlert(Alert.AlertType.INFORMATION, "Demo Mode Enabled",
-                    "Sample data will be loaded. Authentication is optional in demo mode.");
+            showAlert(Alert.AlertType.WARNING, "Demo Mode Enabled",
+                    "⚠️ DEMO MODE ACTIVE\n\n" +
+                    "Demo credentials:\n" +
+                    "• admin / admin123\n" +
+                    "• farmer / farmer123\n" +
+                    "• supplier / supplier123\n" +
+                    "• consumer / consumer123\n\n" +
+                    "This mode should NOT be used in production!");
         }
     }
     

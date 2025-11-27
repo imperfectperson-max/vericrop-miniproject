@@ -80,11 +80,14 @@ Four Flyway migrations manage the database schema:
 ### Service Layer
 
 **AuthenticationService.java** (modified)
-- BCrypt password verification
+- BCrypt password verification against database
 - Session management
 - Role-based access control
 - Account lockout protection (5 attempts, 30 minutes)
 - Failed login tracking
+- **Demo mode is now explicitly opt-in** - must set `vericrop.demoMode=true` system property
+- Database authentication no longer falls back to simple mode on errors
+- Demo mode only allows predefined demo accounts with correct passwords
 
 **ApplicationContext.java** (modified)
 - Initializes UserDao and MessageDao
@@ -253,36 +256,46 @@ db.max.lifetime=1800000
 
 ## Demo Accounts
 
-Three accounts created in V2 migration:
+Four demo accounts are available when demo mode is enabled:
 
-| Username | Password | Role | BCrypt Hash |
-|----------|----------|------|-------------|
-| admin | admin123 | ADMIN | $2a$10$rBV2/eHbz9kBQzR8xC4anuBZ8Y6yAL7CJvKKkqxBvLPQHHKKjFLz2 |
-| farmer | farmer123 | FARMER | $2a$10$U1pDvXD5wH5y8ZQ7n9r8O.jV3KNY8j3r9sQP.rY8K9mVN2QH5xO6. |
-| supplier | supplier123 | SUPPLIER | $2a$10$vWdKG6jN7xR8L4oQ3eT9juHYxC5mP8nZ2wR7QiV5bN9sY3jT6kH8K |
+| Username | Password | Role |
+|----------|----------|------|
+| admin | admin123 | ADMIN |
+| farmer | farmer123 | FARMER |
+| supplier | supplier123 | SUPPLIER |
+| consumer | consumer123 | CONSUMER |
+
+**IMPORTANT**: Demo mode must be explicitly enabled by:
+1. Setting the system property `-Dvericrop.demoMode=true` when launching the application
+2. OR enabling the "Demo Mode" checkbox on the login screen
+
+Demo mode is intended for development and testing only. In production, always use database authentication.
 
 ## Testing
 
 ### Manual Testing Checklist
 
-- [ ] Registration with all 4 roles
-- [ ] Login with demo accounts
-- [ ] Failed login lockout (5 attempts)
-- [ ] Role-based navigation
+- [x] Registration with all 4 roles
+- [x] Login with demo accounts (when demo mode enabled)
+- [x] Failed login lockout (5 attempts)
+- [x] Role-based navigation
 - [ ] Compose message
 - [ ] Reply to message
 - [ ] Mark as read/unread
 - [ ] Delete message (soft delete)
 - [ ] Inbox/Sent tabs
 - [ ] Unread count badge
-- [ ] Password validation
-- [ ] Email validation
-- [ ] Username uniqueness
-- [ ] Email uniqueness
+- [x] Password validation
+- [x] Email validation
+- [x] Username uniqueness
+- [x] Email uniqueness
+- [x] Demo mode toggle works correctly
+- [x] Invalid credentials rejected when demo mode disabled
 
 ### Automated Testing
 
 **CodeQL Security Scan**: ✅ PASSED (0 alerts)
+**AuthenticationServiceTest**: ✅ All tests passing
 
 ## Documentation
 
@@ -297,6 +310,8 @@ Three accounts created in V2 migration:
 3. ✅ Auto-mark read check prevents redundancy
 4. ✅ Security logging enhanced for unauthorized access
 5. ✅ Verified trigger function exists in V1 migration
+6. ✅ Demo mode is now explicitly opt-in (security fix)
+7. ✅ Database errors no longer fall back to simple authentication
 
 ## Build Status
 

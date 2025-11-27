@@ -9,9 +9,28 @@ The VeriCrop GUI now supports a **self-contained demo mode** that allows the app
 - **Testing** UI flows in isolation
 - **Offline scenarios** where external services are unavailable
 
+## ⚠️ Security Notice
+
+**Demo mode bypasses normal database authentication.** This is intended for development and testing only:
+
+- Demo mode must be **explicitly enabled**
+- Only predefined demo accounts work in demo mode
+- Demo mode credentials: admin/admin123, farmer/farmer123, supplier/supplier123, consumer/consumer123
+- **NEVER use demo mode in production environments**
+
 ## Enabling Demo Mode
 
-### Method 1: Environment Variable (Recommended)
+### Method 1: System Property (Recommended)
+
+```bash
+# Unix/Linux/Mac
+./gradlew :vericrop-gui:run --args="-Dvericrop.demoMode=true"
+
+# OR set directly
+java -Dvericrop.demoMode=true -jar vericrop-gui.jar
+```
+
+### Method 2: Environment Variable
 
 ```bash
 # Unix/Linux/Mac
@@ -27,11 +46,25 @@ set VERICROP_LOAD_DEMO=true
 gradlew.bat :vericrop-gui:run
 ```
 
-### Method 2: System Property
+### Method 3: UI Toggle
 
-```bash
-./gradlew :vericrop-gui:run --args="-Dvericrop.loadDemo=true"
-```
+1. Launch the application
+2. On the login screen, check the "Demo Mode" checkbox
+3. A warning dialog will appear showing available demo credentials
+4. Use demo credentials to log in
+
+## Demo Mode Authentication
+
+When demo mode is enabled, you can log in with these predefined accounts:
+
+| Username | Password | Role |
+|----------|----------|------|
+| admin | admin123 | ADMIN |
+| farmer | farmer123 | FARMER |
+| supplier | supplier123 | SUPPLIER |
+| consumer | consumer123 | CONSUMER |
+
+**Note**: Other username/password combinations will NOT work, even in demo mode. This is a security measure to prevent arbitrary access.
 
 ## What Works in Demo Mode
 
