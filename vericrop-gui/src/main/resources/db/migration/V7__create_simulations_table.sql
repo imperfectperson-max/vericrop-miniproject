@@ -1,6 +1,9 @@
 -- VeriCrop Simulations Table for Multi-User/Multi-Device Simulation Support
 -- Flyway Migration V7: Simulation tracking with supplier/consumer selection and simulation_token
 
+-- Ensures gen_random_uuid() is available for UUID primary keys
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 -- Drop tables if they exist (for clean re-creation in development)
 DROP TABLE IF EXISTS simulation_batches CASCADE;
 DROP TABLE IF EXISTS simulations CASCADE;
@@ -15,7 +18,7 @@ CREATE TABLE simulations (
     owner_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     supplier_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     consumer_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    simulation_token CHAR(64) NOT NULL UNIQUE,  -- Secure 64-character hex token for multi-device access
+    simulation_token VARCHAR(64) NOT NULL UNIQUE,  -- Secure 64-character hex token for multi-device access
     meta JSONB,  -- Additional flexible simulation metadata
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
