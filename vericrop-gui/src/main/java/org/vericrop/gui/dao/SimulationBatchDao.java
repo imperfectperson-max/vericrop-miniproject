@@ -23,6 +23,9 @@ public class SimulationBatchDao {
     private static final Logger logger = LoggerFactory.getLogger(SimulationBatchDao.class);
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     
+    // Location constant for delivery completion
+    public static final String LOCATION_DESTINATION = "Destination";
+    
     private final DataSource dataSource;
     
     public SimulationBatchDao(DataSource dataSource) {
@@ -257,7 +260,7 @@ public class SimulationBatchDao {
      * @return true if updated successfully
      */
     public boolean markDelivered(UUID id) {
-        return updateBatchProgress(id, SimulationBatch.STATUS_DELIVERED, null, null, "Destination", 100.0);
+        return updateBatchProgress(id, SimulationBatch.STATUS_DELIVERED, null, null, LOCATION_DESTINATION, 100.0);
     }
     
     /**

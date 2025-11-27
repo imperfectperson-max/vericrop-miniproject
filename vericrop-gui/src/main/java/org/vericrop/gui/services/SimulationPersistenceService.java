@@ -25,6 +25,10 @@ public class SimulationPersistenceService {
     private static final Logger logger = LoggerFactory.getLogger(SimulationPersistenceService.class);
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     
+    // Location constants for batch tracking
+    public static final String LOCATION_STARTING = "Origin";
+    public static final String LOCATION_DESTINATION = "Destination";
+    
     private final SimulationDao simulationDao;
     private final SimulationBatchDao batchDao;
     private final UserDao userDao;
@@ -110,7 +114,7 @@ public class SimulationPersistenceService {
         if (batch != null) {
             // Update status to in_transit
             batchDao.updateBatchProgress(batch.getId(), SimulationBatch.STATUS_IN_TRANSIT, 
-                                        null, null, "Starting", 0.0);
+                                        null, null, LOCATION_STARTING, 0.0);
             batch.setStatus(SimulationBatch.STATUS_IN_TRANSIT);
         }
         

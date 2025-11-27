@@ -558,10 +558,10 @@ public class SimulationRestController {
             @RequestBody Map<String, Object> request) {
         try {
             UUID id = UUID.fromString(batchId);
-            Double temperature = getDoubleValue(request, "temperature", null);
-            Double humidity = getDoubleValue(request, "humidity", null);
+            Double temperature = getNullableDoubleValue(request, "temperature");
+            Double humidity = getNullableDoubleValue(request, "humidity");
             String location = (String) request.get("location");
-            Double progress = getDoubleValue(request, "progress", null);
+            Double progress = getNullableDoubleValue(request, "progress");
             
             simulationPersistenceService.updateBatchProgress(id, temperature, humidity, location, progress);
             
@@ -877,16 +877,16 @@ public class SimulationRestController {
     }
     
     /**
-     * Safely extract a Double value from a map with nullable default.
+     * Safely extract a nullable Double value from a map.
      */
-    private Double getDoubleValue(Map<String, Object> map, String key, Double defaultValue) {
+    private Double getNullableDoubleValue(Map<String, Object> map, String key) {
         Object value = map.get(key);
-        if (value == null) return defaultValue;
+        if (value == null) return null;
         if (value instanceof Number) return ((Number) value).doubleValue();
         try {
             return Double.parseDouble(value.toString());
         } catch (NumberFormatException e) {
-            return defaultValue;
+            return null;
         }
     }
     

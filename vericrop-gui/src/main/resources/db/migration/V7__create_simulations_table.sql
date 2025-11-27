@@ -15,7 +15,7 @@ CREATE TABLE simulations (
     owner_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     supplier_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     consumer_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    simulation_token VARCHAR(255) NOT NULL UNIQUE,  -- Secure token for multi-device access
+    simulation_token CHAR(64) NOT NULL UNIQUE,  -- Secure 64-character hex token for multi-device access
     meta JSONB,  -- Additional flexible simulation metadata
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
