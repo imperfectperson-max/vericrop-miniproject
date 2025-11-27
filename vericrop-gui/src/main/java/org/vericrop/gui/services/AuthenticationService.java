@@ -221,9 +221,15 @@ public class AuthenticationService {
             return false;
         }
         
+        // Validate and normalize username
+        String normalizedUsername = (username != null) ? username.trim().toLowerCase() : "";
+        if (normalizedUsername.isEmpty()) {
+            logger.warn("Demo login failed: empty username");
+            return false;
+        }
+        
         // Validate against predefined demo accounts for security
         // Only allow specific demo usernames with their expected passwords
-        String normalizedUsername = username.trim().toLowerCase();
         String role;
         
         switch (normalizedUsername) {
