@@ -114,7 +114,7 @@ public class RegisterController {
                     logger.info("✅ Registration successful for user: {}", finalUsername);
                     return RegistrationResult.success(user);
                 } catch (UserCreationException e) {
-                    logger.warn("Registration failed for user '{}': {}", finalUsername, e.getMessage());
+                    logger.warn("Registration failed for user '{}': {}", finalUsername, e.getMessage(), e);
                     
                     // Map exception to specific field error
                     if (e.isDuplicateUsername()) {
@@ -122,14 +122,17 @@ public class RegisterController {
                     } else if (e.isDuplicateEmail()) {
                         return RegistrationResult.emailError(e.getMessage());
                     } else {
-                        // General database error - provide user-friendly message
+                        // General database error - provide user-friendly message with exception detail
+                        String errorDetail = e.getMessage() != null ? e.getMessage() : "Unknown error";
                         return RegistrationResult.generalError(
-                            "Could not create account. Please try again or contact support.");
+                            "Could not create account. " + errorDetail);
                     }
                 } catch (DataAccessException e) {
-                    logger.error("Database error during registration for user '{}': {}", finalUsername, e.getMessage());
+                    logger.error("Database error during registration for user '{}': {}", finalUsername, e.getMessage(), e);
+                    // Provide user-friendly message with exception detail
+                    String errorDetail = e.getMessage() != null ? e.getMessage() : "Unknown error";
                     return RegistrationResult.generalError(
-                        "Could not create account. Please try again or contact support.");
+                        "Could not create account. " + errorDetail);
                 }
             }
             
