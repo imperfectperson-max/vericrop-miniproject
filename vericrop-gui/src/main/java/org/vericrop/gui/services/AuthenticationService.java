@@ -262,14 +262,17 @@ public class AuthenticationService {
                 return false;
         }
         
-        this.currentUser = username;
+        // Use the normalized username for consistency
+        this.currentUser = normalizedUsername;
         this.currentRole = role;
-        this.currentEmail = username + "@vericrop.demo";
-        this.currentFullName = username.substring(0, 1).toUpperCase() + username.substring(1) + " (Demo)";
+        this.currentEmail = normalizedUsername + "@vericrop.demo";
+        // Capitalize first letter for display name
+        this.currentFullName = normalizedUsername.substring(0, 1).toUpperCase() + 
+                               normalizedUsername.substring(1) + " (Demo)";
         this.authenticated = true;
         this.sessionData.clear();
         
-        logger.info("✅ User logged in (DEMO MODE): {} (role: {})", username, role);
+        logger.info("✅ User logged in (DEMO MODE): {} (role: {})", normalizedUsername, role);
         return true;
     }
 
