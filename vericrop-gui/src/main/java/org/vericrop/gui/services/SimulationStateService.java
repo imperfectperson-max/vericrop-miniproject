@@ -36,29 +36,31 @@ public class SimulationStateService {
     
     private static final String TOPIC_NAME = "vericrop-simulation-state";
     private static final String CONSUMER_GROUP = "vericrop-state-consumer";
+    private static final long SSE_TIMEOUT_MS = 30 * 60 * 1000L; // 30 minutes
+    private static final int MAX_EVENT_HISTORY = 1000;
     
     @Value("${kafka.bootstrap.servers:localhost:9092}")
     private String bootstrapServers;
     
-    @Value("${kafka.enabled:false}")
+    @Value("${kafka.enabled:true}")
     private boolean kafkaEnabled;
     
     private final ObjectMapper objectMapper;
     private final Map<String, Object> currentState;
-    private final List<StateEvent> eventHistory;
+    private final java.util.Deque<StateEvent> eventHistory; // Using Deque for efficient removal
     private final AtomicBoolean running;
     
     private KafkaProducer<String, String> producer;
     private KafkaConsumer<String, String> consumer;
     private ExecutorService consumerExecutor;
     private Consumer<Map<String, Object>> stateBroadcastCallback;
-    private long lastProcessedOffset = -1;
+    private final Map<Integer, Long> lastProcessedOffsets = new ConcurrentHashMap<>(); // Per-partition offsets
     
     public SimulationStateService() {
         this.objectMapper = new ObjectMapper();
         this.objectMapper.registerModule(new JavaTimeModule());
         this.currentState = new ConcurrentHashMap<>();
-        this.eventHistory = new CopyOnWriteArrayList<>();
+        this.eventHistory = new java.util.concurrent.ConcurrentLinkedDeque<>();
         this.running = new AtomicBoolean(false);
         
         // Initialize default state
@@ -164,9 +166,13 @@ public class SimulationStateService {
      */
     private void processStateEvent(ConsumerRecord<String, String> record) {
         try {
-            // Skip already processed events (idempotency)
-            if (record.offset() <= lastProcessedOffset) {
-                logger.trace("Skipping already processed event at offset {}", record.offset());
+            int partition = record.partition();
+            long offset = record.offset();
+            
+            // Skip already processed events (idempotency - per partition)
+            Long lastOffset = lastProcessedOffsets.get(partition);
+            if (lastOffset != null && offset <= lastOffset) {
+                logger.trace("Skipping already processed event at partition {} offset {}", partition, offset);
                 return;
             }
             
@@ -175,15 +181,15 @@ public class SimulationStateService {
             // Apply event to state
             applyEventToState(event);
             
-            // Track for history
-            eventHistory.add(event);
-            if (eventHistory.size() > 1000) {
-                eventHistory.remove(0); // Keep last 1000 events
+            // Track for history (efficient removal from deque)
+            eventHistory.addLast(event);
+            while (eventHistory.size() > MAX_EVENT_HISTORY) {
+                eventHistory.removeFirst(); // Efficient O(1) removal from deque
             }
             
-            lastProcessedOffset = record.offset();
+            lastProcessedOffsets.put(partition, offset);
             
-            logger.debug("Processed state event: {} from offset {}", event.getEventType(), record.offset());
+            logger.debug("Processed state event: {} from partition {} offset {}", event.getEventType(), partition, offset);
             
         } catch (Exception e) {
             logger.error("Error processing state event at offset {}: {}", record.offset(), e.getMessage());

@@ -249,7 +249,8 @@ public class SimulationRestController {
      */
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamSimulationState() {
-        SseEmitter emitter = new SseEmitter(0L); // No timeout
+        // Set timeout to 30 minutes to prevent resource leaks from dead connections
+        SseEmitter emitter = new SseEmitter(30 * 60 * 1000L);
         
         sseEmitters.add(emitter);
         logger.info("SSE client connected. Total clients: {}", sseEmitters.size());
