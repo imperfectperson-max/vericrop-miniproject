@@ -409,14 +409,6 @@ public class ConsumerController implements SimulationListener {
     }
     
     @FXML
-    private void handleShowMessages() {
-        MainApp mainApp = MainApp.getInstance();
-        if (mainApp != null) {
-            mainApp.showInboxScreen();
-        }
-    }
-    
-    @FXML
     private void handleLogout() {
         MainApp mainApp = MainApp.getInstance();
         if (mainApp != null) {

@@ -36,12 +36,6 @@
                     <Button fx:id="consumerButton" text="👥 Consumer"
                             style="-fx-background-color: #10B981; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8; -fx-padding: 8 12;"
                             onAction="#handleShowConsumer"/>
-                    <Button fx:id="messagesButton" text="💬 Messages"
-                            style="-fx-background-color: #8B5CF6; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8; -fx-padding: 8 12;"
-                            onAction="#handleShowMessages"/>
-                    <Button fx:id="contactsButton" text="👥 Contacts"
-                            style="-fx-background-color: #3B82F6; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8; -fx-padding: 8 12;"
-                            onAction="#handleShowContacts"/>
                     <Button fx:id="simulatorButton" text="🚀 Simulator"
                             style="-fx-background-color: #EC4899; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8; -fx-padding: 8 12;"
                             onAction="#handleShowSimulator"/>

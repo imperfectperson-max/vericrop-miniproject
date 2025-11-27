@@ -4,24 +4,29 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import org.vericrop.gui.models.Simulation;
 import org.vericrop.gui.models.SimulationBatch;
 import org.vericrop.gui.services.SimulationAsyncService;
 import org.vericrop.gui.services.SimulationPersistenceService;
+import org.vericrop.gui.services.SimulationStateService;
 import org.vericrop.service.DeliverySimulator;
 import org.vericrop.service.MapSimulator;
 import org.vericrop.service.ScenarioManager;
 import org.vericrop.service.simulation.SimulationManager;
 
+import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 
 /**
  * REST API controller for simulation and map state access.
  * Provides endpoints to retrieve current map simulation state, scenario information,
- * and active shipments tracking.
+ * and active shipments tracking. Includes SSE for real-time state updates.
  */
 @RestController
 @RequestMapping("/api/simulation")
@@ -34,6 +39,10 @@ public class SimulationRestController {
     private final SimulationManager simulationManager;
     private final SimulationAsyncService simulationAsyncService;
     private final SimulationPersistenceService simulationPersistenceService;
+    private final SimulationStateService simulationStateService;
+    
+    // SSE emitters for real-time state updates
+    private final List<SseEmitter> sseEmitters = new CopyOnWriteArrayList<>();
     
     /**
      * Constructor with Spring dependency injection.
@@ -44,14 +53,20 @@ public class SimulationRestController {
                                    DeliverySimulator deliverySimulator,
                                    SimulationManager simulationManager,
                                    SimulationAsyncService simulationAsyncService,
-                                   SimulationPersistenceService simulationPersistenceService) {
+                                   SimulationPersistenceService simulationPersistenceService,
+                                   SimulationStateService simulationStateService) {
         this.mapSimulator = mapSimulator;
         this.scenarioManager = scenarioManager;
         this.deliverySimulator = deliverySimulator;
         this.simulationManager = simulationManager;
         this.simulationAsyncService = simulationAsyncService;
         this.simulationPersistenceService = simulationPersistenceService;
-        logger.info("SimulationRestController initialized with all dependencies including persistence service");
+        this.simulationStateService = simulationStateService;
+        
+        // Register SSE broadcast callback with state service
+        this.simulationStateService.setStateBroadcastCallback(this::broadcastStateUpdate);
+        
+        logger.info("SimulationRestController initialized with all dependencies including SSE support");
     }
     
     /**
@@ -168,6 +183,131 @@ public class SimulationRestController {
         health.put("timestamp", System.currentTimeMillis());
         
         return ResponseEntity.ok(health);
+    }
+    
+    // ==================== Shared State API Endpoints ====================
+    
+    /**
+     * GET /api/simulation/state
+     * Get current shared simulation state.
+     * 
+     * @return Current simulation state from Kafka-backed store
+     */
+    @GetMapping("/state")
+    public ResponseEntity<Map<String, Object>> getSimulationState() {
+        try {
+            Map<String, Object> state = simulationStateService.getCurrentState();
+            return ResponseEntity.ok(state);
+        } catch (Exception e) {
+            logger.error("Error getting simulation state", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(createErrorResponse("Failed to get simulation state: " + e.getMessage()));
+        }
+    }
+    
+    /**
+     * POST /api/simulation/state/update
+     * Submit a state change event (authenticated).
+     * Publishes to Kafka and updates in-memory cache.
+     * 
+     * @param request State update request with event data
+     * @return Updated state
+     */
+    @PostMapping("/state/update")
+    public ResponseEntity<Map<String, Object>> updateSimulationState(@RequestBody Map<String, Object> request) {
+        try {
+            // Extract update type and data
+            String eventType = (String) request.getOrDefault("event_type", "STATE_UPDATE");
+            String role = (String) request.getOrDefault("role", "unknown");
+            Map<String, Object> data = (Map<String, Object>) request.getOrDefault("data", new HashMap<>());
+            
+            // Apply state update
+            Map<String, Object> updatedState = simulationStateService.applyStateUpdate(eventType, role, data);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "State updated successfully");
+            response.put("event_type", eventType);
+            response.put("state", updatedState);
+            response.put("timestamp", System.currentTimeMillis());
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            logger.error("Error updating simulation state", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(createErrorResponse("Failed to update state: " + e.getMessage()));
+        }
+    }
+    
+    /**
+     * GET /api/simulation/stream
+     * Server-Sent Events (SSE) endpoint for live state updates.
+     * Clients subscribe to receive real-time simulation state changes.
+     * 
+     * @return SSE emitter for streaming updates
+     */
+    @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter streamSimulationState() {
+        SseEmitter emitter = new SseEmitter(0L); // No timeout
+        
+        sseEmitters.add(emitter);
+        logger.info("SSE client connected. Total clients: {}", sseEmitters.size());
+        
+        // Send initial state on connect
+        try {
+            Map<String, Object> initialState = simulationStateService.getCurrentState();
+            initialState.put("event_type", "CONNECTED");
+            emitter.send(SseEmitter.event()
+                .name("state")
+                .data(initialState));
+        } catch (IOException e) {
+            logger.warn("Failed to send initial state to SSE client: {}", e.getMessage());
+        }
+        
+        // Handle client disconnect
+        emitter.onCompletion(() -> {
+            sseEmitters.remove(emitter);
+            logger.info("SSE client disconnected. Remaining clients: {}", sseEmitters.size());
+        });
+        
+        emitter.onTimeout(() -> {
+            sseEmitters.remove(emitter);
+            logger.info("SSE client timed out. Remaining clients: {}", sseEmitters.size());
+        });
+        
+        emitter.onError(e -> {
+            sseEmitters.remove(emitter);
+            logger.warn("SSE client error: {}. Remaining clients: {}", e.getMessage(), sseEmitters.size());
+        });
+        
+        return emitter;
+    }
+    
+    /**
+     * Broadcast state update to all connected SSE clients.
+     * Called by SimulationStateService when state changes.
+     */
+    private void broadcastStateUpdate(Map<String, Object> state) {
+        List<SseEmitter> deadEmitters = new ArrayList<>();
+        
+        for (SseEmitter emitter : sseEmitters) {
+            try {
+                emitter.send(SseEmitter.event()
+                    .name("state")
+                    .data(state));
+            } catch (IOException e) {
+                logger.debug("Failed to send to SSE client, marking for removal: {}", e.getMessage());
+                deadEmitters.add(emitter);
+            }
+        }
+        
+        // Clean up dead emitters
+        sseEmitters.removeAll(deadEmitters);
+        
+        if (!deadEmitters.isEmpty()) {
+            logger.debug("Removed {} dead SSE clients. Remaining: {}", deadEmitters.size(), sseEmitters.size());
+        }
     }
     
     /**
