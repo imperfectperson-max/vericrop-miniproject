@@ -173,14 +173,6 @@ public class MainApp extends Application {
         switchToScreen("consumer.fxml");
     }
 
-    public void showInboxScreen() {
-        switchToScreen("inbox.fxml");
-    }
-
-    public void showContactsScreen() {
-        switchToScreen("contacts.fxml");
-    }
-
     public static MainApp getInstance() {
         return instance;
     }

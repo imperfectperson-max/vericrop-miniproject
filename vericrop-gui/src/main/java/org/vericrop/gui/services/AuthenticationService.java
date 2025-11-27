@@ -134,6 +134,8 @@ public class AuthenticationService {
 
     /**
      * Simple authentication (development/demo mode)
+     * Only allows predefined demo users with correct passwords.
+     * This provides a fallback when database is unavailable but still requires valid credentials.
      */
     private boolean authenticateSimple(String username, String password) {
         // Simple validation for demo purposes
@@ -142,16 +144,42 @@ public class AuthenticationService {
             return false;
         }
         
-        // Determine role from username for demo
-        String role = "USER";
-        if (username.equalsIgnoreCase("admin")) {
-            role = "ADMIN";
-        } else if (username.equalsIgnoreCase("farmer")) {
-            role = "FARMER";
-        } else if (username.equalsIgnoreCase("supplier")) {
-            role = "SUPPLIER";
-        } else if (username.equalsIgnoreCase("consumer")) {
-            role = "CONSUMER";
+        // Define demo users with their passwords and roles
+        // These are the only valid credentials when database is unavailable
+        String role = null;
+        String expectedPassword = null;
+        
+        switch (username.toLowerCase()) {
+            case "admin":
+            case "admin_demo":
+                role = "ADMIN";
+                expectedPassword = "DemoPass123!";
+                break;
+            case "farmer":
+            case "producer_demo":
+                role = "PRODUCER";
+                expectedPassword = "DemoPass123!";
+                break;
+            case "supplier":
+            case "logistics_demo":
+                role = "LOGISTICS";
+                expectedPassword = "DemoPass123!";
+                break;
+            case "consumer":
+            case "consumer_demo":
+                role = "CONSUMER";
+                expectedPassword = "DemoPass123!";
+                break;
+            default:
+                // No other users allowed in simple mode
+                logger.warn("Login failed: user '{}' not found in demo mode", username);
+                return false;
+        }
+        
+        // Verify password matches the expected demo password
+        if (!password.equals(expectedPassword)) {
+            logger.warn("Login failed: incorrect password for demo user '{}'", username);
+            return false;
         }
         
         this.currentUser = username;
