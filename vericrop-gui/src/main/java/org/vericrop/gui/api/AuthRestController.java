@@ -87,7 +87,8 @@ public class AuthRestController {
         this.userDao = userDao;
         this.jwtService = jwtService;
         this.dataSource = dataSource;
-        this.passwordEncoder = new BCryptPasswordEncoder();
+        // Use explicit cost factor 10 for BCrypt (matches UserDao)
+        this.passwordEncoder = new BCryptPasswordEncoder(10);
         logger.info("AuthRestController initialized");
     }
     
@@ -517,23 +518,34 @@ public class AuthRestController {
     
     private void incrementFailedAttempts(String username, int currentAttempts) {
         int newAttempts = currentAttempts + 1;
-        String sql;
         
         if (newAttempts >= MAX_FAILED_ATTEMPTS) {
-            sql = "UPDATE users SET failed_login_attempts = ?, locked_until = CURRENT_TIMESTAMP + INTERVAL '" + 
-                  LOCKOUT_DURATION_MINUTES + " minutes' WHERE username = ?";
+            // Use parameterized interval to avoid string concatenation in SQL
+            // PostgreSQL supports make_interval function for safe interval creation
+            String sql = "UPDATE users SET failed_login_attempts = ?, " +
+                        "locked_until = CURRENT_TIMESTAMP + make_interval(mins => ?) WHERE username = ?";
             logger.warn("Account locked due to too many failed attempts: {}", username);
+            
+            try (Connection conn = dataSource.getConnection();
+                 PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.setInt(1, newAttempts);
+                stmt.setInt(2, LOCKOUT_DURATION_MINUTES);
+                stmt.setString(3, username);
+                stmt.executeUpdate();
+            } catch (SQLException e) {
+                logger.error("Error locking account: {}", e.getMessage());
+            }
         } else {
-            sql = "UPDATE users SET failed_login_attempts = ? WHERE username = ?";
-        }
-        
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setInt(1, newAttempts);
-            stmt.setString(2, username);
-            stmt.executeUpdate();
-        } catch (SQLException e) {
-            logger.error("Error incrementing failed attempts: {}", e.getMessage());
+            String sql = "UPDATE users SET failed_login_attempts = ? WHERE username = ?";
+            
+            try (Connection conn = dataSource.getConnection();
+                 PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.setInt(1, newAttempts);
+                stmt.setString(2, username);
+                stmt.executeUpdate();
+            } catch (SQLException e) {
+                logger.error("Error incrementing failed attempts: {}", e.getMessage());
+            }
         }
     }
     

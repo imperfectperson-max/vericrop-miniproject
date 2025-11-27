@@ -34,22 +34,30 @@ public class JwtService {
     /**
      * Constructor with injected configuration.
      * Falls back to secure defaults if not configured.
+     * 
+     * For HMAC-SHA256, the secret key must be at least 256 bits (32 bytes).
      */
     public JwtService(
             @Value("${jwt.secret:}") String secret,
             @Value("${jwt.expiration:86400000}") long expirationMs) {
         
         // Use provided secret or generate a secure default
-        if (secret == null || secret.trim().isEmpty() || secret.length() < MIN_SECRET_LENGTH) {
+        // For HS256, the key must be at least 256 bits (32 bytes)
+        if (secret == null || secret.trim().isEmpty() || secret.getBytes(StandardCharsets.UTF_8).length < MIN_SECRET_LENGTH) {
             // Generate a secure random key for development
             this.secretKey = Keys.secretKeyFor(SignatureAlgorithm.HS256);
             logger.warn("JWT secret not configured or too short. Using auto-generated secure key. " +
-                       "Set jwt.secret in application.yml for production use (min 32 chars).");
+                       "Set jwt.secret in application.yml for production use (min {} bytes/chars).", MIN_SECRET_LENGTH);
         } else {
-            // Pad or use the configured secret
+            // Use the configured secret - validate it meets the minimum length
             byte[] keyBytes = secret.getBytes(StandardCharsets.UTF_8);
+            if (keyBytes.length < MIN_SECRET_LENGTH) {
+                // This shouldn't happen given the check above, but defensive programming
+                throw new IllegalArgumentException(
+                    "JWT secret must be at least " + MIN_SECRET_LENGTH + " bytes for HMAC-SHA256");
+            }
             this.secretKey = Keys.hmacShaKeyFor(keyBytes);
-            logger.info("JWT service initialized with configured secret");
+            logger.info("JWT service initialized with configured secret ({} bytes)", keyBytes.length);
         }
         
         this.expirationMs = expirationMs > 0 ? expirationMs : DEFAULT_EXPIRATION_MS;
