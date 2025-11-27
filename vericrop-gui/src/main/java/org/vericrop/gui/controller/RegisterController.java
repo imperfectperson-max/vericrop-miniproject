@@ -1,9 +1,11 @@
 package org.vericrop.gui.controller;
 
+import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
+import javafx.util.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.vericrop.gui.MainApp;
@@ -12,10 +14,6 @@ import org.vericrop.gui.dao.UserDao;
 import org.vericrop.gui.exception.DataAccessException;
 import org.vericrop.gui.exception.UserCreationException;
 import org.vericrop.gui.models.User;
-
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Controller for the user registration screen.
@@ -177,23 +175,16 @@ public class RegisterController {
             logger.info("✅ Registration successful for user: {}", username);
             showStatus("✅ Account created successfully! Redirecting to login...", "success");
             
-            // Navigate to login screen after 2 seconds using ScheduledExecutorService
-            // This keeps the delay off the JavaFX thread
-            ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
-                Thread t = new Thread(r, "LoginRedirectTimer");
-                t.setDaemon(true);
-                return t;
+            // Navigate to login screen after 2 seconds using JavaFX's PauseTransition
+            // This is the recommended way to handle delays in JavaFX applications
+            PauseTransition delay = new PauseTransition(Duration.seconds(2));
+            delay.setOnFinished(event -> {
+                MainApp mainApp = MainApp.getInstance();
+                if (mainApp != null) {
+                    mainApp.switchToScreen("login.fxml");
+                }
             });
-            
-            scheduler.schedule(() -> {
-                Platform.runLater(() -> {
-                    MainApp mainApp = MainApp.getInstance();
-                    if (mainApp != null) {
-                        mainApp.switchToScreen("login.fxml");
-                    }
-                });
-                scheduler.shutdown();
-            }, 2, TimeUnit.SECONDS);
+            delay.play();
         } else {
             // Show field-specific error if applicable
             if (result.isUsernameError()) {

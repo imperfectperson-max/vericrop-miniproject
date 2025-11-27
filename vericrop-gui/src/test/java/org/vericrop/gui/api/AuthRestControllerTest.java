@@ -259,6 +259,136 @@ class AuthRestControllerTest {
         assertFalse((Boolean) response.getBody().get("success"));
     }
     
+    @Test
+    void testRegister_DuplicateUsername_ViaException() throws Exception {
+        // Given - test that UserCreationException with duplicate username is handled correctly
+        AuthRestController.RegisterRequest request = new AuthRestController.RegisterRequest();
+        request.setUsername("duplicateuser");
+        request.setEmail("new@example.com");
+        request.setPassword("SecurePass123");
+        request.setFullName("Test User");
+        request.setRole("PRODUCER");
+        
+        when(userDao.usernameExists("duplicateuser")).thenReturn(false);
+        when(userDao.emailExists("new@example.com")).thenReturn(false);
+        when(userDao.createUser(anyString(), anyString(), anyString(), anyString(), anyString()))
+            .thenThrow(new UserCreationException(
+                "Username 'duplicateuser' is already taken",
+                UserCreationException.ConflictType.DUPLICATE_USERNAME,
+                "username"
+            ));
+        
+        // When
+        ResponseEntity<Map<String, Object>> response = controller.register(request);
+        
+        // Then
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertFalse((Boolean) response.getBody().get("success"));
+        assertEquals("username", response.getBody().get("field"));
+        assertTrue(response.getBody().get("details").toString().contains("duplicateuser"));
+    }
+    
+    @Test
+    void testRegister_DuplicateEmail_ViaException() throws Exception {
+        // Given - test that UserCreationException with duplicate email is handled correctly
+        AuthRestController.RegisterRequest request = new AuthRestController.RegisterRequest();
+        request.setUsername("newuser");
+        request.setEmail("duplicate@example.com");
+        request.setPassword("SecurePass123");
+        request.setFullName("Test User");
+        request.setRole("PRODUCER");
+        
+        when(userDao.usernameExists("newuser")).thenReturn(false);
+        when(userDao.emailExists("duplicate@example.com")).thenReturn(false);
+        when(userDao.createUser(anyString(), anyString(), anyString(), anyString(), anyString()))
+            .thenThrow(new UserCreationException(
+                "Email is already registered",
+                UserCreationException.ConflictType.DUPLICATE_EMAIL,
+                "email"
+            ));
+        
+        // When
+        ResponseEntity<Map<String, Object>> response = controller.register(request);
+        
+        // Then
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertFalse((Boolean) response.getBody().get("success"));
+        assertEquals("email", response.getBody().get("field"));
+    }
+    
+    @Test
+    void testRegister_DatabaseError_ViaException() throws Exception {
+        // Given - test that general database error is handled correctly
+        AuthRestController.RegisterRequest request = new AuthRestController.RegisterRequest();
+        request.setUsername("newuser");
+        request.setEmail("new@example.com");
+        request.setPassword("SecurePass123");
+        request.setFullName("Test User");
+        request.setRole("PRODUCER");
+        
+        when(userDao.usernameExists("newuser")).thenReturn(false);
+        when(userDao.emailExists("new@example.com")).thenReturn(false);
+        when(userDao.createUser(anyString(), anyString(), anyString(), anyString(), anyString()))
+            .thenThrow(new UserCreationException(
+                "Database connection error",
+                UserCreationException.ConflictType.DATABASE_ERROR,
+                null
+            ));
+        
+        // When
+        ResponseEntity<Map<String, Object>> response = controller.register(request);
+        
+        // Then
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertFalse((Boolean) response.getBody().get("success"));
+    }
+    
+    @Test
+    void testRegister_ResponseContainsFieldInfo_ForUsernameError() {
+        // Given
+        AuthRestController.RegisterRequest request = new AuthRestController.RegisterRequest();
+        request.setUsername("existinguser");
+        request.setEmail("new@example.com");
+        request.setPassword("SecurePass123");
+        request.setFullName("Test User");
+        
+        when(userDao.usernameExists("existinguser")).thenReturn(true);
+        
+        // When
+        ResponseEntity<Map<String, Object>> response = controller.register(request);
+        
+        // Then
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertFalse((Boolean) response.getBody().get("success"));
+        assertEquals("username", response.getBody().get("field"));
+    }
+    
+    @Test
+    void testRegister_ResponseContainsFieldInfo_ForEmailError() {
+        // Given
+        AuthRestController.RegisterRequest request = new AuthRestController.RegisterRequest();
+        request.setUsername("newuser");
+        request.setEmail("existing@example.com");
+        request.setPassword("SecurePass123");
+        request.setFullName("Test User");
+        
+        when(userDao.usernameExists("newuser")).thenReturn(false);
+        when(userDao.emailExists("existing@example.com")).thenReturn(true);
+        
+        // When
+        ResponseEntity<Map<String, Object>> response = controller.register(request);
+        
+        // Then
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertFalse((Boolean) response.getBody().get("success"));
+        assertEquals("email", response.getBody().get("field"));
+    }
+    
     // ==================== Login Tests ====================
     
     @Test

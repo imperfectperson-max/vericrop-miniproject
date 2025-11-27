@@ -56,7 +56,7 @@ public class UserDao {
             stmt.setString(4, fullName);
             stmt.setString(5, role);
             
-            logger.debug("Attempting to create user: {} (role: {})", username, role);
+            logger.debug("Attempting to create user with role: {}", role);
             
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
@@ -64,7 +64,7 @@ public class UserDao {
                     user.setId(rs.getLong("id"));
                     user.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
                     user.setUpdatedAt(rs.getTimestamp("updated_at").toLocalDateTime());
-                    logger.info("✅ User created successfully: {} (role: {})", username, role);
+                    logger.info("✅ User created successfully with id: {} (role: {})", user.getId(), role);
                     return user;
                 }
                 // Should not reach here if INSERT with RETURNING works correctly
@@ -79,7 +79,7 @@ public class UserDao {
             String sqlState = e.getSQLState();
             String message = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
             
-            logger.debug("SQL error during user creation - SQLState: {}, Message: {}", sqlState, e.getMessage());
+            logger.debug("SQL error during user creation - SQLState: {}", sqlState);
             
             // PostgreSQL unique violation is SQLState 23505
             // H2 unique violation is also SQLState 23505
@@ -88,7 +88,7 @@ public class UserDao {
                 
                 // Determine which field caused the conflict
                 if (message.contains("username") || message.contains("users_username")) {
-                    logger.warn("Registration failed: Username '{}' already exists", username);
+                    logger.warn("Registration failed: Username already exists");
                     throw new UserCreationException(
                         "Username '" + username + "' is already taken",
                         ConflictType.DUPLICATE_USERNAME,
@@ -96,7 +96,7 @@ public class UserDao {
                         e
                     );
                 } else if (message.contains("email") || message.contains("users_email")) {
-                    logger.warn("Registration failed: Email already exists for user attempt: {}", username);
+                    logger.warn("Registration failed: Email already exists");
                     throw new UserCreationException(
                         "Email is already registered",
                         ConflictType.DUPLICATE_EMAIL,
@@ -105,7 +105,7 @@ public class UserDao {
                     );
                 } else {
                     // Generic duplicate key error - could be username or email
-                    logger.warn("Registration failed: Duplicate key violation for user: {}", username);
+                    logger.warn("Registration failed: Duplicate key violation");
                     throw new UserCreationException(
                         "Username or email already exists",
                         ConflictType.DATABASE_ERROR,
@@ -116,8 +116,8 @@ public class UserDao {
             }
             
             // For other database errors, include detailed cause information
-            logger.error("Failed to create user '{}': {} (SQLState: {})", 
-                        username, e.getMessage(), sqlState);
+            logger.error("Failed to create user due to database error (SQLState: {}): {}", 
+                        sqlState, e.getMessage());
             throw new UserCreationException(
                 "Could not create user account due to database error",
                 ConflictType.DATABASE_ERROR,
