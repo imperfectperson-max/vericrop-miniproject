@@ -3,6 +3,9 @@ package org.vericrop.gui.dao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.vericrop.gui.exception.DataAccessException;
+import org.vericrop.gui.exception.UserCreationException;
+import org.vericrop.gui.exception.UserCreationException.ConflictType;
 import org.vericrop.gui.models.User;
 
 import javax.sql.DataSource;
@@ -27,15 +30,18 @@ public class UserDao {
     }
     
     /**
-     * Create a new user with hashed password
+     * Create a new user with hashed password.
+     * 
      * @param username Username (must be unique)
      * @param password Plaintext password (will be hashed)
-     * @param email Email address
+     * @param email Email address (must be unique)
      * @param fullName Full name
      * @param role User role (FARMER, CONSUMER, ADMIN, SUPPLIER)
-     * @return Created User object with ID, or null if creation failed
+     * @return Created User object with ID
+     * @throws UserCreationException if creation fails due to duplicate username/email or other DB error
      */
-    public User createUser(String username, String password, String email, String fullName, String role) {
+    public User createUser(String username, String password, String email, String fullName, String role) 
+            throws UserCreationException {
         String sql = "INSERT INTO users (username, password_hash, email, full_name, role, status) " +
                      "VALUES (?, ?, ?, ?, ?, 'active') RETURNING id, created_at, updated_at";
         
@@ -50,23 +56,75 @@ public class UserDao {
             stmt.setString(4, fullName);
             stmt.setString(5, role);
             
+            logger.debug("Attempting to create user with role: {}", role);
+            
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
                     User user = new User(username, email, fullName, role);
                     user.setId(rs.getLong("id"));
                     user.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
                     user.setUpdatedAt(rs.getTimestamp("updated_at").toLocalDateTime());
-                    logger.info("✅ User created successfully: {} (role: {})", username, role);
+                    logger.info("✅ User created successfully with id: {} (role: {})", user.getId(), role);
                     return user;
                 }
+                // Should not reach here if INSERT with RETURNING works correctly
+                throw new UserCreationException(
+                    "User creation returned no result", 
+                    ConflictType.DATABASE_ERROR, 
+                    null
+                );
             }
         } catch (SQLException e) {
-            logger.error("Failed to create user: {}", e.getMessage());
-            if (e.getMessage().contains("duplicate key")) {
-                logger.error("Username or email already exists: {}", username);
+            // Parse the SQL exception to determine the specific constraint violation
+            String sqlState = e.getSQLState();
+            String message = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
+            
+            logger.debug("SQL error during user creation - SQLState: {}", sqlState);
+            
+            // PostgreSQL unique violation is SQLState 23505
+            // H2 unique violation is also SQLState 23505
+            if ("23505".equals(sqlState) || message.contains("duplicate key") || 
+                message.contains("unique constraint") || message.contains("unique_violation")) {
+                
+                // Determine which field caused the conflict
+                if (message.contains("username") || message.contains("users_username")) {
+                    logger.warn("Registration failed: Username already exists");
+                    throw new UserCreationException(
+                        "Username '" + username + "' is already taken",
+                        ConflictType.DUPLICATE_USERNAME,
+                        "username",
+                        e
+                    );
+                } else if (message.contains("email") || message.contains("users_email")) {
+                    logger.warn("Registration failed: Email already exists");
+                    throw new UserCreationException(
+                        "Email is already registered",
+                        ConflictType.DUPLICATE_EMAIL,
+                        "email",
+                        e
+                    );
+                } else {
+                    // Generic duplicate key error - could be username or email
+                    logger.warn("Registration failed: Duplicate key violation");
+                    throw new UserCreationException(
+                        "Username or email already exists",
+                        ConflictType.DATABASE_ERROR,
+                        null,
+                        e
+                    );
+                }
             }
+            
+            // For other database errors, include detailed cause information
+            logger.error("Failed to create user due to database error (SQLState: {}): {}", 
+                        sqlState, e.getMessage());
+            throw new UserCreationException(
+                "Could not create user account due to database error",
+                ConflictType.DATABASE_ERROR,
+                null,
+                e
+            );
         }
-        return null;
     }
     
     /**
@@ -251,11 +309,18 @@ public class UserDao {
     }
     
     /**
-     * Check if a username already exists
+     * Check if a username already exists.
+     * 
      * @param username Username to check
-     * @return true if username exists
+     * @return true if username exists, false if it doesn't
+     * @throws DataAccessException if a database error occurs during the check
      */
     public boolean usernameExists(String username) {
+        if (username == null || username.trim().isEmpty()) {
+            logger.debug("usernameExists called with null or empty username");
+            return false;
+        }
+        
         String sql = "SELECT COUNT(*) FROM users WHERE username = ?";
         
         try (Connection conn = dataSource.getConnection();
@@ -265,21 +330,33 @@ public class UserDao {
             
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
-                    return rs.getInt(1) > 0;
+                    boolean exists = rs.getInt(1) > 0;
+                    logger.debug("Username '{}' exists: {}", username, exists);
+                    return exists;
                 }
             }
+            // Should not reach here if COUNT(*) works correctly
+            return false;
         } catch (SQLException e) {
-            logger.error("Error checking username existence: {}", e.getMessage());
+            logger.error("Error checking username existence for '{}': {} (SQLState: {})", 
+                        username, e.getMessage(), e.getSQLState());
+            throw new DataAccessException("Failed to check if username exists", e);
         }
-        return false;
     }
     
     /**
-     * Check if an email already exists
+     * Check if an email already exists.
+     * 
      * @param email Email to check
-     * @return true if email exists
+     * @return true if email exists, false if it doesn't
+     * @throws DataAccessException if a database error occurs during the check
      */
     public boolean emailExists(String email) {
+        if (email == null || email.trim().isEmpty()) {
+            logger.debug("emailExists called with null or empty email");
+            return false;
+        }
+        
         String sql = "SELECT COUNT(*) FROM users WHERE email = ?";
         
         try (Connection conn = dataSource.getConnection();
@@ -289,13 +366,18 @@ public class UserDao {
             
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
-                    return rs.getInt(1) > 0;
+                    boolean exists = rs.getInt(1) > 0;
+                    logger.debug("Email exists check completed: {}", exists);
+                    return exists;
                 }
             }
+            // Should not reach here if COUNT(*) works correctly
+            return false;
         } catch (SQLException e) {
-            logger.error("Error checking email existence: {}", e.getMessage());
+            logger.error("Error checking email existence: {} (SQLState: {})", 
+                        e.getMessage(), e.getSQLState());
+            throw new DataAccessException("Failed to check if email exists", e);
         }
-        return false;
     }
     
     /**
