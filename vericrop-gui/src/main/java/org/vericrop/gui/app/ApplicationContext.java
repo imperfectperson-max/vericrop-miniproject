@@ -6,6 +6,7 @@ import org.vericrop.gui.clients.MLClientService;
 import org.vericrop.gui.config.ConfigService;
 import org.vericrop.gui.dao.ParticipantDao;
 import org.vericrop.gui.dao.UserDao;
+import org.vericrop.gui.persistence.DatabaseInitializer;
 import org.vericrop.gui.persistence.PostgresBatchRepository;
 import org.vericrop.gui.services.*;
 import org.vericrop.service.DeliverySimulator;
@@ -67,8 +68,17 @@ public class ApplicationContext {
         this.kafkaMessagingService = new KafkaMessagingService(configService);
         this.batchRepository = new PostgresBatchRepository(configService);
         
-        // Initialize DAO layer with shared DataSource
+        // Initialize database schema (idempotent - safe to run multiple times)
         DataSource dataSource = this.batchRepository.getDataSource();
+        try {
+            DatabaseInitializer.initialize(dataSource);
+            logger.info("✅ Database schema initialized successfully");
+        } catch (Exception e) {
+            logger.warn("⚠️  Database schema initialization encountered issues: {}. Continuing anyway.", 
+                       e.getMessage());
+        }
+        
+        // Initialize DAO layer with shared DataSource
         this.userDao = new UserDao(dataSource);
         this.participantDao = new ParticipantDao(dataSource);
         

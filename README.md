@@ -931,6 +931,28 @@ For detailed cleanup instructions, see the [Stopping and Cleaning](#stopping-and
 
 VeriCrop uses PostgreSQL for metadata storage with Flyway for automatic migrations.
 
+### Automatic Schema Initialization
+
+When the application starts, it automatically ensures the required database schema exists. The `DatabaseInitializer` utility:
+
+1. **Runs at startup** after the HikariCP connection pool is created
+2. **Loads** the idempotent schema from `src/main/resources/db/schema.sql`
+3. **Executes** CREATE TABLE IF NOT EXISTS statements for all required tables
+4. **Is resilient** - logs errors but doesn't crash the UI if the database is temporarily unavailable
+
+**Tables created automatically:**
+- `users` - User authentication and profile information
+- `batches` - Batch metadata and quality tracking
+- `shipments` - Shipment tracking with blockchain integration
+- `messages` - User-to-user messaging
+- `participants` - GUI instance tracking for contact discovery
+- `simulations` - Simulation metadata with supplier/consumer relationships
+- `simulation_batches` - Batch data during simulation runtime
+
+This ensures registration and other DB operations no longer fail with "relation does not exist" errors on first run.
+
+**To opt out of automatic schema initialization**, remove or rename the schema.sql file from resources. In this case, you must ensure the database schema is created manually or via Flyway migrations before starting the application.
+
 ### Database Migrations
 
 Database schema is managed through Flyway migrations located in `vericrop-gui/src/main/resources/db/migration/`:
