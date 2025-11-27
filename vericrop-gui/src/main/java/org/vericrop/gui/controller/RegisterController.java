@@ -93,7 +93,7 @@ public class RegisterController {
         
         // Disable form during registration
         setFormDisabled(true);
-        showStatus("Checking availability...", "info");
+        showStatus("Creating account...", "info");
         
         // Store for use in inner class
         final String finalUsername = username;
@@ -108,23 +108,7 @@ public class RegisterController {
             protected RegistrationResult call() {
                 logger.debug("Starting registration process for user: {}", finalUsername);
                 
-                // Optimistic duplicate checks - advisory only, not authoritative
-                // The database constraint is the final arbiter to avoid race conditions
-                try {
-                    if (userDao.usernameExists(finalUsername)) {
-                        logger.debug("Advisory check: username '{}' already exists", finalUsername);
-                        return RegistrationResult.usernameError("Username '" + finalUsername + "' is already taken");
-                    }
-                    if (userDao.emailExists(finalEmail)) {
-                        logger.debug("Advisory check: email already exists");
-                        return RegistrationResult.emailError("Email is already registered");
-                    }
-                } catch (DataAccessException e) {
-                    logger.error("Database error during duplicate check: {}", e.getMessage());
-                    return RegistrationResult.generalError("Unable to verify availability. Please try again.");
-                }
-                
-                // Try to create the user - database constraints provide final protection
+                // Try to create the user - database constraints provide authoritative uniqueness enforcement
                 try {
                     User user = userDao.createUser(finalUsername, finalPassword, finalEmail, finalFullName, finalRole);
                     logger.info("✅ Registration successful for user: {}", finalUsername);
@@ -142,6 +126,10 @@ public class RegisterController {
                         return RegistrationResult.generalError(
                             "Could not create account. Please try again or contact support.");
                     }
+                } catch (DataAccessException e) {
+                    logger.error("Database error during registration for user '{}': {}", finalUsername, e.getMessage());
+                    return RegistrationResult.generalError(
+                        "Could not create account. Please try again or contact support.");
                 }
             }
             
