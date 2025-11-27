@@ -11,6 +11,7 @@ import org.vericrop.gui.models.Simulation;
 import org.vericrop.gui.models.SimulationBatch;
 import org.vericrop.gui.services.SimulationAsyncService;
 import org.vericrop.gui.services.SimulationPersistenceService;
+import org.vericrop.gui.services.SimulationStateService;
 import org.vericrop.service.DeliverySimulator;
 import org.vericrop.service.MapSimulator;
 import org.vericrop.service.ScenarioManager;
@@ -54,13 +55,17 @@ class SimulationRestControllerPersistenceTest {
     @Mock
     private SimulationPersistenceService simulationPersistenceService;
     
+    @Mock
+    private SimulationStateService simulationStateService;
+    
     private SimulationRestController controller;
     
     @BeforeEach
     void setUp() {
         controller = new SimulationRestController(
             mapSimulator, scenarioManager, deliverySimulator, 
-            simulationManager, simulationAsyncService, simulationPersistenceService);
+            simulationManager, simulationAsyncService, simulationPersistenceService,
+            simulationStateService);
     }
     
     // ==================== Start Simulation Tests ====================

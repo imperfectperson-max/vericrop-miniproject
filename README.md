@@ -326,6 +326,125 @@ curl "http://localhost:8080/api/simulation/user/{userId}?activeOnly=true"
    - Monitor progress via GET `/api/simulation/active-shipments`
    - Check map state via GET `/api/simulation/map`
 
+### Kafka-Backed Shared Simulation State (NEW)
+
+VeriCrop now supports **shared simulation state** across multiple running instances. This enables different users (farmer, supplier, admin, consumer) to observe and modify the same simulation state in real time.
+
+**Key Features:**
+- 📡 **Server-Sent Events (SSE)**: Real-time state streaming to connected clients
+- 🔄 **Kafka Event Sourcing**: State changes are published to Kafka for multi-instance synchronization
+- 👥 **Multi-Role Support**: Different users with different roles can participate in the same simulation
+- 🔐 **Role-Based Actions**: Each role can perform specific state modifications
+
+**REST API Endpoints:**
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/simulation/state` | GET | Get current shared simulation state |
+| `/api/simulation/state/update` | POST | Submit a state change event |
+| `/api/simulation/stream` | GET (SSE) | Subscribe to real-time state updates |
+
+**Getting Current State:**
+
+```bash
+curl http://localhost:8080/api/simulation/state
+```
+
+**Response:**
+```json
+{
+  "simulation_active": false,
+  "current_step": 0,
+  "temperature": 4.0,
+  "humidity": 85.0,
+  "location": "Origin",
+  "quality_score": 100.0,
+  "participants": {},
+  "batches": [],
+  "alerts": [],
+  "last_updated": 1700000000000,
+  "version": 1
+}
+```
+
+**Updating State (Role-Based):**
+
+```bash
+curl -X POST http://localhost:8080/api/simulation/state/update \
+  -H "Content-Type: application/json" \
+  -d '{
+    "event_type": "STEP_UPDATE",
+    "role": "supplier",
+    "data": {
+      "step": 5,
+      "temperature": 4.5,
+      "location": "Highway Mile 20"
+    }
+  }'
+```
+
+**Subscribing to State Updates (SSE):**
+
+```bash
+# Connect to SSE stream
+curl -N http://localhost:8080/api/simulation/stream
+```
+
+**JavaScript Client Example:**
+```javascript
+const eventSource = new EventSource('/api/simulation/stream');
+
+eventSource.addEventListener('state', (event) => {
+  const state = JSON.parse(event.data);
+  console.log('State update:', state);
+  // Update UI with new state
+  updateDashboard(state);
+});
+
+eventSource.onerror = (error) => {
+  console.error('SSE connection error:', error);
+};
+```
+
+**Supported Event Types:**
+- `SIMULATION_STARTED`: Simulation has started
+- `SIMULATION_STOPPED`: Simulation has stopped
+- `STEP_UPDATE`: Environmental data update (temperature, humidity, location)
+- `PARTICIPANT_JOINED`: A user joined the simulation
+- `PARTICIPANT_LEFT`: A user left the simulation
+- `ALERT_ADDED`: A new alert was generated
+- `BATCH_ADDED`: A new batch was created
+- `STATE_UPDATE`: Generic state modification
+
+**Running Kafka Locally:**
+
+Use Docker Compose to start Kafka and Zookeeper:
+
+```bash
+docker-compose -f docker-compose-kafka.yml up -d
+```
+
+Or use the full stack:
+
+```bash
+docker-compose up -d kafka zookeeper
+```
+
+**Environment Variables:**
+
+```bash
+# Enable Kafka for state synchronization
+KAFKA_ENABLED=true
+KAFKA_BOOTSTRAP_SERVERS=localhost:9092
+```
+
+**Multi-Instance Setup:**
+
+1. Start Kafka: `docker-compose up -d kafka zookeeper`
+2. Start first instance: `./gradlew :vericrop-gui:run` (port 8080)
+3. Start second instance: `SERVER_PORT=8081 ./gradlew :vericrop-gui:run` (port 8081)
+4. Both instances will share simulation state through Kafka
+
 ### Realtime Simulation Updates (NEW)
 
 VeriCrop now features **realtime simulation with live UI updates** that animate delivery progress across Producer, Logistics, and Consumer views.
