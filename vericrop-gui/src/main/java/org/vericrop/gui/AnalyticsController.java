@@ -301,7 +301,7 @@ public class AnalyticsController implements SimulationListener {
     private void handleShowMessages() {
         MainApp mainApp = MainApp.getInstance();
         if (mainApp != null) {
-            mainApp.showInboxScreen();
+            //mainApp.showInboxScreen();
         }
     }
     
@@ -309,7 +309,7 @@ public class AnalyticsController implements SimulationListener {
     private void handleShowContacts() {
         MainApp mainApp = MainApp.getInstance();
         if (mainApp != null) {
-            mainApp.showContactsScreen();
+            //mainApp.showContactsScreen();
         }
     }
     

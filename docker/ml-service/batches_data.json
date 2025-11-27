@@ -1,0 +1,44 @@
+[
+  {
+    "batch_id": "BATCH_1764076999_9920",
+    "name": "i",
+    "farmer": "v",
+    "product_type": "c",
+    "quantity": 2,
+    "quality_score": 0.99,
+    "quality_label": "fresh",
+    "timestamp": "2025-11-25T13:23:19.921187",
+    "status": "created",
+    "data_hash": "49c8fa3ff4220cce6b4745e32e0069742dc3fd8c5b29afdde61b7c0c1d3e7fd7",
+    "prime_rate": 0.998,
+    "rejection_rate": 0.0004
+  },
+  {
+    "batch_id": "BATCH_1764094416_6458",
+    "name": "h",
+    "farmer": "b",
+    "product_type": "v",
+    "quantity": 8,
+    "quality_score": 0.96,
+    "quality_label": "fresh",
+    "timestamp": "2025-11-25T18:13:36.458371",
+    "status": "created",
+    "data_hash": "609c0c390e6bb7f9d1a6a689283a0fa13f039933c80ea1284134cbf0205f943d",
+    "prime_rate": 0.992,
+    "rejection_rate": 0.0016
+  },
+  {
+    "batch_id": "BATCH_1764235726_6646",
+    "name": "Berries",
+    "farmer": "Farmer",
+    "product_type": "hh",
+    "quantity": 80,
+    "quality_score": 0.35,
+    "quality_label": "low_quality",
+    "timestamp": "2025-11-27T09:28:46.646508",
+    "status": "created",
+    "data_hash": "a4ed0c7acbac508fe85f97d8318c51749477426d87d995bd72b4cdbd72f37a38",
+    "prime_rate": 0.104,
+    "rejection_rate": 0.026
+  }
+]
