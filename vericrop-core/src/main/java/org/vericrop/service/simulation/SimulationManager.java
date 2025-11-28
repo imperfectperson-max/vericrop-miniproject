@@ -246,6 +246,19 @@ public class SimulationManager {
     }
     
     /**
+     * Reset the SimulationManager singleton for testing purposes.
+     * This allows tests to reinitialize the manager with different dependencies.
+     * WARNING: This method should only be used in test code.
+     */
+    public static synchronized void resetForTesting() {
+        if (instance != null) {
+            instance.shutdown();
+            instance = null;
+            logger.info("SimulationManager singleton reset for testing");
+        }
+    }
+    
+    /**
      * Register a listener to receive simulation events.
      */
     public void registerListener(SimulationListener listener) {

@@ -33,6 +33,9 @@ public class SimulationIntegrationTest {
     
     @BeforeEach
     public void setup() {
+        // Reset the singleton to ensure clean state for each test
+        SimulationManager.resetForTesting();
+        
         messageService = new MessageService(false); // No persistence for tests
         alertService = new AlertService();
         deliverySimulator = new DeliverySimulator(messageService, alertService);
@@ -52,6 +55,8 @@ public class SimulationIntegrationTest {
         if (deliverySimulator != null) {
             deliverySimulator.shutdown();
         }
+        // Reset to clean up the singleton after each test
+        SimulationManager.resetForTesting();
     }
     
     @Test
