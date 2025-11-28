@@ -28,6 +28,8 @@ import org.vericrop.dto.MapSimulationEvent;
 import org.vericrop.dto.TemperatureComplianceEvent;
 import org.vericrop.kafka.consumers.MapSimulationEventConsumer;
 import org.vericrop.kafka.consumers.TemperatureComplianceEventConsumer;
+import org.vericrop.kafka.consumers.SimulationControlConsumer;
+import org.vericrop.kafka.events.SimulationControlEvent;
 import org.vericrop.kafka.producers.QualityAlertProducer;
 import org.vericrop.kafka.events.QualityAlertEvent;
 import org.slf4j.Logger;
@@ -87,6 +89,7 @@ public class LogisticsController implements SimulationListener {
     // Kafka consumers for real-time events
     private MapSimulationEventConsumer mapSimulationConsumer;
     private TemperatureComplianceEventConsumer temperatureComplianceConsumer;
+    private SimulationControlConsumer simulationControlConsumer;
     private ExecutorService kafkaConsumerExecutor;
     
     // Kafka producer for alerts
@@ -209,7 +212,7 @@ public class LogisticsController implements SimulationListener {
      */
     private void setupKafkaConsumers() {
         try {
-            kafkaConsumerExecutor = Executors.newFixedThreadPool(2);
+            kafkaConsumerExecutor = Executors.newFixedThreadPool(3);
             
             // Initialize alert producer
             try {
@@ -232,6 +235,14 @@ public class LogisticsController implements SimulationListener {
                 this::handleTemperatureComplianceEvent
             );
             
+            // Create simulation control consumer with unique group ID per instance
+            // Using unique group ID ensures each instance receives all simulation control events
+            String uniqueGroupId = "logistics-simulation-control-" + UUID.randomUUID().toString().substring(0, 8);
+            simulationControlConsumer = new SimulationControlConsumer(
+                uniqueGroupId,
+                this::handleSimulationControlEvent
+            );
+            
             // Start consumers in background threads
             kafkaConsumerExecutor.submit(() -> {
                 try {
@@ -249,12 +260,78 @@ public class LogisticsController implements SimulationListener {
                 }
             });
             
+            kafkaConsumerExecutor.submit(() -> {
+                try {
+                    simulationControlConsumer.startConsuming();
+                } catch (Exception e) {
+                    System.err.println("Simulation control consumer error: " + e.getMessage());
+                }
+            });
+            
             System.out.println("✅ Kafka consumers initialized for logistics monitoring");
         } catch (Exception e) {
             System.err.println("⚠️ Failed to initialize Kafka consumers: " + e.getMessage());
             e.printStackTrace();
             // Continue without Kafka - fallback to SimulationListener updates
         }
+    }
+    
+    /**
+     * Handle simulation control event from Kafka.
+     * Coordinates simulation start/stop across instances.
+     */
+    private void handleSimulationControlEvent(SimulationControlEvent event) {
+        if (event == null) {
+            return;
+        }
+        
+        System.out.println("📡 LogisticsController received simulation control event: " + event);
+        
+        Platform.runLater(() -> {
+            try {
+                if (event.isStart()) {
+                    // Handle simulation START - initialize tracking for this batch
+                    String batchId = event.getBatchId();
+                    String farmerId = event.getFarmerId();
+                    
+                    alerts.add(0, "🚚 Simulation started via Kafka: " + batchId);
+                    if (alerts.size() > MAX_ALERT_ITEMS) {
+                        alerts.remove(alerts.size() - 1);
+                    }
+                    
+                    // Initialize map marker at origin for this batch
+                    initializeMapMarker(batchId);
+                    
+                    // Initialize temperature chart series
+                    initializeTemperatureChartSeries(batchId);
+                    
+                    // Persist simulation start
+                    persistSimulationStart(batchId, farmerId);
+                    
+                    System.out.println("✅ LogisticsController: Started tracking simulation via Kafka: " + batchId);
+                    
+                } else if (event.isStop()) {
+                    // Handle simulation STOP - cleanup tracking for this batch
+                    String batchId = event.getBatchId() != null ? event.getBatchId() : event.getSimulationId();
+                    
+                    alerts.add(0, "⏹ Simulation stopped via Kafka: " + batchId);
+                    if (alerts.size() > MAX_ALERT_ITEMS) {
+                        alerts.remove(alerts.size() - 1);
+                    }
+                    
+                    // Persist simulation completion
+                    persistSimulationComplete(batchId, true);
+                    
+                    // Cleanup map marker
+                    cleanupMapMarker(batchId);
+                    
+                    System.out.println("✅ LogisticsController: Stopped tracking simulation via Kafka: " + batchId);
+                }
+            } catch (Exception e) {
+                System.err.println("❌ Error handling simulation control event: " + e.getMessage());
+                e.printStackTrace();
+            }
+        });
     }
     
     /**
@@ -1302,6 +1379,9 @@ public class LogisticsController implements SimulationListener {
         }
         if (temperatureComplianceConsumer != null) {
             temperatureComplianceConsumer.stop();
+        }
+        if (simulationControlConsumer != null) {
+            simulationControlConsumer.stop();
         }
         if (kafkaConsumerExecutor != null && !kafkaConsumerExecutor.isShutdown()) {
             kafkaConsumerExecutor.shutdownNow();

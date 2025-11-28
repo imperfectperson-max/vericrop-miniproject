@@ -36,9 +36,11 @@ import org.vericrop.kafka.KafkaServiceManager;
 import org.vericrop.kafka.producers.LogisticsEventProducer;
 import org.vericrop.kafka.producers.BlockchainEventProducer;
 import org.vericrop.kafka.producers.QualityAlertProducer;
+import org.vericrop.kafka.producers.SimulationControlProducer;
 import org.vericrop.kafka.events.LogisticsEvent;
 import org.vericrop.kafka.events.BlockchainEvent;
 import org.vericrop.kafka.events.QualityAlertEvent;
+import org.vericrop.kafka.services.InstanceRegistry;
 import org.vericrop.gui.util.BlockchainInitializer;
 import org.vericrop.service.simulation.SimulationListener;
 import org.vericrop.service.simulation.SimulationManager;
@@ -75,6 +77,10 @@ public class ProducerController implements SimulationListener {
     private BlockchainEventProducer blockchainProducer;
     private QualityAlertProducer qualityAlertProducer;
     private BatchUpdateEventProducer batchUpdateProducer;
+    private SimulationControlProducer simulationControlProducer;
+    
+    // Instance registry for tracking running instances
+    private InstanceRegistry instanceRegistry;
     
     // Extended simulation services
     private TemperatureComplianceService temperatureComplianceService;
@@ -276,15 +282,21 @@ public class ProducerController implements SimulationListener {
             this.blockchainProducer = new BlockchainEventProducer();
             this.qualityAlertProducer = new QualityAlertProducer();
             this.batchUpdateProducer = new BatchUpdateEventProducer();
+            this.simulationControlProducer = new SimulationControlProducer();
 
             this.kafkaServiceManager = new KafkaServiceManager();
             kafkaServiceManager.startAllConsumers();
+            
+            // Initialize instance registry to track running instances
+            this.instanceRegistry = new InstanceRegistry();
+            this.instanceRegistry.start();
             
             // Initialize extended simulation services
             this.temperatureComplianceService = new TemperatureComplianceService();
             this.logisticsService = new LogisticsService();
 
             System.out.println("✅ Kafka services initialized successfully");
+            System.out.println("📡 Instance registry started with ID: " + instanceRegistry.getInstanceId());
 
             Platform.runLater(() -> {
                 updateStatus("✅ Kafka services ready");
@@ -1398,6 +1410,23 @@ public class ProducerController implements SimulationListener {
     @FXML
     private void handleStartSimulation() {
         try {
+            // Check if enough instances are running for coordinated simulation
+            if (instanceRegistry != null && !instanceRegistry.hasEnoughInstances()) {
+                int activeCount = instanceRegistry.getActiveInstanceCount();
+                int required = instanceRegistry.getMinInstancesRequired();
+                Platform.runLater(() -> {
+                    showError("Not enough instances running for coordinated simulation.\n" +
+                             "Active instances: " + activeCount + ", Required: " + required + "\n\n" +
+                             "Please start more application instances before starting a simulation.");
+                    if (simStatusLabel != null) {
+                        simStatusLabel.setText("⚠ Need " + required + " instances (have " + activeCount + ")");
+                        simStatusLabel.setStyle("-fx-text-fill: #DC2626;");
+                    }
+                });
+                System.out.println("⚠️ Blocked simulation start: need " + required + " instances, have " + activeCount);
+                return;
+            }
+            
             // Allow selecting a batch from recent batches list
             String selectedBatchId = selectBatchForAction("Select Batch for Delivery Simulation");
             if (selectedBatchId == null) {
@@ -1419,6 +1448,10 @@ public class ProducerController implements SimulationListener {
 
             final Duration simulationDuration = Duration.ofMinutes(30); // Extended duration
             final String finalBatchId = selectedBatchId; // Make final for lambda
+            
+            // Generate a unique simulation ID for cross-instance coordination
+            final String simulationId = java.util.UUID.randomUUID().toString();
+            final String instanceId = instanceRegistry != null ? instanceRegistry.getInstanceId() : "unknown";
             
             // Harden simulation startup with synchronized check and immediate UI state update
             if (!SimulationManager.isInitialized()) {
@@ -1459,6 +1492,12 @@ public class ProducerController implements SimulationListener {
                 // Run all blocking/long-running operations asynchronously
                 CompletableFuture.runAsync(() -> {
                     try {
+                        // Publish simulation control event to notify other controllers across instances
+                        if (simulationControlProducer != null) {
+                            simulationControlProducer.sendStart(simulationId, instanceId, finalBatchId, farmerId);
+                            System.out.println("📡 Published simulation START control event: " + simulationId);
+                        }
+                        
                         // Publish batch lifecycle event: DISPATCHED (with quality metrics if available)
                         if (batchUpdateProducer != null) {
                             Map<String, Double> metrics = batchMetricsMap.get(finalBatchId);
@@ -1751,8 +1790,15 @@ public class ProducerController implements SimulationListener {
             }
 
             String stoppingBatchId = manager.getSimulationId();
+            String instanceId = instanceRegistry != null ? instanceRegistry.getInstanceId() : "unknown";
             System.out.println("⏹ Stopping simulation for batch: " + stoppingBatchId);
             manager.stopSimulation();
+            
+            // Publish simulation control STOP event to notify other controllers across instances
+            if (simulationControlProducer != null) {
+                simulationControlProducer.sendStop(stoppingBatchId, instanceId);
+                System.out.println("📡 Published simulation STOP control event: " + stoppingBatchId);
+            }
             
             // Stop extended simulations
             if (temperatureComplianceService != null) {
@@ -2327,6 +2373,13 @@ public class ProducerController implements SimulationListener {
         }
         if (batchUpdateProducer != null) {
             batchUpdateProducer.close();
+        }
+        if (simulationControlProducer != null) {
+            simulationControlProducer.close();
+        }
+        // Close instance registry
+        if (instanceRegistry != null) {
+            instanceRegistry.close();
         }
         // Shutdown extended simulation services
         if (temperatureComplianceService != null) {

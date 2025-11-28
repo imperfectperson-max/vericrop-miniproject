@@ -11,6 +11,7 @@ import javafx.stage.Stage;
 import java.util.Set;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.io.File;
@@ -19,12 +20,16 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.vericrop.gui.util.QRDecoder;
 import org.vericrop.service.TemperatureService;
 import org.vericrop.service.simulation.SimulationConfig;
 import org.vericrop.service.simulation.SimulationListener;
 import org.vericrop.service.simulation.SimulationManager;
+import org.vericrop.kafka.consumers.SimulationControlConsumer;
+import org.vericrop.kafka.events.SimulationControlEvent;
 import com.google.zxing.NotFoundException;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -126,6 +131,10 @@ public class ConsumerController implements SimulationListener {
     private String currentBatchId = null;
     private double lastProgress = 0.0;
     
+    // Kafka consumer for simulation control events
+    private SimulationControlConsumer simulationControlConsumer;
+    private ExecutorService kafkaConsumerExecutor;
+    
     /** Default final quality used when SimulationManager data is unavailable */
     private static final double DEFAULT_FINAL_QUALITY = 95.0;
     
@@ -178,6 +187,103 @@ public class ConsumerController implements SimulationListener {
         setupNavigationButtons();
         registerWithSimulationManager();
         initializeJourneyDisplay();
+        setupKafkaConsumers();
+    }
+    
+    /**
+     * Setup Kafka consumers for simulation control events.
+     */
+    private void setupKafkaConsumers() {
+        try {
+            kafkaConsumerExecutor = Executors.newSingleThreadExecutor();
+            
+            // Create simulation control consumer with unique group ID per instance
+            String uniqueGroupId = "consumer-simulation-control-" + UUID.randomUUID().toString().substring(0, 8);
+            simulationControlConsumer = new SimulationControlConsumer(
+                uniqueGroupId,
+                this::handleSimulationControlEvent
+            );
+            
+            // Start consumer in background thread
+            kafkaConsumerExecutor.submit(() -> {
+                try {
+                    simulationControlConsumer.startConsuming();
+                } catch (Exception e) {
+                    System.err.println("Simulation control consumer error: " + e.getMessage());
+                }
+            });
+            
+            System.out.println("✅ Kafka consumers initialized for consumer verification");
+        } catch (Exception e) {
+            System.err.println("⚠️ Failed to initialize Kafka consumers: " + e.getMessage());
+            // Continue without Kafka - fallback to SimulationListener updates
+        }
+    }
+    
+    /**
+     * Handle simulation control event from Kafka.
+     * Coordinates simulation start/stop across instances.
+     */
+    private void handleSimulationControlEvent(SimulationControlEvent event) {
+        if (event == null) {
+            return;
+        }
+        
+        System.out.println("📡 ConsumerController received simulation control event: " + event);
+        
+        Platform.runLater(() -> {
+            try {
+                if (event.isStart()) {
+                    // Handle simulation START
+                    String batchId = event.getBatchId();
+                    String farmerId = event.getFarmerId();
+                    
+                    currentBatchId = batchId;
+                    lastProgress = 0.0;
+                    
+                    String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+                    String message = timestamp + ": 🚚 Batch " + batchId + " is now in transit from " + farmerId + " (via Kafka)";
+                    verificationHistory.add(0, message);
+                    
+                    // Reset and start journey display
+                    initializeJourneyDisplay();
+                    updateJourneyStep(1, "✅", "Batch Created - " + batchId, 
+                        "Started at " + timestamp + " | From: " + farmerId);
+                    updateJourneyStep(2, "🚚", "In Transit", "Starting delivery...");
+                    
+                    if (statusLabel != null) statusLabel.setText("Started");
+                    if (temperatureLabel != null) temperatureLabel.setText("Monitoring...");
+                    
+                    System.out.println("✅ ConsumerController: Started tracking simulation via Kafka: " + batchId);
+                    
+                } else if (event.isStop()) {
+                    // Handle simulation STOP
+                    String batchId = event.getBatchId() != null ? event.getBatchId() : event.getSimulationId();
+                    
+                    String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+                    String message = timestamp + ": ✅ Batch " + batchId + " delivered (via Kafka) - Ready for verification";
+                    verificationHistory.add(0, message);
+                    
+                    // Display final quality
+                    displayFinalQuality(batchId, DEFAULT_FINAL_QUALITY);
+                    
+                    // Get and display average temperature from TemperatureService
+                    displayAverageTemperature(batchId);
+                    
+                    // Update all journey steps to complete
+                    updateJourneyFromProgress(batchId, 100.0, "Delivered");
+                    
+                    // Reset tracking
+                    currentBatchId = null;
+                    lastProgress = 0.0;
+                    
+                    System.out.println("✅ ConsumerController: Stopped tracking simulation via Kafka: " + batchId);
+                }
+            } catch (Exception e) {
+                System.err.println("❌ Error handling simulation control event: " + e.getMessage());
+                e.printStackTrace();
+            }
+        });
     }
     
     /**
@@ -762,6 +868,14 @@ public class ConsumerController implements SimulationListener {
             }
         } catch (Exception e) {
             System.err.println("Error unregistering from SimulationManager: " + e.getMessage());
+        }
+        
+        // Stop Kafka consumers
+        if (simulationControlConsumer != null) {
+            simulationControlConsumer.stop();
+        }
+        if (kafkaConsumerExecutor != null && !kafkaConsumerExecutor.isShutdown()) {
+            kafkaConsumerExecutor.shutdownNow();
         }
     }
     
