@@ -342,6 +342,9 @@ public class LogisticsController implements SimulationListener {
                     // Persist simulation start
                     persistSimulationStart(batchId, farmerId);
                     
+                    // Add shipment to Active Shipments table (UI)
+                    addShipmentToTable(batchId, farmerId != null ? farmerId : "Unknown");
+                    
                     logger.info("✅ LogisticsController: Started tracking simulation via Kafka: {}", batchId);
                     
                 } else if (event.isStop()) {
@@ -1615,8 +1618,47 @@ public class LogisticsController implements SimulationListener {
             // Persist shipment
             persistShipmentUpdate(batchId, farmerId, "CREATED", "Origin", 4.0, 65.0, "Starting", null);
             
+            // Add shipment to Active Shipments table (UI)
+            addShipmentToTable(batchId, farmerId);
+            
             logger.info("LogisticsController: Simulation started - {}", batchId);
         });
+    }
+    
+    /**
+     * Add a new shipment to the Active Shipments table when simulation starts.
+     * This ensures the Active Shipments tab is populated with active simulations.
+     * 
+     * @param batchId The batch identifier
+     * @param farmerId The farmer/producer identifier
+     */
+    private void addShipmentToTable(String batchId, String farmerId) {
+        if (shipmentsTable == null) return;
+        
+        try {
+            // Check if shipment already exists (avoid duplicates)
+            boolean exists = shipments.stream()
+                .anyMatch(s -> s.getBatchId().equals(batchId));
+            
+            if (!exists) {
+                // Create new shipment entry with initial values
+                Shipment newShipment = new Shipment(
+                    batchId,
+                    "IN_TRANSIT",
+                    "Origin - " + farmerId,
+                    4.0,  // Default cold-chain temperature
+                    65.0, // Default humidity
+                    "Starting...",
+                    generateVehicleId(batchId)
+                );
+                
+                shipments.add(0, newShipment); // Add at top of list
+                
+                logger.info("Added shipment to Active Shipments table: {}", batchId);
+            }
+        } catch (Exception e) {
+            logger.error("Error adding shipment to table: {}", e.getMessage());
+        }
     }
     
     /**
