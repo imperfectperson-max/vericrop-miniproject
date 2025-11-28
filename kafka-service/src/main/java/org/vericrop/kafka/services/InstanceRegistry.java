@@ -8,24 +8,29 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.vericrop.kafka.KafkaConfig;
 import org.vericrop.kafka.events.InstanceHeartbeatEvent;
+import org.vericrop.kafka.events.InstanceHeartbeatEvent.Role;
 
 import java.time.Duration;
-import java.util.Collections;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 /**
  * Service for tracking running application instances using Kafka.
  * Each instance sends periodic heartbeats to the instance-registry topic.
- * The service maintains a count of active instances based on recent heartbeats.
+ * The service maintains a registry of active instances by their unique ID and role.
  * 
- * This is used to enforce the requirement that simulations should only start
- * across all controllers when at least 3 instances are running.
+ * This supports multi-instance coordination by:
+ * - Tracking instances by unique identifier (role + host + port or UUID)
+ * - Grouping instances by role (PRODUCER, LOGISTICS, CONSUMER)
+ * - Allowing multiple instances of the same role to run concurrently
+ * - Providing role-based queries for simulation start validation
+ * 
+ * For simulations to start, at least one instance of each required role must be present.
  */
 public class InstanceRegistry implements AutoCloseable {
     
@@ -35,33 +40,110 @@ public class InstanceRegistry implements AutoCloseable {
     /** Time after which an instance is considered dead if no heartbeat received */
     private static final long INSTANCE_TIMEOUT_MS = 15000; // 15 seconds
     
-    /** Minimum number of instances required for coordinated simulation start */
+    /** Minimum number of instances required for coordinated simulation start (legacy) */
     private static final int MIN_INSTANCES_FOR_COORDINATION = 3;
     
+    /** Required roles for simulation coordination */
+    private static final Set<Role> REQUIRED_ROLES_FOR_SIMULATION = Set.of(
+        Role.PRODUCER, Role.LOGISTICS, Role.CONSUMER
+    );
+    
     private final String instanceId;
+    private final Role role;
+    private final String host;
+    private final int port;
     private final KafkaProducer<String, String> producer;
     private final KafkaConsumer<String, String> consumer;
     private final ObjectMapper objectMapper;
-    private final Map<String, Long> instanceLastSeen;
+    private final Map<String, InstanceInfo> instanceRegistry;
     private final ScheduledExecutorService scheduler;
     private final AtomicBoolean running;
     
     /**
-     * Create a new instance registry with a random instance ID.
+     * Information about a registered instance.
      */
-    public InstanceRegistry() {
-        this(UUID.randomUUID().toString());
+    public static class InstanceInfo {
+        private final String instanceId;
+        private final Role role;
+        private final String host;
+        private final int port;
+        private volatile long lastSeen;
+        
+        public InstanceInfo(String instanceId, Role role, String host, int port, long lastSeen) {
+            this.instanceId = instanceId;
+            this.role = role;
+            this.host = host;
+            this.port = port;
+            this.lastSeen = lastSeen;
+        }
+        
+        public String getInstanceId() { return instanceId; }
+        public Role getRole() { return role; }
+        public String getHost() { return host; }
+        public int getPort() { return port; }
+        public long getLastSeen() { return lastSeen; }
+        public void setLastSeen(long lastSeen) { this.lastSeen = lastSeen; }
+        
+        @Override
+        public String toString() {
+            return String.format("InstanceInfo{id=%s, role=%s, host=%s, port=%d}", 
+                instanceId, role, host, port);
+        }
     }
     
     /**
-     * Create a new instance registry with a specific instance ID.
+     * Create a new instance registry with a random instance ID and UNKNOWN role.
+     * For backward compatibility with existing code.
+     */
+    public InstanceRegistry() {
+        this(UUID.randomUUID().toString(), Role.UNKNOWN, null, 0);
+    }
+    
+    /**
+     * Create a new instance registry with a specific instance ID and UNKNOWN role.
+     * For backward compatibility with existing code.
      * 
      * @param instanceId Unique identifier for this instance
      */
     public InstanceRegistry(String instanceId) {
+        this(instanceId, Role.UNKNOWN, null, 0);
+    }
+    
+    /**
+     * Create a new instance registry with a specific role.
+     * 
+     * @param role The role of this instance (PRODUCER, LOGISTICS, CONSUMER)
+     */
+    public InstanceRegistry(Role role) {
+        this(UUID.randomUUID().toString(), role, null, 0);
+    }
+    
+    /**
+     * Create a new instance registry with a specific role, host, and port.
+     * 
+     * @param role The role of this instance
+     * @param host The host/IP address of this instance
+     * @param port The port number of this instance
+     */
+    public InstanceRegistry(Role role, String host, int port) {
+        this(UUID.randomUUID().toString(), role, host, port);
+    }
+    
+    /**
+     * Create a new instance registry with full configuration.
+     * 
+     * @param instanceId Unique identifier for this instance
+     * @param role The role of this instance
+     * @param host The host/IP address of this instance
+     * @param port The port number of this instance
+     */
+    public InstanceRegistry(String instanceId, Role role, String host, int port) {
         this.instanceId = instanceId;
+        this.role = role != null ? role : Role.UNKNOWN;
+        this.host = host;
+        this.port = port;
         this.objectMapper = new ObjectMapper();
-        this.instanceLastSeen = new ConcurrentHashMap<>();
+        this.instanceRegistry = new ConcurrentHashMap<>();
         this.running = new AtomicBoolean(false);
         this.scheduler = Executors.newScheduledThreadPool(2);
         
@@ -80,7 +162,7 @@ public class InstanceRegistry implements AutoCloseable {
             return; // Already running
         }
         
-        System.out.println("🔄 Starting InstanceRegistry for instance: " + instanceId);
+        System.out.println("🔄 Starting InstanceRegistry for instance: " + instanceId + " (role: " + role + ")");
         
         // Start heartbeat sender
         scheduler.scheduleAtFixedRate(
@@ -101,7 +183,7 @@ public class InstanceRegistry implements AutoCloseable {
             TimeUnit.MILLISECONDS
         );
         
-        System.out.println("✅ InstanceRegistry started for instance: " + instanceId);
+        System.out.println("✅ InstanceRegistry started for instance: " + instanceId + " (role: " + role + ")");
     }
     
     /**
@@ -109,7 +191,7 @@ public class InstanceRegistry implements AutoCloseable {
      */
     private void sendHeartbeat() {
         try {
-            InstanceHeartbeatEvent event = new InstanceHeartbeatEvent(instanceId);
+            InstanceHeartbeatEvent event = new InstanceHeartbeatEvent(instanceId, role, host, port);
             String json = objectMapper.writeValueAsString(event);
             
             ProducerRecord<String, String> record = new ProducerRecord<>(
@@ -124,8 +206,8 @@ public class InstanceRegistry implements AutoCloseable {
                 }
             });
             
-            // Also update our own timestamp
-            instanceLastSeen.put(instanceId, System.currentTimeMillis());
+            // Also update our own entry in the registry
+            instanceRegistry.put(instanceId, new InstanceInfo(instanceId, role, host, port, System.currentTimeMillis()));
             
         } catch (Exception e) {
             System.err.println("❌ Error sending heartbeat: " + e.getMessage());
@@ -148,10 +230,20 @@ public class InstanceRegistry implements AutoCloseable {
                             record.value(), InstanceHeartbeatEvent.class);
                         
                         if (event.isAlive()) {
-                            instanceLastSeen.put(event.getInstanceId(), event.getTimestamp());
+                            InstanceInfo info = new InstanceInfo(
+                                event.getInstanceId(),
+                                event.getRoleEnum(),
+                                event.getHost(),
+                                event.getPort(),
+                                event.getTimestamp()
+                            );
+                            instanceRegistry.put(event.getInstanceId(), info);
                         } else if (event.isShutdown()) {
-                            instanceLastSeen.remove(event.getInstanceId());
-                            System.out.println("📤 Instance shutdown: " + event.getInstanceId());
+                            InstanceInfo removed = instanceRegistry.remove(event.getInstanceId());
+                            if (removed != null) {
+                                System.out.println("📤 Instance shutdown: " + event.getInstanceId() + 
+                                    " (role: " + removed.getRole() + ")");
+                            }
                         }
                     } catch (Exception e) {
                         System.err.println("❌ Error parsing heartbeat event: " + e.getMessage());
@@ -178,14 +270,15 @@ public class InstanceRegistry implements AutoCloseable {
      */
     private void cleanupStaleInstances() {
         long now = System.currentTimeMillis();
-        instanceLastSeen.entrySet().removeIf(entry -> {
+        instanceRegistry.entrySet().removeIf(entry -> {
             // Never remove ourselves - our heartbeat should always be fresh
             if (entry.getKey().equals(instanceId)) {
                 return false;
             }
-            boolean isStale = (now - entry.getValue()) > INSTANCE_TIMEOUT_MS;
+            boolean isStale = (now - entry.getValue().getLastSeen()) > INSTANCE_TIMEOUT_MS;
             if (isStale) {
-                System.out.println("🗑️ Removing stale instance: " + entry.getKey());
+                System.out.println("🗑️ Removing stale instance: " + entry.getKey() + 
+                    " (role: " + entry.getValue().getRole() + ")");
             }
             return isStale;
         });
@@ -198,25 +291,115 @@ public class InstanceRegistry implements AutoCloseable {
      */
     public int getActiveInstanceCount() {
         cleanupStaleInstances();
-        return instanceLastSeen.size();
+        return instanceRegistry.size();
+    }
+    
+    /**
+     * Get the number of active instances for a specific role.
+     * 
+     * @param role The role to count instances for
+     * @return Count of active instances with the specified role
+     */
+    public int getActiveInstanceCountByRole(Role role) {
+        cleanupStaleInstances();
+        return (int) instanceRegistry.values().stream()
+            .filter(info -> info.getRole() == role)
+            .count();
+    }
+    
+    /**
+     * Get all active instances for a specific role.
+     * 
+     * @param role The role to get instances for
+     * @return Immutable list of instance info for the specified role
+     */
+    public List<InstanceInfo> getInstancesByRole(Role role) {
+        cleanupStaleInstances();
+        return instanceRegistry.values().stream()
+            .filter(info -> info.getRole() == role)
+            .toList();
+    }
+    
+    /**
+     * Get all active instances grouped by role.
+     * 
+     * @return Immutable map of role to list of instances
+     */
+    public Map<Role, List<InstanceInfo>> getInstancesByRoleMap() {
+        cleanupStaleInstances();
+        Map<Role, List<InstanceInfo>> groupedMap = instanceRegistry.values().stream()
+            .collect(Collectors.groupingBy(InstanceInfo::getRole));
+        return Map.copyOf(groupedMap);
+    }
+    
+    /**
+     * Get the set of roles that currently have at least one active instance.
+     * 
+     * @return Set of active roles
+     */
+    public Set<Role> getActiveRoles() {
+        cleanupStaleInstances();
+        return instanceRegistry.values().stream()
+            .map(InstanceInfo::getRole)
+            .filter(r -> r != Role.UNKNOWN)
+            .collect(Collectors.toSet());
+    }
+    
+    /**
+     * Check if all required roles for simulation are present.
+     * Required roles are: PRODUCER, LOGISTICS, CONSUMER.
+     * 
+     * @return true if at least one instance of each required role is active
+     */
+    public boolean hasRequiredRolesForSimulation() {
+        Set<Role> activeRoles = getActiveRoles();
+        return activeRoles.containsAll(REQUIRED_ROLES_FOR_SIMULATION);
+    }
+    
+    /**
+     * Get the missing roles required for simulation.
+     * 
+     * @return Set of roles that are required but not currently active
+     */
+    public Set<Role> getMissingRolesForSimulation() {
+        Set<Role> activeRoles = getActiveRoles();
+        return REQUIRED_ROLES_FOR_SIMULATION.stream()
+            .filter(role -> !activeRoles.contains(role))
+            .collect(Collectors.toSet());
     }
     
     /**
      * Check if enough instances are running for coordinated simulation start.
+     * This now checks for required roles instead of just counting instances.
      * 
-     * @return true if at least MIN_INSTANCES_FOR_COORDINATION instances are active
+     * @return true if all required roles (PRODUCER, LOGISTICS, CONSUMER) are present
      */
     public boolean hasEnoughInstances() {
+        // First check if we have required roles
+        if (hasRequiredRolesForSimulation()) {
+            return true;
+        }
+        // Fallback to legacy count-based check for backward compatibility
+        // (for instances that don't specify a role)
         return getActiveInstanceCount() >= MIN_INSTANCES_FOR_COORDINATION;
     }
     
     /**
      * Get the minimum number of instances required for coordinated simulation.
      * 
-     * @return Minimum instance count
+     * @return Minimum instance count (legacy)
      */
     public int getMinInstancesRequired() {
         return MIN_INSTANCES_FOR_COORDINATION;
+    }
+    
+    /**
+     * Get the required roles for simulation.
+     * 
+     * @return Set of required roles
+     */
+    public Set<Role> getRequiredRolesForSimulation() {
+        return new HashSet<>(REQUIRED_ROLES_FOR_SIMULATION);
     }
     
     /**
@@ -229,6 +412,25 @@ public class InstanceRegistry implements AutoCloseable {
     }
     
     /**
+     * Get this instance's role.
+     * 
+     * @return Instance role
+     */
+    public Role getRole() {
+        return role;
+    }
+    
+    /**
+     * Get an immutable copy of all registered instances.
+     * 
+     * @return Immutable map of instance ID to instance info
+     */
+    public Map<String, InstanceInfo> getAllInstances() {
+        cleanupStaleInstances();
+        return Map.copyOf(instanceRegistry);
+    }
+    
+    /**
      * Send a shutdown heartbeat and stop the registry.
      */
     @Override
@@ -237,11 +439,11 @@ public class InstanceRegistry implements AutoCloseable {
             return; // Already stopped
         }
         
-        System.out.println("🛑 Stopping InstanceRegistry for instance: " + instanceId);
+        System.out.println("🛑 Stopping InstanceRegistry for instance: " + instanceId + " (role: " + role + ")");
         
         // Send shutdown heartbeat
         try {
-            InstanceHeartbeatEvent shutdownEvent = InstanceHeartbeatEvent.shutdown(instanceId);
+            InstanceHeartbeatEvent shutdownEvent = InstanceHeartbeatEvent.shutdown(instanceId, role);
             String json = objectMapper.writeValueAsString(shutdownEvent);
             
             ProducerRecord<String, String> record = new ProducerRecord<>(

@@ -30,8 +30,10 @@ import org.vericrop.kafka.consumers.MapSimulationEventConsumer;
 import org.vericrop.kafka.consumers.TemperatureComplianceEventConsumer;
 import org.vericrop.kafka.consumers.SimulationControlConsumer;
 import org.vericrop.kafka.events.SimulationControlEvent;
+import org.vericrop.kafka.events.InstanceHeartbeatEvent;
 import org.vericrop.kafka.producers.QualityAlertProducer;
 import org.vericrop.kafka.events.QualityAlertEvent;
+import org.vericrop.kafka.services.InstanceRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -94,6 +96,9 @@ public class LogisticsController implements SimulationListener {
     
     // Kafka producer for alerts
     private QualityAlertProducer qualityAlertProducer;
+    
+    // Instance registry for multi-instance tracking
+    private InstanceRegistry instanceRegistry;
     
     // Track temperature chart series by batch ID (thread-safe for Kafka consumer access)
     private Map<String, XYChart.Series<Number, Number>> temperatureSeriesMap = new ConcurrentHashMap<>();
@@ -170,6 +175,9 @@ public class LogisticsController implements SimulationListener {
         
         // Initialize Kafka consumers for real-time updates
         setupKafkaConsumers();
+        
+        // Initialize instance registry with LOGISTICS role
+        initializeInstanceRegistry();
 
         // Get delivery simulator from application context
         try {
@@ -180,6 +188,21 @@ public class LogisticsController implements SimulationListener {
         
         // Register with SimulationManager to track running simulations
         registerWithSimulationManager();
+    }
+    
+    /**
+     * Initialize instance registry with LOGISTICS role for multi-instance coordination.
+     */
+    private void initializeInstanceRegistry() {
+        try {
+            this.instanceRegistry = new InstanceRegistry(InstanceHeartbeatEvent.Role.LOGISTICS);
+            this.instanceRegistry.start();
+            logger.info("📡 LogisticsController instance registry started with ID: {} (role: {})",
+                       instanceRegistry.getInstanceId(), instanceRegistry.getRole());
+        } catch (Exception e) {
+            logger.warn("⚠️ Failed to initialize instance registry: {} - simulation coordination may be affected", 
+                       e.getMessage());
+        }
     }
     
     /**
@@ -1373,6 +1396,15 @@ public class LogisticsController implements SimulationListener {
             }
         } catch (Exception e) {
             System.err.println("Error unregistering from SimulationManager: " + e.getMessage());
+        }
+        
+        // Close instance registry
+        if (instanceRegistry != null) {
+            try {
+                instanceRegistry.close();
+            } catch (Exception e) {
+                System.err.println("Error closing instance registry: " + e.getMessage());
+            }
         }
         
         // Stop Kafka consumers
