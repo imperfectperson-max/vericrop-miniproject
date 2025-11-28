@@ -348,6 +348,12 @@ public class LogisticsController implements SimulationListener {
                     // Handle simulation STOP - cleanup tracking for this batch
                     String batchId = event.getBatchId() != null ? event.getBatchId() : event.getSimulationId();
                     
+                    // Check if already stopped to avoid duplicate alerts
+                    if (stoppedSimulations.contains(batchId)) {
+                        logger.debug("Ignoring duplicate stop event for already stopped simulation: {}", batchId);
+                        return;
+                    }
+                    
                     // Mark simulation as stopped to prevent further chart updates
                     stoppedSimulations.add(batchId);
                     
@@ -882,7 +888,13 @@ public class LogisticsController implements SimulationListener {
                 } else {
                     // Simulation ended, remove from map
                     activeShipments.remove(shipmentId);
-                    addAlert("✅ Delivery completed: " + shipmentId);
+                    
+                    // Only add "delivery completed" alert if not already in stoppedSimulations
+                    // This prevents duplicate alerts when onSimulationStopped has already fired
+                    if (!stoppedSimulations.contains(shipmentId)) {
+                        stoppedSimulations.add(shipmentId);
+                        addAlert("✅ Delivery completed: " + shipmentId);
+                    }
                 }
             } catch (Exception e) {
                 System.err.println("Error getting status for " + shipmentId + ": " + e.getMessage());
@@ -2089,8 +2101,13 @@ public class LogisticsController implements SimulationListener {
     
     @Override
     public void onSimulationStopped(String batchId, boolean completed) {
-        // Mark simulation as stopped to prevent further chart updates
-        stoppedSimulations.add(batchId);
+        // Check if already stopped to avoid duplicate alerts
+        // Use putIfAbsent semantics - only proceed if not already stopped
+        if (!stoppedSimulations.add(batchId)) {
+            logger.debug("Ignoring duplicate stop event for already stopped simulation: {}", batchId);
+            return;
+        }
+        
         logger.info("Simulation stopped for batch: {} (completed: {})", batchId, completed);
         
         Platform.runLater(() -> {

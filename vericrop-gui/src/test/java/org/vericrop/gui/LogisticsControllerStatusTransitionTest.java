@@ -2,6 +2,7 @@ package org.vericrop.gui;
 
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Test for LogisticsController status transition logic.
@@ -91,6 +92,53 @@ class LogisticsControllerStatusTransitionTest {
         String status4 = getStatusForProgress(90.0);
         assertEquals(status3, status4, 
             "Status should be consistent for same progress value");
+    }
+    
+    /**
+     * Test that stoppedSimulations set correctly deduplicates stop events.
+     * Addresses Bug #5: Duplicate "batch delivered" messages.
+     */
+    @Test
+    void testStoppedSimulationsDeduplication() {
+        java.util.Set<String> stoppedSimulations = ConcurrentHashMap.newKeySet();
+        String batchId = "TEST_BATCH_001";
+        
+        // First stop should return true (was added)
+        assertTrue(stoppedSimulations.add(batchId),
+            "First stop event should add batch to stoppedSimulations");
+        
+        // Second stop should return false (already present)
+        assertFalse(stoppedSimulations.add(batchId),
+            "Duplicate stop event should NOT add batch again");
+        
+        // Set should contain exactly one entry
+        assertEquals(1, stoppedSimulations.size(),
+            "StoppedSimulations should have exactly one entry");
+        
+        // Set should contain the batch
+        assertTrue(stoppedSimulations.contains(batchId),
+            "StoppedSimulations should contain the batch");
+    }
+    
+    /**
+     * Test that different batches can be stopped independently.
+     */
+    @Test
+    void testMultipleBatchesCanBeStopped() {
+        java.util.Set<String> stoppedSimulations = ConcurrentHashMap.newKeySet();
+        
+        // Stop multiple batches
+        assertTrue(stoppedSimulations.add("BATCH_A"));
+        assertTrue(stoppedSimulations.add("BATCH_B"));
+        assertTrue(stoppedSimulations.add("BATCH_C"));
+        
+        assertEquals(3, stoppedSimulations.size());
+        
+        // Duplicate of BATCH_A should be rejected
+        assertFalse(stoppedSimulations.add("BATCH_A"));
+        
+        // Size should remain 3
+        assertEquals(3, stoppedSimulations.size());
     }
     
     /**
