@@ -1,5 +1,6 @@
 package org.vericrop.kafka.events;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
@@ -7,6 +8,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * Used to track how many application instances are currently running.
  * Instances send heartbeats periodically to indicate they are alive.
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class InstanceHeartbeatEvent {
     
     @JsonProperty("instanceId")

@@ -72,6 +72,22 @@ class InstanceHeartbeatEventTest {
     }
     
     @Test
+    void testJsonDeserializationWithUnknownFields() throws Exception {
+        // Given - JSON with extra "alive" and "shutdown" fields that should be ignored
+        String json = "{\"alive\":true,\"shutdown\":false,\"instanceId\":\"496e12f7-7d50-4082-bce8-05f349421eb1\",\"timestamp\":1764336517507,\"status\":\"ALIVE\"}";
+        
+        // When
+        InstanceHeartbeatEvent event = objectMapper.readValue(json, InstanceHeartbeatEvent.class);
+        
+        // Then - Known fields should be parsed correctly
+        assertEquals("496e12f7-7d50-4082-bce8-05f349421eb1", event.getInstanceId());
+        assertEquals("ALIVE", event.getStatus());
+        assertEquals(1764336517507L, event.getTimestamp());
+        assertTrue(event.isAlive());
+        assertFalse(event.isShutdown());
+    }
+    
+    @Test
     void testToString() {
         // Given
         InstanceHeartbeatEvent event = new InstanceHeartbeatEvent("instance-abc");
