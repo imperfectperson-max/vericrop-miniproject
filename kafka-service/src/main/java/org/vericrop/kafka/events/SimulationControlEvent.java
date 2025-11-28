@@ -1,5 +1,6 @@
 package org.vericrop.kafka.events;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
@@ -7,9 +8,17 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * Published to the "simulation-control" topic when a simulation is started or stopped
  * from the ProducerController.
  * 
- * JSON payload format:
- * {"action":"START"|"STOP","simulationId":"<uuid>","timestamp":<epochMs>,"instanceId":"<instanceUuid>"}
+ * Supports two JSON payload formats for backward compatibility:
+ * 1. Action-based format (preferred):
+ *    {"action":"START"|"STOP","simulationId":"<uuid>","timestamp":<epochMs>,"instanceId":"<instanceUuid>"}
+ * 
+ * 2. Boolean-based format (legacy clients):
+ *    {"start":true,"simulationId":"<uuid>",...} or {"stop":true,...}
+ * 
+ * When deserializing, boolean "start" or "stop" fields are mapped to the action field.
+ * The @JsonIgnoreProperties annotation ensures forward compatibility with new fields.
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class SimulationControlEvent {
     
     /**
@@ -143,6 +152,44 @@ public class SimulationControlEvent {
     
     public boolean isStop() {
         return action == Action.STOP;
+    }
+    
+    /**
+     * Setter for the "start" boolean field from JSON.
+     * When set to true, derives action = START for backward compatibility
+     * with clients that send {"start": true, ...} instead of {"action": "START", ...}.
+     * 
+     * <p>Note: When {@code start} is null or false, the existing action is not modified.
+     * This means if both "action" and "start" fields are present in JSON, the final
+     * action depends on the order of deserialization (typically the last setter wins).
+     * For predictable behavior, clients should use either "action" OR "start"/"stop", not both.</p>
+     * 
+     * @param start If true, sets action to START; if false or null, action is unchanged
+     */
+    @JsonProperty("start")
+    public void setStart(Boolean start) {
+        if (Boolean.TRUE.equals(start)) {
+            this.action = Action.START;
+        }
+    }
+    
+    /**
+     * Setter for the "stop" boolean field from JSON.
+     * When set to true, derives action = STOP for backward compatibility
+     * with clients that send {"stop": true, ...} instead of {"action": "STOP", ...}.
+     * 
+     * <p>Note: When {@code stop} is null or false, the existing action is not modified.
+     * This means if both "action" and "stop" fields are present in JSON, the final
+     * action depends on the order of deserialization (typically the last setter wins).
+     * For predictable behavior, clients should use either "action" OR "start"/"stop", not both.</p>
+     * 
+     * @param stop If true, sets action to STOP; if false or null, action is unchanged
+     */
+    @JsonProperty("stop")
+    public void setStop(Boolean stop) {
+        if (Boolean.TRUE.equals(stop)) {
+            this.action = Action.STOP;
+        }
     }
     
     @Override

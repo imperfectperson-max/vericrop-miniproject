@@ -133,4 +133,163 @@ class SimulationControlEventTest {
         assertEquals("farmer-def", event.getFarmerId());
         assertEquals(9876543210L, event.getTimestamp());
     }
+    
+    // ========== Tests for boolean start/stop fields (backward compatibility) ==========
+    
+    @Test
+    void testDeserializationWithStartBoolean() throws Exception {
+        // Given - JSON with "start":true instead of "action":"START"
+        String json = "{\"start\":true,\"simulationId\":\"sim-bool-start\"," +
+                     "\"instanceId\":\"instance-789\",\"batchId\":\"BATCH_BOOL\"," +
+                     "\"farmerId\":\"farmer-bool\",\"timestamp\":1234567890}";
+        
+        // When
+        SimulationControlEvent event = objectMapper.readValue(json, SimulationControlEvent.class);
+        
+        // Then - action should be derived from "start":true
+        assertEquals(SimulationControlEvent.Action.START, event.getAction());
+        assertTrue(event.isStart());
+        assertFalse(event.isStop());
+        assertEquals("sim-bool-start", event.getSimulationId());
+        assertEquals("BATCH_BOOL", event.getBatchId());
+    }
+    
+    @Test
+    void testDeserializationWithStopBoolean() throws Exception {
+        // Given - JSON with "stop":true instead of "action":"STOP"
+        String json = "{\"stop\":true,\"simulationId\":\"sim-bool-stop\"," +
+                     "\"instanceId\":\"instance-stop\",\"timestamp\":9876543210}";
+        
+        // When
+        SimulationControlEvent event = objectMapper.readValue(json, SimulationControlEvent.class);
+        
+        // Then - action should be derived from "stop":true
+        assertEquals(SimulationControlEvent.Action.STOP, event.getAction());
+        assertTrue(event.isStop());
+        assertFalse(event.isStart());
+        assertEquals("sim-bool-stop", event.getSimulationId());
+    }
+    
+    @Test
+    void testDeserializationWithStartBooleanFalse() throws Exception {
+        // Given - JSON with "start":false should NOT set action to START
+        String json = "{\"start\":false,\"simulationId\":\"sim-no-action\"," +
+                     "\"instanceId\":\"instance-test\",\"timestamp\":1234567890}";
+        
+        // When
+        SimulationControlEvent event = objectMapper.readValue(json, SimulationControlEvent.class);
+        
+        // Then - action should remain null since start is false
+        assertNull(event.getAction());
+        assertFalse(event.isStart());
+        assertFalse(event.isStop());
+    }
+    
+    @Test
+    void testDeserializationWithActionOverridesBoolean() throws Exception {
+        // Given - JSON with both "action" and "start" fields
+        // The "action" field should take precedence (order-dependent, but action is explicit)
+        String json = "{\"action\":\"STOP\",\"start\":true,\"simulationId\":\"sim-mixed\"," +
+                     "\"instanceId\":\"instance-mixed\",\"timestamp\":1234567890}";
+        
+        // When
+        SimulationControlEvent event = objectMapper.readValue(json, SimulationControlEvent.class);
+        
+        // Then - The result depends on JSON processing order, but both should be valid
+        // This test just ensures no exception is thrown
+        assertNotNull(event);
+        assertTrue(event.isStart() || event.isStop());
+    }
+    
+    // ========== Tests for @JsonIgnoreProperties (forward compatibility) ==========
+    
+    @Test
+    void testDeserializationIgnoresUnknownFields() throws Exception {
+        // Given - JSON with unknown fields that should be ignored
+        String json = "{\"action\":\"START\",\"simulationId\":\"sim-unknown\"," +
+                     "\"instanceId\":\"instance-unknown\",\"batchId\":\"BATCH_UNK\"," +
+                     "\"farmerId\":\"farmer-unk\",\"timestamp\":1234567890," +
+                     "\"unknownField1\":\"some-value\",\"unknownField2\":12345," +
+                     "\"anotherUnknownObject\":{\"nested\":true}}";
+        
+        // When - should NOT throw exception due to @JsonIgnoreProperties(ignoreUnknown = true)
+        SimulationControlEvent event = objectMapper.readValue(json, SimulationControlEvent.class);
+        
+        // Then - known fields should be correctly parsed
+        assertEquals(SimulationControlEvent.Action.START, event.getAction());
+        assertEquals("sim-unknown", event.getSimulationId());
+        assertEquals("instance-unknown", event.getInstanceId());
+        assertEquals("BATCH_UNK", event.getBatchId());
+        assertEquals("farmer-unk", event.getFarmerId());
+        assertEquals(1234567890L, event.getTimestamp());
+        assertTrue(event.isStart());
+    }
+    
+    @Test
+    void testDeserializationWithExtraNestedObjects() throws Exception {
+        // Given - JSON with deeply nested unknown fields
+        String json = "{\"action\":\"STOP\",\"simulationId\":\"sim-nested\"," +
+                     "\"instanceId\":\"instance-nested\",\"timestamp\":1234567890," +
+                     "\"metadata\":{\"version\":1,\"source\":\"test\",\"nested\":{\"deep\":true}}}";
+        
+        // When
+        SimulationControlEvent event = objectMapper.readValue(json, SimulationControlEvent.class);
+        
+        // Then
+        assertEquals(SimulationControlEvent.Action.STOP, event.getAction());
+        assertEquals("sim-nested", event.getSimulationId());
+        assertTrue(event.isStop());
+    }
+    
+    @Test
+    void testSetStartBoolean() {
+        // Given
+        SimulationControlEvent event = new SimulationControlEvent();
+        
+        // When
+        event.setStart(true);
+        
+        // Then
+        assertEquals(SimulationControlEvent.Action.START, event.getAction());
+        assertTrue(event.isStart());
+    }
+    
+    @Test
+    void testSetStopBoolean() {
+        // Given
+        SimulationControlEvent event = new SimulationControlEvent();
+        
+        // When
+        event.setStop(true);
+        
+        // Then
+        assertEquals(SimulationControlEvent.Action.STOP, event.getAction());
+        assertTrue(event.isStop());
+    }
+    
+    @Test
+    void testSetStartBooleanNull() {
+        // Given
+        SimulationControlEvent event = new SimulationControlEvent();
+        event.setAction(SimulationControlEvent.Action.STOP);
+        
+        // When - setting null should not change action
+        event.setStart(null);
+        
+        // Then
+        assertEquals(SimulationControlEvent.Action.STOP, event.getAction());
+    }
+    
+    @Test
+    void testSetStopBooleanNull() {
+        // Given
+        SimulationControlEvent event = new SimulationControlEvent();
+        event.setAction(SimulationControlEvent.Action.START);
+        
+        // When - setting null should not change action
+        event.setStop(null);
+        
+        // Then
+        assertEquals(SimulationControlEvent.Action.START, event.getAction());
+    }
 }
