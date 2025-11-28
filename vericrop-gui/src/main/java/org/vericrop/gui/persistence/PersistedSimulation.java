@@ -3,10 +3,13 @@ package org.vericrop.gui.persistence;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.vericrop.dto.SimulationResult;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 /**
  * Represents a persisted simulation run record for historical data and reports.
+ * Includes a list of alerts generated during the simulation for the Alerts tab.
  */
 public class PersistedSimulation {
     
@@ -71,11 +74,79 @@ public class PersistedSimulation {
     private String resultJson;
     
     /**
+     * List of alerts generated during this simulation.
+     * Each alert is stored as a PersistedAlert record.
+     */
+    @JsonProperty("alerts")
+    private List<PersistedAlert> alerts;
+    
+    /**
+     * Represents a persisted alert record.
+     */
+    public static class PersistedAlert {
+        @JsonProperty("id")
+        private String id;
+        
+        @JsonProperty("title")
+        private String title;
+        
+        @JsonProperty("message")
+        private String message;
+        
+        @JsonProperty("severity")
+        private String severity;
+        
+        @JsonProperty("timestamp")
+        private long timestamp;
+        
+        @JsonProperty("source")
+        private String source;
+        
+        @JsonProperty("event_type")
+        private String eventType;
+        
+        public PersistedAlert() {}
+        
+        public PersistedAlert(String id, String title, String message, String severity, 
+                              long timestamp, String source, String eventType) {
+            this.id = id;
+            this.title = title;
+            this.message = message;
+            this.severity = severity;
+            this.timestamp = timestamp;
+            this.source = source;
+            this.eventType = eventType;
+        }
+        
+        // Getters and setters
+        public String getId() { return id; }
+        public void setId(String id) { this.id = id; }
+        public String getTitle() { return title; }
+        public void setTitle(String title) { this.title = title; }
+        public String getMessage() { return message; }
+        public void setMessage(String message) { this.message = message; }
+        public String getSeverity() { return severity; }
+        public void setSeverity(String severity) { this.severity = severity; }
+        public long getTimestamp() { return timestamp; }
+        public void setTimestamp(long timestamp) { this.timestamp = timestamp; }
+        public String getSource() { return source; }
+        public void setSource(String source) { this.source = source; }
+        public String getEventType() { return eventType; }
+        public void setEventType(String eventType) { this.eventType = eventType; }
+        
+        @Override
+        public String toString() {
+            return String.format("[%s] %s: %s", severity, title, message);
+        }
+    }
+    
+    /**
      * Default constructor for JSON deserialization
      */
     public PersistedSimulation() {
         this.id = java.util.UUID.randomUUID().toString();
         this.startTime = System.currentTimeMillis();
+        this.alerts = new ArrayList<>();
     }
     
     /**
@@ -275,6 +346,56 @@ public class PersistedSimulation {
         this.resultJson = resultJson;
     }
     
+    /**
+     * Get the list of alerts generated during this simulation.
+     * @return List of persisted alerts
+     */
+    public List<PersistedAlert> getAlerts() {
+        return alerts;
+    }
+    
+    /**
+     * Set the alerts list.
+     * @param alerts List of alerts to set
+     */
+    public void setAlerts(List<PersistedAlert> alerts) {
+        this.alerts = alerts != null ? alerts : new ArrayList<>();
+    }
+    
+    /**
+     * Add an alert to this simulation.
+     * @param alert The alert to add
+     */
+    public void addAlert(PersistedAlert alert) {
+        if (this.alerts == null) {
+            this.alerts = new ArrayList<>();
+        }
+        this.alerts.add(alert);
+    }
+    
+    /**
+     * Add an alert to this simulation from its components.
+     * @param id Alert ID
+     * @param title Alert title
+     * @param message Alert message
+     * @param severity Alert severity (e.g., "INFO", "WARNING", "ERROR", "CRITICAL")
+     * @param timestamp Alert timestamp (epoch millis)
+     * @param source Alert source
+     * @param eventType Event type (e.g., "BATCH_DELIVERED")
+     */
+    public void addAlert(String id, String title, String message, String severity, 
+                        long timestamp, String source, String eventType) {
+        addAlert(new PersistedAlert(id, title, message, severity, timestamp, source, eventType));
+    }
+    
+    /**
+     * Get the number of alerts for this simulation.
+     * @return Alert count
+     */
+    public int getAlertCount() {
+        return alerts != null ? alerts.size() : 0;
+    }
+    
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -298,6 +419,7 @@ public class PersistedSimulation {
                 ", completed=" + completed +
                 ", finalQuality=" + finalQuality +
                 ", startTime=" + startTime +
+                ", alerts=" + getAlertCount() +
                 '}';
     }
 }
