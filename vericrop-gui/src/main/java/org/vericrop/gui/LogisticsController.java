@@ -103,6 +103,9 @@ public class LogisticsController implements SimulationListener {
     // Track temperature chart series by batch ID (thread-safe for Kafka consumer access)
     private Map<String, XYChart.Series<Number, Number>> temperatureSeriesMap = new ConcurrentHashMap<>();
     
+    // Track stopped simulations to prevent further chart updates (prevents "running" graph after sim ends)
+    private final java.util.Set<String> stoppedSimulations = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    
     // Chart epoch start time for calculating x-values in seconds
     private long chartEpochStart;
     
@@ -310,7 +313,7 @@ public class LogisticsController implements SimulationListener {
             return;
         }
         
-        System.out.println("📡 LogisticsController received simulation control event: " + event);
+        logger.info("📡 LogisticsController received simulation control event: {}", event);
         
         Platform.runLater(() -> {
             try {
@@ -318,6 +321,9 @@ public class LogisticsController implements SimulationListener {
                     // Handle simulation START - initialize tracking for this batch
                     String batchId = event.getBatchId();
                     String farmerId = event.getFarmerId();
+                    
+                    // Remove from stopped simulations if restarting
+                    stoppedSimulations.remove(batchId);
                     
                     alerts.add(0, "🚚 Simulation started via Kafka: " + batchId);
                     if (alerts.size() > MAX_ALERT_ITEMS) {
@@ -330,19 +336,28 @@ public class LogisticsController implements SimulationListener {
                     // Initialize temperature chart series
                     initializeTemperatureChartSeries(batchId);
                     
+                    // Initialize timeline to starting state
+                    updateTimeline(batchId, 0.0, "Started");
+                    
                     // Persist simulation start
                     persistSimulationStart(batchId, farmerId);
                     
-                    System.out.println("✅ LogisticsController: Started tracking simulation via Kafka: " + batchId);
+                    logger.info("✅ LogisticsController: Started tracking simulation via Kafka: {}", batchId);
                     
                 } else if (event.isStop()) {
                     // Handle simulation STOP - cleanup tracking for this batch
                     String batchId = event.getBatchId() != null ? event.getBatchId() : event.getSimulationId();
                     
+                    // Mark simulation as stopped to prevent further chart updates
+                    stoppedSimulations.add(batchId);
+                    
                     alerts.add(0, "⏹ Simulation stopped via Kafka: " + batchId);
                     if (alerts.size() > MAX_ALERT_ITEMS) {
                         alerts.remove(alerts.size() - 1);
                     }
+                    
+                    // Update timeline to final state
+                    updateTimeline(batchId, 100.0, "Delivered");
                     
                     // Persist simulation completion
                     persistSimulationComplete(batchId, true);
@@ -350,11 +365,10 @@ public class LogisticsController implements SimulationListener {
                     // Cleanup map marker
                     cleanupMapMarker(batchId);
                     
-                    System.out.println("✅ LogisticsController: Stopped tracking simulation via Kafka: " + batchId);
+                    logger.info("✅ LogisticsController: Stopped tracking simulation via Kafka: {}", batchId);
                 }
             } catch (Exception e) {
-                System.err.println("❌ Error handling simulation control event: " + e.getMessage());
-                e.printStackTrace();
+                logger.error("Error handling simulation control event: {}", e.getMessage(), e);
             }
         });
     }
@@ -363,21 +377,30 @@ public class LogisticsController implements SimulationListener {
      * Handle map simulation event from Kafka.
      * Updates map visualization with real-time position data and environmental data.
      * Implements status transition guards to prevent duplicate alerts.
+     * Generates humidity and temperature alerts when thresholds are breached.
+     * Respects stopped simulations to prevent updates after simulation ends.
      */
     private void handleMapSimulationEvent(MapSimulationEvent event) {
         if (event == null || event.getBatchId() == null) {
-            System.err.println("⚠️ Received null or invalid map simulation event");
+            logger.warn("Received null or invalid map simulation event");
             return;
         }
         
-        System.out.println("🗺️  Received map event: " + event.getBatchId() + 
-                         " at progress " + (event.getProgress() * 100) + "% - " + event.getLocationName());
+        // Don't process events for stopped simulations
+        if (stoppedSimulations.contains(event.getBatchId())) {
+            logger.debug("Ignoring map event for stopped simulation: {}", event.getBatchId());
+            return;
+        }
+        
+        logger.debug("🗺️  Received map event: {} at progress {}% - {}", 
+                    event.getBatchId(), event.getProgress() * 100, event.getLocationName());
         
         Platform.runLater(() -> {
             try {
                 // Update environmental data tracking from map event
                 ShipmentEnvironmentalData envData = environmentalDataMap.computeIfAbsent(
                     event.getBatchId(), k -> new ShipmentEnvironmentalData());
+                double previousHumidity = envData.humidity;
                 envData.temperature = event.getTemperature();
                 envData.humidity = event.getHumidity();
                 
@@ -391,12 +414,15 @@ public class LogisticsController implements SimulationListener {
                 double progressPercent = event.getProgress() * 100;
                 String newStatus = determineStatusFromProgress(progressPercent);
                 
+                // Update timeline with current progress
+                updateTimeline(event.getBatchId(), progressPercent, newStatus);
+                
                 // Get visualization to track last status
                 MapVisualization visualization = activeShipments.get(event.getBatchId());
                 if (visualization != null) {
                     String lastStatus = visualization.lastStatus;
                     
-                    // Only add alert if status has changed (idempotent status transitions)
+                    // Only add status alert if status has changed (idempotent status transitions)
                     if (lastStatus == null || !lastStatus.equals(newStatus)) {
                         String locationName = event.getLocationName() != null ? event.getLocationName() : "Unknown Location";
                         String alertMsg = String.format("🗺️ %s: %s - %s", 
@@ -408,14 +434,103 @@ public class LogisticsController implements SimulationListener {
                         
                         // Update last status to prevent duplicates
                         visualization.lastStatus = newStatus;
-                        System.out.println("Status transition: " + event.getBatchId() + " -> " + newStatus);
+                        logger.info("Status transition: {} -> {}", event.getBatchId(), newStatus);
                     }
                 }
+                
+                // Generate humidity alerts when thresholds are breached
+                // Optimal humidity for cold chain is 65-85%
+                checkAndGenerateHumidityAlert(event.getBatchId(), event.getHumidity(), 
+                                             event.getLocationName(), previousHumidity);
+                
+                // Generate temperature alerts for extreme values from map event
+                // (complements TemperatureComplianceEvent which handles detailed temp monitoring)
+                checkAndGenerateTemperatureAlert(event.getBatchId(), event.getTemperature(),
+                                                event.getLocationName());
+                
             } catch (Exception e) {
-                System.err.println("❌ Error handling map simulation event: " + e.getMessage());
-                e.printStackTrace();
+                logger.error("Error handling map simulation event: {}", e.getMessage(), e);
             }
         });
+    }
+    
+    /**
+     * Check humidity value and generate alert if outside optimal range.
+     * Optimal humidity for cold chain produce is 65-85%.
+     * 
+     * @param batchId Batch identifier
+     * @param humidity Current humidity percentage
+     * @param location Current location
+     * @param previousHumidity Previous humidity reading (for change detection)
+     */
+    private void checkAndGenerateHumidityAlert(String batchId, double humidity, 
+                                               String location, double previousHumidity) {
+        // Humidity thresholds for cold chain (optimal: 65-85%)
+        final double HUMIDITY_LOW_THRESHOLD = 50.0;
+        final double HUMIDITY_HIGH_THRESHOLD = 90.0;
+        final double HUMIDITY_CHANGE_THRESHOLD = 10.0; // Alert on significant changes
+        
+        String alertMsg = null;
+        
+        if (humidity < HUMIDITY_LOW_THRESHOLD) {
+            alertMsg = String.format("💧 LOW HUMIDITY ALERT: %s - %.1f%% at %s (threshold: %.1f%%)",
+                batchId, humidity, location != null ? location : "Unknown", HUMIDITY_LOW_THRESHOLD);
+        } else if (humidity > HUMIDITY_HIGH_THRESHOLD) {
+            alertMsg = String.format("💧 HIGH HUMIDITY ALERT: %s - %.1f%% at %s (threshold: %.1f%%)",
+                batchId, humidity, location != null ? location : "Unknown", HUMIDITY_HIGH_THRESHOLD);
+        } else if (Math.abs(humidity - previousHumidity) > HUMIDITY_CHANGE_THRESHOLD) {
+            // Alert on significant humidity change (could indicate seal issue)
+            alertMsg = String.format("💧 HUMIDITY CHANGE: %s - %.1f%% (was %.1f%%) at %s",
+                batchId, humidity, previousHumidity, location != null ? location : "Unknown");
+        }
+        
+        if (alertMsg != null) {
+            alerts.add(0, alertMsg);
+            if (alerts.size() > MAX_ALERT_ITEMS) {
+                alerts.remove(alerts.size() - 1);
+            }
+            logger.info("Humidity alert generated: {}", alertMsg);
+        }
+    }
+    
+    /**
+     * Check temperature value and generate alert if outside safe range.
+     * Safe temperature for cold chain is 2-8°C.
+     * 
+     * @param batchId Batch identifier
+     * @param temperature Current temperature in Celsius
+     * @param location Current location
+     */
+    private void checkAndGenerateTemperatureAlert(String batchId, double temperature, String location) {
+        // Temperature thresholds for cold chain (optimal: 2-8°C)
+        final double TEMP_LOW_THRESHOLD = 2.0;
+        final double TEMP_HIGH_THRESHOLD = 8.0;
+        final double TEMP_CRITICAL_LOW = 0.0;
+        final double TEMP_CRITICAL_HIGH = 12.0;
+        
+        String alertMsg = null;
+        
+        if (temperature < TEMP_CRITICAL_LOW) {
+            alertMsg = String.format("❄️ CRITICAL FREEZE ALERT: %s - %.1f°C at %s",
+                batchId, temperature, location != null ? location : "Unknown");
+        } else if (temperature < TEMP_LOW_THRESHOLD) {
+            alertMsg = String.format("❄️ LOW TEMP WARNING: %s - %.1f°C at %s (threshold: %.1f°C)",
+                batchId, temperature, location != null ? location : "Unknown", TEMP_LOW_THRESHOLD);
+        } else if (temperature > TEMP_CRITICAL_HIGH) {
+            alertMsg = String.format("🔥 CRITICAL TEMP ALERT: %s - %.1f°C at %s",
+                batchId, temperature, location != null ? location : "Unknown");
+        } else if (temperature > TEMP_HIGH_THRESHOLD) {
+            alertMsg = String.format("🔥 HIGH TEMP WARNING: %s - %.1f°C at %s (threshold: %.1f°C)",
+                batchId, temperature, location != null ? location : "Unknown", TEMP_HIGH_THRESHOLD);
+        }
+        
+        if (alertMsg != null) {
+            alerts.add(0, alertMsg);
+            if (alerts.size() > MAX_ALERT_ITEMS) {
+                alerts.remove(alerts.size() - 1);
+            }
+            logger.info("Temperature alert generated: {}", alertMsg);
+        }
     }
     
     /**
@@ -448,15 +563,22 @@ public class LogisticsController implements SimulationListener {
      * Handle temperature compliance event from Kafka.
      * Updates temperature chart with real-time data points.
      * Note: Humidity is tracked via MapSimulationEvent which includes both temp and humidity.
+     * Respects stopped simulations to prevent updates after simulation ends.
      */
     private void handleTemperatureComplianceEvent(TemperatureComplianceEvent event) {
         if (event == null || event.getBatchId() == null) {
-            System.err.println("⚠️ Received null or invalid temperature compliance event");
+            logger.warn("Received null or invalid temperature compliance event");
             return;
         }
         
-        System.out.println("🌡️  Received temperature event: " + event.getBatchId() + 
-                         " = " + event.getTemperature() + "°C (compliant: " + event.isCompliant() + ")");
+        // Don't process events for stopped simulations
+        if (stoppedSimulations.contains(event.getBatchId())) {
+            logger.debug("Ignoring temperature event for stopped simulation: {}", event.getBatchId());
+            return;
+        }
+        
+        logger.debug("🌡️  Received temperature event: {} = {}°C (compliant: {})",
+                    event.getBatchId(), event.getTemperature(), event.isCompliant());
         
         Platform.runLater(() -> {
             try {
@@ -619,8 +741,18 @@ public class LogisticsController implements SimulationListener {
      * Add temperature data point to chart for given batch.
      * Uses numeric x-axis (seconds since chart epoch) for reliable live updates.
      */
+    /**
+     * Add a temperature data point to the chart for a batch.
+     * Respects stopped simulations to prevent the graph from "running" after sim ends.
+     */
     private void addTemperatureDataPoint(TemperatureComplianceEvent event) {
         if (temperatureChart == null) return;
+        
+        // Don't add data points for stopped simulations (prevents "running" chart)
+        if (stoppedSimulations.contains(event.getBatchId())) {
+            logger.debug("Ignoring temperature data for stopped simulation: {}", event.getBatchId());
+            return;
+        }
         
         try {
             // Get or create series for this batch
@@ -645,10 +777,11 @@ public class LogisticsController implements SimulationListener {
             
             // Format time for logging
             String timeLabel = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"));
-            System.out.println("Added temperature point: " + event.getBatchId() + " = " + 
-                event.getTemperature() + "°C at " + timeLabel + " (x=" + String.format("%.1f", secondsSinceEpoch) + "s)");
+            logger.debug("Added temperature point: {} = {}°C at {} (x={}s)", 
+                event.getBatchId(), event.getTemperature(), timeLabel, 
+                String.format("%.1f", secondsSinceEpoch));
         } catch (Exception e) {
-            System.err.println("Error adding temperature data point: " + e.getMessage());
+            logger.error("Error adding temperature data point: {}", e.getMessage());
         }
     }
 
@@ -1448,6 +1581,10 @@ public class LogisticsController implements SimulationListener {
     
     @Override
     public void onSimulationStarted(String batchId, String farmerId) {
+        // Remove from stopped simulations if restarting (allows chart updates again)
+        stoppedSimulations.remove(batchId);
+        logger.info("Simulation started for batch: {} from farmer: {}", batchId, farmerId);
+        
         Platform.runLater(() -> {
             alerts.add(0, "🚚 Delivery simulation started for: " + batchId);
             
@@ -1457,13 +1594,16 @@ public class LogisticsController implements SimulationListener {
             // Initialize temperature chart series
             initializeTemperatureChartSeries(batchId);
             
+            // Initialize timeline to starting state
+            updateTimeline(batchId, 0.0, "Started");
+            
             // Persist simulation start
             persistSimulationStart(batchId, farmerId);
             
             // Persist shipment
             persistShipmentUpdate(batchId, farmerId, "CREATED", "Origin", 4.0, 65.0, "Starting", null);
             
-            System.out.println("LogisticsController: Simulation started - " + batchId);
+            logger.info("LogisticsController: Simulation started - {}", batchId);
         });
     }
     
@@ -1949,6 +2089,10 @@ public class LogisticsController implements SimulationListener {
     
     @Override
     public void onSimulationStopped(String batchId, boolean completed) {
+        // Mark simulation as stopped to prevent further chart updates
+        stoppedSimulations.add(batchId);
+        logger.info("Simulation stopped for batch: {} (completed: {})", batchId, completed);
+        
         Platform.runLater(() -> {
             String message = completed ? 
                 "✅ Delivery completed for: " + batchId : 
@@ -1957,6 +2101,9 @@ public class LogisticsController implements SimulationListener {
             
             // Persist simulation completion
             persistSimulationComplete(batchId, completed);
+            
+            // Update timeline to final state
+            updateTimeline(batchId, 100.0, completed ? "Delivered" : "Stopped");
             
             // Update shipment status
             String status = completed ? "DELIVERED" : "STOPPED";
