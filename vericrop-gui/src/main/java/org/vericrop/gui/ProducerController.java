@@ -29,6 +29,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import java.lang.reflect.InvocationTargetException;
 
 // Kafka imports
@@ -40,6 +41,7 @@ import org.vericrop.kafka.producers.SimulationControlProducer;
 import org.vericrop.kafka.events.LogisticsEvent;
 import org.vericrop.kafka.events.BlockchainEvent;
 import org.vericrop.kafka.events.QualityAlertEvent;
+import org.vericrop.kafka.events.InstanceHeartbeatEvent.Role;
 import org.vericrop.kafka.services.InstanceRegistry;
 import org.vericrop.gui.util.BlockchainInitializer;
 import org.vericrop.service.simulation.SimulationListener;
@@ -288,9 +290,7 @@ public class ProducerController implements SimulationListener {
             kafkaServiceManager.startAllConsumers();
             
             // Initialize instance registry with PRODUCER role to track running instances
-            this.instanceRegistry = new InstanceRegistry(
-                org.vericrop.kafka.events.InstanceHeartbeatEvent.Role.PRODUCER
-            );
+            this.instanceRegistry = new InstanceRegistry(Role.PRODUCER);
             this.instanceRegistry.start();
             
             // Initialize extended simulation services
@@ -1416,16 +1416,14 @@ public class ProducerController implements SimulationListener {
             // Check if required roles are present for coordinated simulation
             if (instanceRegistry != null && !instanceRegistry.hasEnoughInstances()) {
                 // Get detailed information about missing roles
-                java.util.Set<org.vericrop.kafka.events.InstanceHeartbeatEvent.Role> missingRoles = 
-                    instanceRegistry.getMissingRolesForSimulation();
-                java.util.Set<org.vericrop.kafka.events.InstanceHeartbeatEvent.Role> activeRoles = 
-                    instanceRegistry.getActiveRoles();
+                Set<Role> missingRoles = instanceRegistry.getMissingRolesForSimulation();
+                Set<Role> activeRoles = instanceRegistry.getActiveRoles();
                 int activeCount = instanceRegistry.getActiveInstanceCount();
                 
                 String missingRolesStr = missingRoles.isEmpty() ? "none" : 
-                    missingRoles.stream().map(Enum::name).collect(java.util.stream.Collectors.joining(", "));
+                    missingRoles.stream().map(Enum::name).collect(Collectors.joining(", "));
                 String activeRolesStr = activeRoles.isEmpty() ? "none" : 
-                    activeRoles.stream().map(Enum::name).collect(java.util.stream.Collectors.joining(", "));
+                    activeRoles.stream().map(Enum::name).collect(Collectors.joining(", "));
                 
                 Platform.runLater(() -> {
                     showError("Cannot start simulation: missing required controller roles.\n\n" +

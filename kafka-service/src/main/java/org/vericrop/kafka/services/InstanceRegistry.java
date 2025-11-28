@@ -311,24 +311,25 @@ public class InstanceRegistry implements AutoCloseable {
      * Get all active instances for a specific role.
      * 
      * @param role The role to get instances for
-     * @return List of instance info for the specified role
+     * @return Immutable list of instance info for the specified role
      */
     public List<InstanceInfo> getInstancesByRole(Role role) {
         cleanupStaleInstances();
         return instanceRegistry.values().stream()
             .filter(info -> info.getRole() == role)
-            .collect(Collectors.toList());
+            .toList();
     }
     
     /**
      * Get all active instances grouped by role.
      * 
-     * @return Map of role to list of instances
+     * @return Immutable map of role to list of instances
      */
     public Map<Role, List<InstanceInfo>> getInstancesByRoleMap() {
         cleanupStaleInstances();
-        return instanceRegistry.values().stream()
+        Map<Role, List<InstanceInfo>> groupedMap = instanceRegistry.values().stream()
             .collect(Collectors.groupingBy(InstanceInfo::getRole));
+        return Map.copyOf(groupedMap);
     }
     
     /**
@@ -420,13 +421,13 @@ public class InstanceRegistry implements AutoCloseable {
     }
     
     /**
-     * Get a copy of all registered instances.
+     * Get an immutable copy of all registered instances.
      * 
-     * @return Map of instance ID to instance info
+     * @return Immutable map of instance ID to instance info
      */
     public Map<String, InstanceInfo> getAllInstances() {
         cleanupStaleInstances();
-        return new HashMap<>(instanceRegistry);
+        return Map.copyOf(instanceRegistry);
     }
     
     /**

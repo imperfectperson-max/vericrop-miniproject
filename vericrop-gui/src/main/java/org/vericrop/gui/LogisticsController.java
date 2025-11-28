@@ -197,11 +197,11 @@ public class LogisticsController implements SimulationListener {
         try {
             this.instanceRegistry = new InstanceRegistry(InstanceHeartbeatEvent.Role.LOGISTICS);
             this.instanceRegistry.start();
-            System.out.println("📡 LogisticsController instance registry started with ID: " + 
-                              instanceRegistry.getInstanceId() + " (role: " + instanceRegistry.getRole() + ")");
+            logger.info("📡 LogisticsController instance registry started with ID: {} (role: {})",
+                       instanceRegistry.getInstanceId(), instanceRegistry.getRole());
         } catch (Exception e) {
-            System.err.println("⚠️ Failed to initialize instance registry: " + e.getMessage());
-            // Continue without instance registry - simulation coordination may be affected
+            logger.warn("⚠️ Failed to initialize instance registry: {} - simulation coordination may be affected", 
+                       e.getMessage());
         }
     }
     
