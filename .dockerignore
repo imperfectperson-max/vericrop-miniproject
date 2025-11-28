@@ -1,0 +1,39 @@
+# Build outputs
+build/
+bin/
+out/
+target/
+
+# Gradle
+.gradle/
+gradle-app.setting
+
+# IDE
+.idea/
+*.iws
+*.iml
+*.ipr
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+airflow/
+
+# Node.js (if any)
+node_modules/
+npm-debug.log*
+
+# Temporary files
+tmp/
+temp/
+
+# Other large directories that shouldn't be in Docker context
+ledger/
+data/
