@@ -403,8 +403,9 @@ public class ConsumerController implements SimulationListener {
                     
                     // Track simulation start time for quality calculation
                     // Use current time minus estimated elapsed time based on progress
-                    // Assume 3-minute simulation duration for demo mode
-                    long estimatedElapsedMs = (long)(progress / 100.0 * 180_000);
+                    // Use SimulationConfig.forDemo() to get the correct simulation duration
+                    long simulationDurationMs = SimulationConfig.forDemo().getSimulationDurationMs();
+                    long estimatedElapsedMs = (long)(progress / 100.0 * simulationDurationMs);
                     simulationStartTimeMs = System.currentTimeMillis() - estimatedElapsedMs;
                     lastProgress = progress;
                     
