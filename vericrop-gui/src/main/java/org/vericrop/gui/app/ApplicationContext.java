@@ -11,6 +11,8 @@ import org.vericrop.gui.persistence.PostgresBatchRepository;
 import org.vericrop.gui.services.*;
 import org.vericrop.service.DeliverySimulator;
 import org.vericrop.service.MessageService;
+import org.vericrop.service.QualityAssessmentService;
+import org.vericrop.service.QualityDecayService;
 import org.vericrop.service.simulation.SimulationManager;
 
 import javax.sql.DataSource;
@@ -48,6 +50,8 @@ public class ApplicationContext {
     private final org.vericrop.service.TemperatureService temperatureService;
     private final org.vericrop.service.AlertService coreAlertService;
     private final SimulationManager simulationManager;
+    private final QualityDecayService qualityDecayService;
+    private final QualityAssessmentService qualityAssessmentService;
     
     // Additional services for demo mode
     private org.vericrop.service.BlockchainService blockchainService;
@@ -100,6 +104,12 @@ public class ApplicationContext {
                                      mapSimulator, scenarioManager);
         this.simulationManager = SimulationManager.getInstance();
         logger.info("SimulationManager initialized with integrated services and map simulation");
+        
+        // Initialize quality services
+        this.qualityDecayService = new QualityDecayService();
+        this.qualityAssessmentService = new QualityAssessmentService(
+            qualityDecayService, temperatureService, coreAlertService);
+        logger.info("Quality assessment services initialized");
         
         // Initialize additional services for demo mode
         this.fileLedgerService = new org.vericrop.service.impl.FileLedgerService();
@@ -215,6 +225,14 @@ public class ApplicationContext {
     
     public org.vericrop.service.AlertService getCoreAlertService() {
         return coreAlertService;
+    }
+    
+    public QualityDecayService getQualityDecayService() {
+        return qualityDecayService;
+    }
+    
+    public QualityAssessmentService getQualityAssessmentService() {
+        return qualityAssessmentService;
     }
     
     /**
