@@ -893,9 +893,8 @@ public class LogisticsController implements SimulationListener {
                     activeShipments.remove(shipmentId);
                     
                     // Only add "delivery completed" alert if not already in stoppedSimulations
-                    // This prevents duplicate alerts when onSimulationStopped has already fired
-                    if (!stoppedSimulations.contains(shipmentId)) {
-                        stoppedSimulations.add(shipmentId);
+                    // Uses atomic add() operation to avoid race condition between check and add
+                    if (stoppedSimulations.add(shipmentId)) {
                         addAlert("✅ Delivery completed: " + shipmentId);
                     }
                 }

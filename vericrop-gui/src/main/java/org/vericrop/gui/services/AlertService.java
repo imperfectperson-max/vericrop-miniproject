@@ -28,6 +28,9 @@ public class AlertService {
     /** Maximum number of alerts to retain in history */
     private static final int MAX_ALERTS = 100;
     
+    /** Maximum number of entries in dedup cache before cleanup triggers */
+    private static final int DEDUP_CACHE_CLEANUP_THRESHOLD = 100;
+    
     /** Time window in milliseconds to consider alerts as duplicates (30 seconds) */
     private static final long DEDUP_WINDOW_MS = 30_000;
     
@@ -172,8 +175,8 @@ public class AlertService {
             // Record this alert in the cache
             recentAlertCache.put(dedupKey, now);
             
-            // Cleanup old entries periodically (every ~10 alerts)
-            if (recentAlertCache.size() > 100) {
+            // Cleanup old entries periodically when cache exceeds threshold
+            if (recentAlertCache.size() > DEDUP_CACHE_CLEANUP_THRESHOLD) {
                 cleanupRecentAlertCache();
             }
         }
