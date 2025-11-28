@@ -445,6 +445,93 @@ KAFKA_BOOTSTRAP_SERVERS=localhost:9092
 3. Start second instance: `SERVER_PORT=8081 ./gradlew :vericrop-gui:run` (port 8081)
 4. Both instances will share simulation state through Kafka
 
+### Running Multiple Controller Instances (Role-Based Coordination)
+
+VeriCrop supports running multiple controller instances locally for testing multi-party supply chain scenarios. Each controller (Producer, Logistics, Consumer) registers with a central instance registry using Kafka heartbeats.
+
+**Instance Registration:**
+
+Each controller automatically registers its role with the InstanceRegistry on startup:
+- **ProducerController**: Registers as `PRODUCER` role
+- **LogisticsController**: Registers as `LOGISTICS` role
+- **ConsumerController**: Registers as `CONSUMER` role
+
+**Simulation Coordination:**
+
+For a simulation to start, the InstanceRegistry must detect at least one active instance of each required role:
+- ✅ PRODUCER (creates batches and starts simulations)
+- ✅ LOGISTICS (tracks deliveries and routes)
+- ✅ CONSUMER (verifies and receives batches)
+
+If any required role is missing, the ProducerController will block simulation start with an error message like:
+```
+Cannot start simulation: missing required controller roles.
+Active roles: PRODUCER
+Missing roles: LOGISTICS, CONSUMER
+```
+
+**Running Multiple Instances Locally:**
+
+1. **Start Infrastructure**:
+   ```bash
+   docker-compose up -d kafka zookeeper postgres
+   ```
+
+2. **Start Producer Instance** (Terminal 1):
+   ```bash
+   # Default port 8080
+   ./gradlew :vericrop-gui:run
+   # Login and navigate to Producer screen
+   ```
+
+3. **Start Logistics Instance** (Terminal 2):
+   ```bash
+   # Use different port to avoid conflict
+   SERVER_PORT=8081 ./gradlew :vericrop-gui:run
+   # Login and navigate to Logistics screen
+   ```
+
+4. **Start Consumer Instance** (Terminal 3):
+   ```bash
+   # Use another different port
+   SERVER_PORT=8082 ./gradlew :vericrop-gui:run
+   # Login and navigate to Consumer screen
+   ```
+
+5. **Start Simulation**:
+   - In the Producer instance (Terminal 1), click "Start Simulation"
+   - The simulation will now proceed since all required roles are present
+   - All three instances will receive simulation updates via Kafka
+
+**Instance Registry Heartbeats:**
+
+- Each instance sends heartbeats every 5 seconds
+- Instances are considered stale after 15 seconds of no heartbeat
+- Heartbeat messages include: instance ID, role, host, port, timestamp
+
+**Troubleshooting Multiple Instances:**
+
+| Issue | Solution |
+|-------|----------|
+| "Missing roles" error | Ensure all three controller types are running |
+| Port conflict | Use `SERVER_PORT=XXXX` environment variable |
+| Instances not detecting each other | Verify Kafka is running with `docker-compose ps kafka` |
+| Stale instances shown | Wait 15 seconds for cleanup or restart instances |
+
+**Environment Variables:**
+
+```bash
+# Set different ports for multiple instances
+SERVER_PORT=8081  # Web server port
+
+# Custom instance ID (auto-generated if not set)
+VERICROP_INSTANCE_ID=producer-instance-1
+
+# Kafka settings (should be same for all instances)
+KAFKA_BOOTSTRAP_SERVERS=localhost:9092
+KAFKA_ENABLED=true
+```
+
 ### Realtime Simulation Updates (NEW)
 
 VeriCrop now features **realtime simulation with live UI updates** that animate delivery progress across Producer, Logistics, and Consumer views.

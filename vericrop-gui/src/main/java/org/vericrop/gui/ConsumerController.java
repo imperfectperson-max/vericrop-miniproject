@@ -29,6 +29,8 @@ import org.vericrop.service.simulation.SimulationListener;
 import org.vericrop.service.simulation.SimulationManager;
 import org.vericrop.kafka.consumers.SimulationControlConsumer;
 import org.vericrop.kafka.events.SimulationControlEvent;
+import org.vericrop.kafka.events.InstanceHeartbeatEvent;
+import org.vericrop.kafka.services.InstanceRegistry;
 import com.google.zxing.NotFoundException;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -134,6 +136,9 @@ public class ConsumerController implements SimulationListener {
     private SimulationControlConsumer simulationControlConsumer;
     private ExecutorService kafkaConsumerExecutor;
     
+    // Instance registry for multi-instance tracking
+    private InstanceRegistry instanceRegistry;
+    
     /** Default final quality used when SimulationManager data is unavailable */
     private static final double DEFAULT_FINAL_QUALITY = 95.0;
     
@@ -187,6 +192,22 @@ public class ConsumerController implements SimulationListener {
         registerWithSimulationManager();
         initializeJourneyDisplay();
         setupKafkaConsumers();
+        initializeInstanceRegistry();
+    }
+    
+    /**
+     * Initialize instance registry with CONSUMER role for multi-instance coordination.
+     */
+    private void initializeInstanceRegistry() {
+        try {
+            this.instanceRegistry = new InstanceRegistry(InstanceHeartbeatEvent.Role.CONSUMER);
+            this.instanceRegistry.start();
+            System.out.println("📡 ConsumerController instance registry started with ID: " + 
+                              instanceRegistry.getInstanceId() + " (role: " + instanceRegistry.getRole() + ")");
+        } catch (Exception e) {
+            System.err.println("⚠️ Failed to initialize instance registry: " + e.getMessage());
+            // Continue without instance registry - simulation coordination may be affected
+        }
     }
     
     /**
@@ -869,6 +890,15 @@ public class ConsumerController implements SimulationListener {
             }
         } catch (Exception e) {
             System.err.println("Error unregistering from SimulationManager: " + e.getMessage());
+        }
+        
+        // Close instance registry
+        if (instanceRegistry != null) {
+            try {
+                instanceRegistry.close();
+            } catch (Exception e) {
+                System.err.println("Error closing instance registry: " + e.getMessage());
+            }
         }
         
         // Stop Kafka consumers

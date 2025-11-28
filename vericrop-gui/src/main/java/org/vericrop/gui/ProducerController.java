@@ -287,8 +287,10 @@ public class ProducerController implements SimulationListener {
             this.kafkaServiceManager = new KafkaServiceManager();
             kafkaServiceManager.startAllConsumers();
             
-            // Initialize instance registry to track running instances
-            this.instanceRegistry = new InstanceRegistry();
+            // Initialize instance registry with PRODUCER role to track running instances
+            this.instanceRegistry = new InstanceRegistry(
+                org.vericrop.kafka.events.InstanceHeartbeatEvent.Role.PRODUCER
+            );
             this.instanceRegistry.start();
             
             // Initialize extended simulation services
@@ -296,7 +298,8 @@ public class ProducerController implements SimulationListener {
             this.logisticsService = new LogisticsService();
 
             System.out.println("✅ Kafka services initialized successfully");
-            System.out.println("📡 Instance registry started with ID: " + instanceRegistry.getInstanceId());
+            System.out.println("📡 Instance registry started with ID: " + instanceRegistry.getInstanceId() + 
+                              " (role: " + instanceRegistry.getRole() + ")");
 
             Platform.runLater(() -> {
                 updateStatus("✅ Kafka services ready");
@@ -1410,20 +1413,34 @@ public class ProducerController implements SimulationListener {
     @FXML
     private void handleStartSimulation() {
         try {
-            // Check if enough instances are running for coordinated simulation
+            // Check if required roles are present for coordinated simulation
             if (instanceRegistry != null && !instanceRegistry.hasEnoughInstances()) {
+                // Get detailed information about missing roles
+                java.util.Set<org.vericrop.kafka.events.InstanceHeartbeatEvent.Role> missingRoles = 
+                    instanceRegistry.getMissingRolesForSimulation();
+                java.util.Set<org.vericrop.kafka.events.InstanceHeartbeatEvent.Role> activeRoles = 
+                    instanceRegistry.getActiveRoles();
                 int activeCount = instanceRegistry.getActiveInstanceCount();
-                int required = instanceRegistry.getMinInstancesRequired();
+                
+                String missingRolesStr = missingRoles.isEmpty() ? "none" : 
+                    missingRoles.stream().map(Enum::name).collect(java.util.stream.Collectors.joining(", "));
+                String activeRolesStr = activeRoles.isEmpty() ? "none" : 
+                    activeRoles.stream().map(Enum::name).collect(java.util.stream.Collectors.joining(", "));
+                
                 Platform.runLater(() -> {
-                    showError("Not enough instances running for coordinated simulation.\n" +
-                             "Active instances: " + activeCount + ", Required: " + required + "\n\n" +
-                             "Please start more application instances before starting a simulation.");
+                    showError("Cannot start simulation: missing required controller roles.\n\n" +
+                             "Active instances: " + activeCount + "\n" +
+                             "Active roles: " + activeRolesStr + "\n" +
+                             "Missing roles: " + missingRolesStr + "\n\n" +
+                             "Please start ProducerController, LogisticsController, and ConsumerController " +
+                             "before starting a simulation.");
                     if (simStatusLabel != null) {
-                        simStatusLabel.setText("⚠ Need " + required + " instances (have " + activeCount + ")");
+                        simStatusLabel.setText("⚠ Missing roles: " + missingRolesStr);
                         simStatusLabel.setStyle("-fx-text-fill: #DC2626;");
                     }
                 });
-                System.out.println("⚠️ Blocked simulation start: need " + required + " instances, have " + activeCount);
+                System.out.println("⚠️ Blocked simulation start: missing roles " + missingRolesStr + 
+                                 " (active: " + activeRolesStr + ")");
                 return;
             }
             
