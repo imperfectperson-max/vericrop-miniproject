@@ -159,7 +159,12 @@ public class SimulationControlEvent {
      * When set to true, derives action = START for backward compatibility
      * with clients that send {"start": true, ...} instead of {"action": "START", ...}.
      * 
-     * @param start If true, sets action to START
+     * <p>Note: When {@code start} is null or false, the existing action is not modified.
+     * This means if both "action" and "start" fields are present in JSON, the final
+     * action depends on the order of deserialization (typically the last setter wins).
+     * For predictable behavior, clients should use either "action" OR "start"/"stop", not both.</p>
+     * 
+     * @param start If true, sets action to START; if false or null, action is unchanged
      */
     @JsonProperty("start")
     public void setStart(Boolean start) {
@@ -173,7 +178,12 @@ public class SimulationControlEvent {
      * When set to true, derives action = STOP for backward compatibility
      * with clients that send {"stop": true, ...} instead of {"action": "STOP", ...}.
      * 
-     * @param stop If true, sets action to STOP
+     * <p>Note: When {@code stop} is null or false, the existing action is not modified.
+     * This means if both "action" and "stop" fields are present in JSON, the final
+     * action depends on the order of deserialization (typically the last setter wins).
+     * For predictable behavior, clients should use either "action" OR "start"/"stop", not both.</p>
+     * 
+     * @param stop If true, sets action to STOP; if false or null, action is unchanged
      */
     @JsonProperty("stop")
     public void setStop(Boolean stop) {
