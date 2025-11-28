@@ -620,6 +620,78 @@ When starting a simulation through the ProducerController, the system defaults t
 
 The MapSimulator is initialized with the selected scenario and steps forward in sync with the delivery simulation, updating entity positions each tick. Temperature compliance monitoring generates alerts for violations based on scenario thresholds.
 
+### Simulation Orchestration and Controller Isolation
+
+VeriCrop implements a robust simulation orchestration system that ensures independent, thread-safe execution of simulations across multiple controllers.
+
+**Key Orchestration Features:**
+
+1. **Independent Controller Instances**
+   - Each simulation batch runs in its own isolated execution context
+   - ProducerController, LogisticsController, and ConsumerController operate independently
+   - Controller state is not shared between simulations
+
+2. **Thread-Safe Execution**
+   - SimulationManager uses `AtomicBoolean` flags for thread-safe state management
+   - ExecutorService pools handle concurrent simulation tasks
+   - ConcurrentHashMap is used for tracking active simulations
+
+3. **QualityAssessmentService Integration**
+   - ConsumerController uses QualityAssessmentService to compute final quality on delivery
+   - Quality computation aggregates sensor data (temperature, humidity) from the entire route
+   - Final quality grade is based on temperature violations, humidity exceedances, and transit time
+
+**Component Interaction:**
+
+```
+ProducerController.startSimulation()
+    ↓
+SimulationManager (thread-safe singleton)
+    ↓ Creates isolated simulation context
+DeliverySimulator (generates waypoints and events)
+    ↓ Emits SimulationEvent
+┌─────────────────────────────────────┐
+│  LogisticsController               │ → Temperature monitoring graph
+│  (SimulationListener)               │ → Live route tracing animation
+│                                     │ → Timeline updates
+│                                     │ → Alert generation
+└─────────────────────────────────────┘
+    ↓
+┌─────────────────────────────────────┐
+│  ConsumerController                 │ → Product journey tracking
+│  (SimulationListener)               │ → Final quality computation
+│                                     │ → Verification history
+└─────────────────────────────────────┘
+```
+
+**Configuration Options:**
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `simulation.emit.intervalMs` | 1000 | Interval between event emissions |
+| `simulation.waypoints.count` | 10 | Number of waypoints per route |
+| `simulation.temperature.min` | 2.0 | Minimum cold-chain temperature (°C) |
+| `simulation.temperature.max` | 8.0 | Maximum cold-chain temperature (°C) |
+| `simulation.humidity.min` | 65.0 | Minimum humidity threshold (%) |
+| `simulation.humidity.max` | 90.0 | Maximum humidity threshold (%) |
+
+**Quality Assessment Formula:**
+
+The final quality score is calculated by:
+1. Starting with initial quality (100%)
+2. Applying quality decay based on transit time and average temperature
+3. Subtracting penalty for temperature violations (0.5% per violation)
+4. Subtracting penalty for critical temperature exceedances (2.0% per critical violation)
+5. Subtracting penalty for humidity violations (0.3% per violation)
+
+Quality grades are assigned based on final score:
+- **PRIME**: ≥90%
+- **EXCELLENT**: ≥80%
+- **GOOD**: ≥70%
+- **ACCEPTABLE**: ≥60%
+- **MARGINAL**: ≥40%
+- **REJECTED**: <40%
+
 ## Architecture
 
 VeriCrop follows a microservices architecture with event-driven communication:

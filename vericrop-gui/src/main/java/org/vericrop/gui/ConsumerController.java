@@ -24,6 +24,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.vericrop.gui.util.QRDecoder;
 import org.vericrop.service.TemperatureService;
+import org.vericrop.service.QualityAssessmentService;
 import org.vericrop.service.simulation.SimulationConfig;
 import org.vericrop.service.simulation.SimulationListener;
 import org.vericrop.service.simulation.SimulationManager;
@@ -139,6 +140,12 @@ public class ConsumerController implements SimulationListener {
     // Instance registry for multi-instance tracking
     private InstanceRegistry instanceRegistry;
     
+    // Quality assessment service for computing final quality
+    private QualityAssessmentService qualityAssessmentService;
+    
+    // Track simulation start time for quality decay calculation
+    private long simulationStartTimeMs = 0;
+    
     /** Default final quality used when SimulationManager data is unavailable */
     private static final double DEFAULT_FINAL_QUALITY = 95.0;
     
@@ -193,6 +200,7 @@ public class ConsumerController implements SimulationListener {
         initializeJourneyDisplay();
         setupKafkaConsumers();
         initializeInstanceRegistry();
+        initializeQualityAssessmentService();
     }
     
     /**
@@ -207,6 +215,26 @@ public class ConsumerController implements SimulationListener {
         } catch (Exception e) {
             System.err.println("⚠️ Failed to initialize instance registry: " + e.getMessage());
             // Continue without instance registry - simulation coordination may be affected
+        }
+    }
+    
+    /**
+     * Initialize quality assessment service for computing final quality on delivery.
+     */
+    private void initializeQualityAssessmentService() {
+        try {
+            qualityAssessmentService = MainApp.getInstance()
+                .getApplicationContext()
+                .getQualityAssessmentService();
+            
+            if (qualityAssessmentService != null) {
+                System.out.println("✅ QualityAssessmentService initialized for ConsumerController");
+            } else {
+                System.err.println("⚠️ QualityAssessmentService is null in ApplicationContext");
+            }
+        } catch (Exception e) {
+            System.err.println("⚠️ Failed to initialize QualityAssessmentService: " + e.getMessage());
+            // Continue without quality assessment - will use default quality values
         }
     }
     
@@ -1063,6 +1091,7 @@ public class ConsumerController implements SimulationListener {
         Platform.runLater(() -> {
             currentBatchId = batchId;
             lastProgress = 0.0;
+            simulationStartTimeMs = System.currentTimeMillis();
             
             String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
             String message = timestamp + ": 🚚 Batch " + batchId + " is now in transit from " + farmerId;
@@ -1119,14 +1148,31 @@ public class ConsumerController implements SimulationListener {
             if (completed) {
                 message = timestamp + ": ✅ Batch " + batchId + " delivered successfully - Ready for verification";
                 
-                // Get final quality from SimulationManager
+                // Compute final quality using QualityAssessmentService
                 double finalQuality = DEFAULT_FINAL_QUALITY;
                 try {
-                    if (SimulationManager.isInitialized()) {
+                    if (qualityAssessmentService != null && simulationStartTimeMs > 0) {
+                        // Use initial quality of 100% and compute final quality from temperature monitoring
+                        QualityAssessmentService.FinalQualityAssessment assessment =
+                            qualityAssessmentService.assessFinalQualityFromMonitoring(
+                                batchId, 100.0, simulationStartTimeMs);
+                        
+                        if (assessment != null) {
+                            finalQuality = assessment.getFinalQuality();
+                            System.out.println("ConsumerController: Computed final quality using QualityAssessmentService: " + 
+                                             finalQuality + "% (grade: " + assessment.getQualityGrade() + ")");
+                            
+                            // Update journey step with detailed quality info
+                            updateJourneyStep(4, "✅", "Delivered - " + assessment.getQualityGrade(),
+                                String.format("Final Quality: %.1f%% | Temp Violations: %d | Alerts: %d",
+                                    finalQuality, assessment.getTemperatureViolations(), assessment.getAlertCount()));
+                        }
+                    } else if (SimulationManager.isInitialized()) {
+                        // Fallback to SimulationManager if QualityAssessmentService unavailable
                         finalQuality = SimulationManager.getInstance().getFinalQuality();
                     }
                 } catch (Exception e) {
-                    System.err.println("Could not get final quality: " + e.getMessage());
+                    System.err.println("Could not compute final quality: " + e.getMessage());
                 }
                 
                 // Display final quality
@@ -1148,6 +1194,7 @@ public class ConsumerController implements SimulationListener {
             // Reset tracking
             currentBatchId = null;
             lastProgress = 0.0;
+            simulationStartTimeMs = 0;
             
             System.out.println("ConsumerController: " + (completed ? "Delivery completed" : "Delivery stopped") + " - " + batchId);
         });
