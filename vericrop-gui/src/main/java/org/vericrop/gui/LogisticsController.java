@@ -342,11 +342,20 @@ public class LogisticsController implements SimulationListener {
                     // Persist simulation start
                     persistSimulationStart(batchId, farmerId);
                     
+                    // Add shipment to Active Shipments table (UI)
+                    addShipmentToTable(batchId, farmerId != null ? farmerId : "Unknown");
+                    
                     logger.info("✅ LogisticsController: Started tracking simulation via Kafka: {}", batchId);
                     
                 } else if (event.isStop()) {
                     // Handle simulation STOP - cleanup tracking for this batch
                     String batchId = event.getBatchId() != null ? event.getBatchId() : event.getSimulationId();
+                    
+                    // Check if already stopped to avoid duplicate alerts
+                    if (stoppedSimulations.contains(batchId)) {
+                        logger.debug("Ignoring duplicate stop event for already stopped simulation: {}", batchId);
+                        return;
+                    }
                     
                     // Mark simulation as stopped to prevent further chart updates
                     stoppedSimulations.add(batchId);
@@ -882,7 +891,12 @@ public class LogisticsController implements SimulationListener {
                 } else {
                     // Simulation ended, remove from map
                     activeShipments.remove(shipmentId);
-                    addAlert("✅ Delivery completed: " + shipmentId);
+                    
+                    // Only add "delivery completed" alert if not already in stoppedSimulations
+                    // Uses atomic add() operation to avoid race condition between check and add
+                    if (stoppedSimulations.add(shipmentId)) {
+                        addAlert("✅ Delivery completed: " + shipmentId);
+                    }
                 }
             } catch (Exception e) {
                 System.err.println("Error getting status for " + shipmentId + ": " + e.getMessage());
@@ -1603,8 +1617,47 @@ public class LogisticsController implements SimulationListener {
             // Persist shipment
             persistShipmentUpdate(batchId, farmerId, "CREATED", "Origin", 4.0, 65.0, "Starting", null);
             
+            // Add shipment to Active Shipments table (UI)
+            addShipmentToTable(batchId, farmerId);
+            
             logger.info("LogisticsController: Simulation started - {}", batchId);
         });
+    }
+    
+    /**
+     * Add a new shipment to the Active Shipments table when simulation starts.
+     * This ensures the Active Shipments tab is populated with active simulations.
+     * 
+     * @param batchId The batch identifier
+     * @param farmerId The farmer/producer identifier
+     */
+    private void addShipmentToTable(String batchId, String farmerId) {
+        if (shipmentsTable == null) return;
+        
+        try {
+            // Check if shipment already exists (avoid duplicates)
+            boolean exists = shipments.stream()
+                .anyMatch(s -> s.getBatchId().equals(batchId));
+            
+            if (!exists) {
+                // Create new shipment entry with initial values
+                Shipment newShipment = new Shipment(
+                    batchId,
+                    "IN_TRANSIT",
+                    "Origin - " + farmerId,
+                    4.0,  // Default cold-chain temperature
+                    65.0, // Default humidity
+                    "Starting...",
+                    generateVehicleId(batchId)
+                );
+                
+                shipments.add(0, newShipment); // Add at top of list
+                
+                logger.info("Added shipment to Active Shipments table: {}", batchId);
+            }
+        } catch (Exception e) {
+            logger.error("Error adding shipment to table: {}", e.getMessage());
+        }
     }
     
     /**
@@ -2089,8 +2142,13 @@ public class LogisticsController implements SimulationListener {
     
     @Override
     public void onSimulationStopped(String batchId, boolean completed) {
-        // Mark simulation as stopped to prevent further chart updates
-        stoppedSimulations.add(batchId);
+        // Check if already stopped to avoid duplicate alerts
+        // Use putIfAbsent semantics - only proceed if not already stopped
+        if (!stoppedSimulations.add(batchId)) {
+            logger.debug("Ignoring duplicate stop event for already stopped simulation: {}", batchId);
+            return;
+        }
+        
         logger.info("Simulation stopped for batch: {} (completed: {})", batchId, completed);
         
         Platform.runLater(() -> {
