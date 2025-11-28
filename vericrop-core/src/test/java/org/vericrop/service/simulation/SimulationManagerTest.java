@@ -28,6 +28,9 @@ public class SimulationManagerTest {
     
     @BeforeEach
     public void setUp() {
+        // Reset the singleton to ensure clean state for each test
+        SimulationManager.resetForTesting();
+        
         messageService = new MessageService(false);  // In-memory for tests
         deliverySimulator = new DeliverySimulator(messageService);
         SimulationManager.initialize(deliverySimulator);
@@ -48,6 +51,8 @@ public class SimulationManagerTest {
         if (deliverySimulator != null) {
             deliverySimulator.shutdown();
         }
+        // Reset to clean up the singleton after each test
+        SimulationManager.resetForTesting();
     }
     
     @Test

@@ -24,6 +24,9 @@ public class MapSimulationIntegrationTest {
     
     @BeforeEach
     public void setUp() {
+        // Reset the singleton to ensure clean state for each test
+        SimulationManager.resetForTesting();
+        
         // Initialize all components
         mapSimulator = new MapSimulator();
         scenarioManager = new ScenarioManager();
@@ -44,9 +47,8 @@ public class MapSimulationIntegrationTest {
         if (simulationManager != null && simulationManager.isRunning()) {
             simulationManager.stopSimulation();
         }
-        if (simulationManager != null) {
-            simulationManager.shutdown();
-        }
+        // Reset to clean up the singleton after each test
+        SimulationManager.resetForTesting();
     }
     
     @Test

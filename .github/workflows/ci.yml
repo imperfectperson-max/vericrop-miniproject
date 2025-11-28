@@ -52,10 +52,10 @@ jobs:
       run: chmod +x gradlew
     
     - name: Build with Gradle
-      run: ./gradlew build --no-daemon --stacktrace
+      run: ./gradlew build --no-daemon --stacktrace --warning-mode=all
     
     - name: Run tests
-      run: ./gradlew test --no-daemon --stacktrace
+      run: ./gradlew test --no-daemon --stacktrace --warning-mode=all
     
     - name: Publish test results
       uses: EnricoMi/publish-unit-test-result-action@v2

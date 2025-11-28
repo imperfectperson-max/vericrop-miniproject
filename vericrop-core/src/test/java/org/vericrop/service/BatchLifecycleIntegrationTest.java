@@ -43,6 +43,9 @@ public class BatchLifecycleIntegrationTest {
     
     @BeforeEach
     public void setUp() {
+        // Reset the singleton to ensure clean state for each test
+        SimulationManager.resetForTesting();
+        
         // Initialize all services
         messageService = new MessageService(false);
         alertService = new AlertService();
@@ -69,6 +72,8 @@ public class BatchLifecycleIntegrationTest {
         if (deliverySimulator != null) {
             deliverySimulator.shutdown();
         }
+        // Reset to clean up the singleton after each test
+        SimulationManager.resetForTesting();
     }
     
     @Test
