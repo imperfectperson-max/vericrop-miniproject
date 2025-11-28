@@ -173,12 +173,18 @@ public class InstanceRegistry implements AutoCloseable {
     
     /**
      * Remove instances that haven't sent a heartbeat recently.
+     * Note: The current instance is never removed as stale because its heartbeat
+     * is refreshed in sendHeartbeat() before this cleanup runs.
      */
     private void cleanupStaleInstances() {
         long now = System.currentTimeMillis();
         instanceLastSeen.entrySet().removeIf(entry -> {
+            // Never remove ourselves - our heartbeat should always be fresh
+            if (entry.getKey().equals(instanceId)) {
+                return false;
+            }
             boolean isStale = (now - entry.getValue()) > INSTANCE_TIMEOUT_MS;
-            if (isStale && !entry.getKey().equals(instanceId)) {
+            if (isStale) {
                 System.out.println("🗑️ Removing stale instance: " + entry.getKey());
             }
             return isStale;

@@ -212,7 +212,9 @@ public class LogisticsController implements SimulationListener {
      */
     private void setupKafkaConsumers() {
         try {
-            kafkaConsumerExecutor = Executors.newFixedThreadPool(3);
+            // Thread pool for Kafka consumers: MapSimulation, TemperatureCompliance, SimulationControl
+            final int KAFKA_CONSUMER_COUNT = 3;
+            kafkaConsumerExecutor = Executors.newFixedThreadPool(KAFKA_CONSUMER_COUNT);
             
             // Initialize alert producer
             try {
@@ -237,7 +239,7 @@ public class LogisticsController implements SimulationListener {
             
             // Create simulation control consumer with unique group ID per instance
             // Using unique group ID ensures each instance receives all simulation control events
-            String uniqueGroupId = "logistics-simulation-control-" + UUID.randomUUID().toString().substring(0, 8);
+            String uniqueGroupId = "logistics-simulation-control-" + System.currentTimeMillis();
             simulationControlConsumer = new SimulationControlConsumer(
                 uniqueGroupId,
                 this::handleSimulationControlEvent

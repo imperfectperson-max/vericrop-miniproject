@@ -11,7 +11,6 @@ import javafx.stage.Stage;
 import java.util.Set;
 import java.util.HashSet;
 import java.util.Map;
-import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.io.File;
@@ -195,10 +194,12 @@ public class ConsumerController implements SimulationListener {
      */
     private void setupKafkaConsumers() {
         try {
+            // Single thread executor for SimulationControl consumer
             kafkaConsumerExecutor = Executors.newSingleThreadExecutor();
             
             // Create simulation control consumer with unique group ID per instance
-            String uniqueGroupId = "consumer-simulation-control-" + UUID.randomUUID().toString().substring(0, 8);
+            // Using timestamp-based ID avoids UUID substring collisions
+            String uniqueGroupId = "consumer-simulation-control-" + System.currentTimeMillis();
             simulationControlConsumer = new SimulationControlConsumer(
                 uniqueGroupId,
                 this::handleSimulationControlEvent

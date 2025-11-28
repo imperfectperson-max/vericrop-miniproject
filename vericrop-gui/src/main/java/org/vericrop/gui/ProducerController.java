@@ -1450,7 +1450,7 @@ public class ProducerController implements SimulationListener {
             final String finalBatchId = selectedBatchId; // Make final for lambda
             
             // Generate a unique simulation ID for cross-instance coordination
-            final String simulationId = java.util.UUID.randomUUID().toString();
+            final String simulationId = UUID.randomUUID().toString();
             final String instanceId = instanceRegistry != null ? instanceRegistry.getInstanceId() : "unknown";
             
             // Harden simulation startup with synchronized check and immediate UI state update
