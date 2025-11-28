@@ -274,6 +274,11 @@ public class ConsumerController implements SimulationListener {
      * Handle simulation control event from Kafka.
      * Coordinates simulation start/stop across instances.
      */
+    /**
+     * Handle simulation control event from Kafka.
+     * Coordinates simulation start/stop across instances.
+     * Uses Platform.runLater to ensure UI updates happen on JavaFX thread.
+     */
     private void handleSimulationControlEvent(SimulationControlEvent event) {
         if (event == null) {
             return;
@@ -290,6 +295,7 @@ public class ConsumerController implements SimulationListener {
                     
                     currentBatchId = batchId;
                     lastProgress = 0.0;
+                    simulationStartTimeMs = System.currentTimeMillis();
                     
                     String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
                     String message = timestamp + ": 🚚 Batch " + batchId + " is now in transit from " + farmerId + " (via Kafka)";
@@ -314,8 +320,33 @@ public class ConsumerController implements SimulationListener {
                     String message = timestamp + ": ✅ Batch " + batchId + " delivered (via Kafka) - Ready for verification";
                     verificationHistory.add(0, message);
                     
+                    // Compute final quality using QualityAssessmentService (same as onSimulationStopped)
+                    double finalQuality = DEFAULT_FINAL_QUALITY;
+                    try {
+                        if (qualityAssessmentService != null && simulationStartTimeMs > 0) {
+                            QualityAssessmentService.FinalQualityAssessment assessment =
+                                qualityAssessmentService.assessFinalQualityFromMonitoring(
+                                    batchId, 100.0, simulationStartTimeMs);
+                            
+                            if (assessment != null) {
+                                finalQuality = assessment.getFinalQuality();
+                                System.out.println("ConsumerController: Computed final quality via Kafka stop: " + 
+                                                 finalQuality + "% (grade: " + assessment.getQualityGrade() + ")");
+                                
+                                // Update journey step with detailed quality info
+                                updateJourneyStep(4, "✅", "Delivered - " + assessment.getQualityGrade(),
+                                    String.format("Final Quality: %.1f%% | Temp Violations: %d | Alerts: %d",
+                                        finalQuality, assessment.getTemperatureViolations(), assessment.getAlertCount()));
+                            }
+                        } else if (SimulationManager.isInitialized()) {
+                            finalQuality = SimulationManager.getInstance().getFinalQuality();
+                        }
+                    } catch (Exception e) {
+                        System.err.println("Could not compute final quality via Kafka: " + e.getMessage());
+                    }
+                    
                     // Display final quality
-                    displayFinalQuality(batchId, DEFAULT_FINAL_QUALITY);
+                    displayFinalQuality(batchId, finalQuality);
                     
                     // Get and display average temperature from TemperatureService
                     displayAverageTemperature(batchId);
@@ -326,6 +357,7 @@ public class ConsumerController implements SimulationListener {
                     // Reset tracking
                     currentBatchId = null;
                     lastProgress = 0.0;
+                    simulationStartTimeMs = 0;
                     
                     System.out.println("✅ ConsumerController: Stopped tracking simulation via Kafka: " + batchId);
                 }
