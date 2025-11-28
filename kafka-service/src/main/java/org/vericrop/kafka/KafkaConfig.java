@@ -22,6 +22,12 @@ public class KafkaConfig {
     public static final String TOPIC_BATCH_UPDATES = "batch-updates";
     public static final String TOPIC_TEMPERATURE_COMPLIANCE = "temperature-compliance";
     public static final String TOPIC_MAP_SIMULATION = "map-simulation";
+    
+    // Simulation control topic for cross-instance coordination
+    public static final String TOPIC_SIMULATION_CONTROL = "simulation-control";
+    
+    // Instance registry topic for tracking running instances
+    public static final String TOPIC_INSTANCE_REGISTRY = "instance-registry";
 
     public static Properties getProducerProperties() {
         Properties props = new Properties();
