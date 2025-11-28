@@ -22,9 +22,9 @@ import java.util.concurrent.ConcurrentHashMap;
 public class QualityAssessmentService {
     private static final Logger logger = LoggerFactory.getLogger(QualityAssessmentService.class);
     
-    // Quality thresholds
-    private static final double PRIME_QUALITY_THRESHOLD = 80.0;
-    private static final double ACCEPTABLE_QUALITY_THRESHOLD = 60.0;
+    // Quality thresholds - must match grade boundaries in determineQualityGrade()
+    private static final double PRIME_QUALITY_THRESHOLD = 90.0;  // Matches PRIME grade (≥90%)
+    private static final double ACCEPTABLE_QUALITY_THRESHOLD = 60.0;  // Matches ACCEPTABLE grade (≥60%)
     
     // Temperature violation penalties
     private static final double TEMP_VIOLATION_PENALTY_PER_READING = 0.5;
