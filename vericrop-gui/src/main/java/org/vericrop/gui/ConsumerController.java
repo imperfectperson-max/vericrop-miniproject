@@ -394,15 +394,30 @@ public class ConsumerController implements SimulationListener {
                 SimulationManager manager = SimulationManager.getInstance();
                 manager.registerListener(this);
                 
-                // If simulation is already running, update journey display
+                // If simulation is already running, catch up with current state
                 if (manager.isRunning()) {
                     currentBatchId = manager.getSimulationId();
                     double progress = manager.getProgress();
                     String location = manager.getCurrentLocation();
+                    String farmerId = manager.getCurrentProducer();
+                    
+                    // Track simulation start time for quality calculation
+                    // Use current time minus estimated elapsed time based on progress
+                    // Use SimulationConfig.forDemo() to get the correct simulation duration
+                    long simulationDurationMs = SimulationConfig.forDemo().getSimulationDurationMs();
+                    long estimatedElapsedMs = (long)(progress / 100.0 * simulationDurationMs);
+                    simulationStartTimeMs = System.currentTimeMillis() - estimatedElapsedMs;
+                    lastProgress = progress;
                     
                     Platform.runLater(() -> {
-                        verificationHistory.add(0, "📦 Batch in transit: " + currentBatchId + " - Track in Logistics tab");
+                        verificationHistory.add(0, "📦 Batch in transit: " + currentBatchId + 
+                            " (" + String.format("%.0f%%", progress) + ") - Track in Logistics tab");
                         updateJourneyFromProgress(currentBatchId, progress, location);
+                        
+                        // Update status label
+                        if (statusLabel != null) {
+                            statusLabel.setText(progress >= 100 ? "Delivered" : "In Transit");
+                        }
                     });
                 }
             }

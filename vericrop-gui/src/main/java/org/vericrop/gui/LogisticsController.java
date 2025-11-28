@@ -218,12 +218,32 @@ public class LogisticsController implements SimulationListener {
                 SimulationManager manager = SimulationManager.getInstance();
                 manager.registerListener(this);
                 
-                // If simulation is already running when we initialize, show it on map
+                // If simulation is already running when we initialize, catch up with current state
                 if (manager.isRunning()) {
                     String batchId = manager.getSimulationId();
+                    double progress = manager.getProgress();
+                    String location = manager.getCurrentLocation();
+                    String farmerId = manager.getCurrentProducer();
+                    
                     Platform.runLater(() -> {
                         alerts.add(0, "📍 Active simulation detected: " + batchId);
-                        System.out.println("LogisticsController: Detected running simulation: " + batchId);
+                        System.out.println("LogisticsController: Detected running simulation: " + batchId + " at " + progress + "%");
+                        
+                        // Initialize map marker at current position (not just origin)
+                        initializeMapMarker(batchId);
+                        if (progress > 0) {
+                            updateMapMarkerPosition(batchId, progress, location);
+                        }
+                        
+                        // Initialize temperature chart series
+                        initializeTemperatureChartSeries(batchId);
+                        
+                        // Initialize timeline to current state
+                        String status = determineStatusFromProgress(progress);
+                        updateTimeline(batchId, progress, status);
+                        
+                        // Add shipment to Active Shipments table
+                        addShipmentToTable(batchId, farmerId != null ? farmerId : "Unknown");
                     });
                 }
             }
