@@ -620,7 +620,93 @@ When starting a simulation through the ProducerController, the system defaults t
 
 The MapSimulator is initialized with the selected scenario and steps forward in sync with the delivery simulation, updating entity positions each tick. Temperature compliance monitoring generates alerts for violations based on scenario thresholds.
 
-### Simulation Orchestration and Controller Isolation
+### SimulationService API for Controllers
+
+VeriCrop's `SimulationManager` is a singleton service that allows multiple controllers to subscribe to the same simulation without creating independent simulation instances. This ensures all three controllers (ProducerController, LogisticsController, ConsumerController) run synchronously with real-time updates.
+
+**How Controllers Join a Simulation:**
+
+```java
+// 1. In controller's initialize() method, register as a listener
+@FXML
+public void initialize() {
+    // Check if SimulationManager is available
+    if (SimulationManager.isInitialized()) {
+        SimulationManager manager = SimulationManager.getInstance();
+        manager.registerListener(this);
+        
+        // If simulation is already running, catch up with current state
+        if (manager.isRunning()) {
+            String batchId = manager.getSimulationId();
+            double progress = manager.getProgress();
+            String location = manager.getCurrentLocation();
+            
+            // Update UI to reflect current state
+            Platform.runLater(() -> updateUIFromState(batchId, progress, location));
+        }
+    }
+}
+
+// 2. Implement SimulationListener interface
+public class MyController implements SimulationListener {
+    @Override
+    public void onSimulationStarted(String batchId, String farmerId) {
+        Platform.runLater(() -> {
+            // Update UI: initialize tracking, charts, timeline
+        });
+    }
+    
+    @Override
+    public void onProgressUpdate(String batchId, double progress, String currentLocation) {
+        Platform.runLater(() -> {
+            // Update UI: animate map marker, update timeline, refresh charts
+        });
+    }
+    
+    @Override
+    public void onSimulationStopped(String batchId, boolean completed) {
+        Platform.runLater(() -> {
+            // Update UI: show final quality, cleanup markers
+        });
+    }
+}
+
+// 3. In cleanup() method, unregister to prevent memory leaks
+public void cleanup() {
+    if (SimulationManager.isInitialized()) {
+        SimulationManager.getInstance().unregisterListener(this);
+    }
+}
+```
+
+**Key SimulationManager Methods:**
+
+| Method | Description |
+|--------|-------------|
+| `getInstance()` | Returns the singleton SimulationManager instance |
+| `isInitialized()` | Checks if SimulationManager is ready |
+| `registerListener(listener)` | Subscribe to simulation events |
+| `unregisterListener(listener)` | Unsubscribe from simulation events |
+| `isRunning()` | Check if simulation is active |
+| `getSimulationId()` | Get current batch ID |
+| `getProgress()` | Get progress percentage (0-100) |
+| `getCurrentLocation()` | Get current location name |
+| `getFinalQuality()` | Get final quality score (after completion) |
+| `startSimulation(...)` | Start a new simulation (called by ProducerController) |
+| `stopSimulation()` | Stop the current simulation |
+
+**Thread Safety:**
+
+- SimulationManager uses `CopyOnWriteArrayList` for thread-safe listener management
+- All UI updates must use `Platform.runLater()` to run on JavaFX Application Thread
+- Newly registered listeners automatically receive current state if simulation is already running
+
+**Cross-Instance Coordination (via Kafka):**
+
+For multi-instance deployments where controllers run in separate JVM processes:
+1. SimulationManager publishes events to `simulation-control`, `temperature-compliance`, and `map-simulation` Kafka topics
+2. Controllers can subscribe to these topics via `SimulationControlConsumer`, `TemperatureComplianceEventConsumer`, and `MapSimulationEventConsumer`
+3. `InstanceRegistry` tracks active instances with their roles (PRODUCER, LOGISTICS, CONSUMER)
 
 VeriCrop implements a robust simulation orchestration system that ensures independent, thread-safe execution of simulations across multiple controllers.
 
