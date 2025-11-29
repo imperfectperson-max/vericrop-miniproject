@@ -236,9 +236,7 @@ public class MultiControllerSynchronizationTest {
         monitoring.recordReading(5.0);
         monitoring.recordReading(6.0);
         
-        // Re-get monitoring data (same instance)
-        
-        // Re-get monitoring data (same instance)
+        // Verify monitoring data
         assertNotNull(monitoring, "Monitoring should exist");
         assertEquals(3, monitoring.getReadingCount(), "Should have 3 readings");
         assertEquals(5.0, monitoring.getAvgTemp(), 0.1, "Average should be 5.0°C");
