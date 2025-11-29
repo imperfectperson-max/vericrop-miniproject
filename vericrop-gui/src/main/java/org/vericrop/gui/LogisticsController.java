@@ -1910,6 +1910,9 @@ public class LogisticsController implements SimulationListener {
     
     @Override
     public void onProgressUpdate(String batchId, double progress, String currentLocation) {
+        logger.debug("📊 Progress update received - batchId: {}, progress: {}%, location: {}", 
+                    batchId, String.format("%.1f", progress), currentLocation);
+        
         Platform.runLater(() -> {
             // Update map marker position with smooth animation
             updateMapMarkerPosition(batchId, progress, currentLocation);
@@ -1924,7 +1927,8 @@ public class LogisticsController implements SimulationListener {
                            progress >= PROGRESS_COMPLETE ? "Delivered" : "At Warehouse";
             updateTimeline(batchId, progress, status);
             
-            System.out.println("LogisticsController: Progress update - " + batchId + " at " + progress + "% - " + currentLocation);
+            logger.info("LogisticsController: Progress update - {} at {}% - {}", batchId, 
+                       String.format("%.1f", progress), currentLocation);
         });
     }
     
