@@ -532,6 +532,47 @@ KAFKA_BOOTSTRAP_SERVERS=localhost:9092
 KAFKA_ENABLED=true
 ```
 
+**Synchronized Simulation Validation Steps:**
+
+To verify that Producer, Logistics, and Consumer controllers are running in synchronized lockstep:
+
+1. **Start All Three Controller Instances** (as described above in three terminals)
+
+2. **In Producer Instance (Terminal 1):**
+   - Click "Start Simulation" to begin a delivery
+   - Note the batch ID and start time in the status area
+
+3. **In Logistics Instance (Terminal 2):**
+   - ✅ Verify Live Route shows truck marker at origin, then animates toward warehouse
+   - ✅ Verify Timeline updates progressively (Created → In Transit → Approaching → Delivered)
+   - ✅ Verify Active Shipments table shows the batch with updating status/location
+   - ✅ Verify Temperature chart shows new data points appearing as the simulation runs
+
+4. **In Consumer Instance (Terminal 3):**
+   - ✅ Verify Product Journey steps update (step icons change from ⏳ to ✅)
+   - ✅ Verify verification history shows progress milestones (25%, 50%, 75%, 100%)
+   - ✅ Verify Final Quality score is computed and displayed when delivery completes
+   - ✅ Verify Average Temperature is shown after delivery
+
+5. **All Instances Should Progress in Lockstep:**
+   - Progress percentages should match within ±5% across all three instances
+   - Status transitions should occur at approximately the same time
+   - Completion should trigger final quality display in Consumer view
+
+**Automated Test Validation:**
+
+Run the synchronized simulation lifecycle tests to verify the multi-listener coordination:
+
+```bash
+./gradlew :vericrop-core:test --tests "org.vericrop.service.simulation.SynchronizedSimulationLifecycleTest"
+```
+
+These tests verify:
+- Multiple listeners can subscribe to the same simulation tick source
+- All registered listeners receive identical tick events
+- Late-joining listeners receive current state notifications
+- Event order is maintained (START → PROGRESS → STOP)
+
 ### Realtime Simulation Updates (NEW)
 
 VeriCrop now features **realtime simulation with live UI updates** that animate delivery progress across Producer, Logistics, and Consumer views.

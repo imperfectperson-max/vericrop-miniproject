@@ -38,8 +38,12 @@ import okhttp3.Request;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ConsumerController implements SimulationListener {
+    
+    private static final Logger logger = LoggerFactory.getLogger(ConsumerController.class);
 
     /**
      * Status of a backend fetch operation.
@@ -1159,6 +1163,9 @@ public class ConsumerController implements SimulationListener {
     
     @Override
     public void onProgressUpdate(String batchId, double progress, String currentLocation) {
+        logger.debug("📊 Progress update received - batchId: {}, progress: {}%, location: {}", 
+                    batchId, String.format("%.1f", progress), currentLocation);
+        
         Platform.runLater(() -> {
             // Skip if not tracking this batch
             if (currentBatchId != null && !currentBatchId.equals(batchId)) {
@@ -1179,7 +1186,7 @@ public class ConsumerController implements SimulationListener {
                 String message = String.format("%s: 📍 Batch %s - %.0f%% complete - %s", 
                                              timestamp, batchId, progress, currentLocation);
                 verificationHistory.add(0, message);
-                System.out.println("ConsumerController: Journey milestone - " + batchId + " at " + progress + "%");
+                logger.info("ConsumerController: Journey milestone - {} at {}%", batchId, progress);
             }
             
             lastProgress = progress;
@@ -1188,6 +1195,8 @@ public class ConsumerController implements SimulationListener {
     
     @Override
     public void onSimulationStopped(String batchId, boolean completed) {
+        logger.info("🛑 Simulation stopped - batchId: {}, completed: {}", batchId, completed);
+        
         Platform.runLater(() -> {
             String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
             String message;
@@ -1206,8 +1215,9 @@ public class ConsumerController implements SimulationListener {
                         
                         if (assessment != null) {
                             finalQuality = assessment.getFinalQuality();
-                            System.out.println("ConsumerController: Computed final quality using QualityAssessmentService: " + 
-                                             finalQuality + "% (grade: " + assessment.getQualityGrade() + ")");
+                            logger.info("✅ Final quality computed - batch: {}, quality: {}%, grade: {}, tempViolations: {}", 
+                                       batchId, String.format("%.1f", finalQuality), 
+                                       assessment.getQualityGrade(), assessment.getTemperatureViolations());
                             
                             // Update journey step with detailed quality info
                             updateJourneyStep(4, "✅", "Delivered - " + assessment.getQualityGrade(),
@@ -1217,9 +1227,10 @@ public class ConsumerController implements SimulationListener {
                     } else if (SimulationManager.isInitialized()) {
                         // Fallback to SimulationManager if QualityAssessmentService unavailable
                         finalQuality = SimulationManager.getInstance().getFinalQuality();
+                        logger.info("Final quality from SimulationManager fallback: {}%", String.format("%.1f", finalQuality));
                     }
                 } catch (Exception e) {
-                    System.err.println("Could not compute final quality: " + e.getMessage());
+                    logger.error("Could not compute final quality: {}", e.getMessage());
                 }
                 
                 // Display final quality
@@ -1243,7 +1254,7 @@ public class ConsumerController implements SimulationListener {
             lastProgress = 0.0;
             simulationStartTimeMs = 0;
             
-            System.out.println("ConsumerController: " + (completed ? "Delivery completed" : "Delivery stopped") + " - " + batchId);
+            logger.info("ConsumerController: {} - {}", completed ? "Delivery completed" : "Delivery stopped", batchId);
         });
     }
     
