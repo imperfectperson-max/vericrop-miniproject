@@ -173,6 +173,12 @@ public class SimulationConfig {
     }
     
     /**
+     * Simulated route duration in milliseconds (30 minutes of simulated time).
+     * This is the base duration that presentation mode scales into the real-time duration.
+     */
+    public static final long SIMULATED_ROUTE_DURATION_MS = 30 * 60 * 1000L;
+    
+    /**
      * Get configuration for presentation mode (~2 minutes total).
      * Designed for multi-instance simulation demonstrations with
      * 3 instances of each controller type running in parallel.
@@ -194,9 +200,8 @@ public class SimulationConfig {
      * @return SimulationConfig configured for the specified duration
      */
     public static SimulationConfig forPresentation(int durationSeconds) {
-        // Calculate time scale to fit 30 minutes of simulated time
-        // into the specified duration
-        double timeScale = (30.0 * 60.0 * 1000.0) / (durationSeconds * 1000.0);
+        // Calculate time scale to fit simulated route duration into the specified duration
+        double timeScale = (double) SIMULATED_ROUTE_DURATION_MS / (durationSeconds * 1000.0);
         
         return new Builder()
             .simulationDurationMs(durationSeconds * 1000L)

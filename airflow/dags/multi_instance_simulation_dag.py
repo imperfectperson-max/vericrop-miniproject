@@ -27,10 +27,21 @@ import uuid
 
 logger = logging.getLogger(__name__)
 
+def safe_int_from_env(env_var: str, default: int) -> int:
+    """Safely parse an integer from environment variable with error handling."""
+    value = os.getenv(env_var)
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        logger.warning(f"Invalid value '{value}' for {env_var}, using default {default}")
+        return default
+
 # Configuration from environment variables with defaults
 KAFKA_BOOTSTRAP_SERVERS = os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'localhost:9092')
-SIMULATION_DURATION_SECONDS = int(os.getenv('SIMULATION_DURATION_SECONDS', '120'))  # 2 minutes default
-NUM_INSTANCES = int(os.getenv('NUM_CONTROLLER_INSTANCES', '3'))
+SIMULATION_DURATION_SECONDS = safe_int_from_env('SIMULATION_DURATION_SECONDS', 120)  # 2 minutes default
+NUM_INSTANCES = safe_int_from_env('NUM_CONTROLLER_INSTANCES', 3)
 
 # Kafka topic names
 TOPIC_SIMULATION_CONTROL = 'simulation-control'

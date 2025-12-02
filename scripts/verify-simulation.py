@@ -38,10 +38,18 @@ class SimulationVerifier:
         'batch-updates'
     ]
     
-    def __init__(self, bootstrap_servers: str = 'localhost:9092'):
+    # Default expected duration and tolerance (can be configured)
+    DEFAULT_EXPECTED_DURATION_SECONDS = 120
+    DEFAULT_DURATION_TOLERANCE_SECONDS = 30
+    
+    def __init__(self, bootstrap_servers: str = 'localhost:9092', 
+                 expected_duration_seconds: int = DEFAULT_EXPECTED_DURATION_SECONDS,
+                 duration_tolerance_seconds: int = DEFAULT_DURATION_TOLERANCE_SECONDS):
         self.bootstrap_servers = bootstrap_servers
         self.results: Dict[str, List[dict]] = {topic: [] for topic in self.TOPICS}
         self.verification_results: Dict[str, bool] = {}
+        self.expected_duration_seconds = expected_duration_seconds
+        self.duration_tolerance_seconds = duration_tolerance_seconds
     
     def collect_messages(self, timeout_seconds: int = 30) -> Dict[str, List[dict]]:
         """Collect messages from all simulation topics."""
@@ -191,7 +199,7 @@ class SimulationVerifier:
         return True, f"Found {len(messages)} alerts"
     
     def verify_duration(self) -> Tuple[bool, str]:
-        """Verify that simulation ran for approximately 2 minutes."""
+        """Verify that simulation ran for approximately the expected duration."""
         control_msgs = self.results['simulation-control']
         
         if len(control_msgs) < 2:
@@ -210,11 +218,14 @@ class SimulationVerifier:
         duration_ms = last_stop - first_start
         duration_seconds = duration_ms / 1000
         
-        # Allow ±30 seconds tolerance from 2 minutes (120 seconds)
-        if 90 <= duration_seconds <= 150:
-            return True, f"Simulation duration: {duration_seconds:.1f} seconds (within expected ~2 minute range)"
+        # Check if duration is within tolerance range
+        min_duration = self.expected_duration_seconds - self.duration_tolerance_seconds
+        max_duration = self.expected_duration_seconds + self.duration_tolerance_seconds
+        
+        if min_duration <= duration_seconds <= max_duration:
+            return True, f"Simulation duration: {duration_seconds:.1f} seconds (within expected ~{self.expected_duration_seconds}s range)"
         else:
-            return False, f"Simulation duration: {duration_seconds:.1f} seconds (expected ~120 seconds)"
+            return False, f"Simulation duration: {duration_seconds:.1f} seconds (expected ~{self.expected_duration_seconds} seconds)"
     
     def run_verification(self, scenario: str = 'normal') -> bool:
         """Run all verifications and return overall result."""
@@ -299,10 +310,18 @@ def main():
                         help='Use mock data instead of connecting to Kafka')
     parser.add_argument('--output', type=str,
                         help='Output file for JSON report')
+    parser.add_argument('--expected-duration', type=int, default=120,
+                        help='Expected simulation duration in seconds (default: 120)')
+    parser.add_argument('--duration-tolerance', type=int, default=30,
+                        help='Duration tolerance in seconds (default: 30)')
     
     args = parser.parse_args()
     
-    verifier = SimulationVerifier(args.kafka_server)
+    verifier = SimulationVerifier(
+        args.kafka_server,
+        expected_duration_seconds=args.expected_duration,
+        duration_tolerance_seconds=args.duration_tolerance
+    )
     
     if args.mock:
         verifier._generate_mock_messages()
