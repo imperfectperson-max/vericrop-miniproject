@@ -106,6 +106,11 @@ public class LogisticsController implements SimulationListener {
     // Track stopped simulations to prevent further chart updates (prevents "running" graph after sim ends)
     private final java.util.Set<String> stoppedSimulations = java.util.concurrent.ConcurrentHashMap.newKeySet();
     
+    // Track simulations that are managed via Kafka events (not local DeliverySimulator)
+    // These simulations should NOT be queried against the local DeliverySimulator for status
+    // because they were started by another instance and are only tracked here for UI updates
+    private final java.util.Set<String> kafkaManagedSimulations = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    
     // Chart epoch start time for calculating x-values in seconds
     private long chartEpochStart;
     
@@ -345,6 +350,12 @@ public class LogisticsController implements SimulationListener {
                     // Remove from stopped simulations if restarting
                     stoppedSimulations.remove(batchId);
                     
+                    // Mark this simulation as Kafka-managed (not locally managed by DeliverySimulator)
+                    // This prevents syncWithDeliverySimulator() from incorrectly marking it as completed
+                    // when the local DeliverySimulator doesn't know about it
+                    kafkaManagedSimulations.add(batchId);
+                    logger.debug("Added {} to kafkaManagedSimulations (total: {})", batchId, kafkaManagedSimulations.size());
+                    
                     alerts.add(0, "🚚 Simulation started via Kafka: " + batchId);
                     if (alerts.size() > MAX_ALERT_ITEMS) {
                         alerts.remove(alerts.size() - 1);
@@ -379,6 +390,10 @@ public class LogisticsController implements SimulationListener {
                     
                     // Mark simulation as stopped to prevent further chart updates
                     stoppedSimulations.add(batchId);
+                    
+                    // Remove from kafkaManagedSimulations as it's now stopped
+                    kafkaManagedSimulations.remove(batchId);
+                    logger.debug("Removed {} from kafkaManagedSimulations (remaining: {})", batchId, kafkaManagedSimulations.size());
                     
                     alerts.add(0, "⏹ Simulation stopped via Kafka: " + batchId);
                     if (alerts.size() > MAX_ALERT_ITEMS) {
@@ -901,7 +916,18 @@ public class LogisticsController implements SimulationListener {
         if (deliverySimulator == null) return;
 
         // Get all active simulations and update map
+        // Only check simulations that are NOT Kafka-managed (i.e., only locally started simulations)
         for (String shipmentId : activeShipments.keySet()) {
+            // Skip simulations that are managed via Kafka events from other instances
+            // These simulations are not tracked by the local DeliverySimulator, so querying
+            // their status would incorrectly return isRunning=false, triggering premature completion.
+            // Kafka-managed simulations will be properly stopped via handleSimulationControlEvent()
+            // when the STOP event is received.
+            if (kafkaManagedSimulations.contains(shipmentId)) {
+                logger.trace("Skipping status check for Kafka-managed simulation: {}", shipmentId);
+                continue;
+            }
+            
             try {
                 org.vericrop.service.DeliverySimulator.SimulationStatus status =
                         deliverySimulator.getSimulationStatus(shipmentId);
@@ -916,10 +942,11 @@ public class LogisticsController implements SimulationListener {
                     // Uses atomic add() operation to avoid race condition between check and add
                     if (stoppedSimulations.add(shipmentId)) {
                         addAlert("✅ Delivery completed: " + shipmentId);
+                        logger.info("Local simulation completed: {}", shipmentId);
                     }
                 }
             } catch (Exception e) {
-                System.err.println("Error getting status for " + shipmentId + ": " + e.getMessage());
+                logger.warn("Error getting status for {}: {}", shipmentId, e.getMessage());
             }
         }
 
@@ -1617,6 +1644,14 @@ public class LogisticsController implements SimulationListener {
     public void onSimulationStarted(String batchId, String farmerId) {
         // Remove from stopped simulations if restarting (allows chart updates again)
         stoppedSimulations.remove(batchId);
+        
+        // This callback indicates the simulation was started locally via SimulationManager,
+        // not via Kafka from another instance. Remove from kafkaManagedSimulations if present.
+        // This handles the race condition where a Kafka START event arrives before this callback.
+        if (kafkaManagedSimulations.remove(batchId)) {
+            logger.debug("Removed {} from kafkaManagedSimulations - now locally managed", batchId);
+        }
+        
         logger.info("Simulation started for batch: {} from farmer: {}", batchId, farmerId);
         
         Platform.runLater(() -> {
@@ -2172,6 +2207,9 @@ public class LogisticsController implements SimulationListener {
             logger.debug("Ignoring duplicate stop event for already stopped simulation: {}", batchId);
             return;
         }
+        
+        // Remove from kafkaManagedSimulations if present (cleanup tracking state)
+        kafkaManagedSimulations.remove(batchId);
         
         logger.info("Simulation stopped for batch: {} (completed: {})", batchId, completed);
         
