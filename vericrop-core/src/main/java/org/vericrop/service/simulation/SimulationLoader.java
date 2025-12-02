@@ -375,6 +375,10 @@ public class SimulationLoader {
      */
     public static List<String> listAvailableSimulations() {
         List<String> simulations = new ArrayList<>();
+        // 2-minute presentation scenarios (for multi-instance Kafka demos)
+        simulations.add("presentation_scenario_1_smooth_delivery");
+        simulations.add("presentation_scenario_2_temperature_alert");
+        simulations.add("presentation_scenario_3_quality_journey");
         // Demo simulations optimized for 3-4 minute presentations
         simulations.add("demo_short_3min");
         simulations.add("demo_medium_4min");
@@ -398,6 +402,19 @@ public class SimulationLoader {
     }
     
     /**
+     * List 2-minute presentation scenarios for multi-instance Kafka demos.
+     * These scenarios are designed for running 3 instances (Producer, Logistics, Consumer)
+     * with real-time Kafka event streaming across all controllers.
+     */
+    public static List<String> listPresentationScenarios() {
+        List<String> scenarios = new ArrayList<>();
+        scenarios.add("presentation_scenario_1_smooth_delivery");
+        scenarios.add("presentation_scenario_2_temperature_alert");
+        scenarios.add("presentation_scenario_3_quality_journey");
+        return scenarios;
+    }
+    
+    /**
      * Load the quick 3-minute demo simulation.
      */
     public static SimulationDefinition loadQuickDemo() throws IOException {
@@ -416,6 +433,51 @@ public class SimulationLoader {
      */
     public static SimulationDefinition loadFullJourneyDemo() throws IOException {
         return loadFromResource("/simulations/demo_full_journey.json");
+    }
+    
+    /**
+     * Load Presentation Scenario 1: Smooth Cold Chain Delivery (2 minutes).
+     * Demonstrates baseline functionality with stable temperatures across all controllers.
+     */
+    public static SimulationDefinition loadPresentationScenario1() throws IOException {
+        return loadFromResource("/simulations/presentation_scenario_1_smooth_delivery.json");
+    }
+    
+    /**
+     * Load Presentation Scenario 2: Temperature Alert Demo (2 minutes).
+     * Demonstrates temperature breach alerts and cold chain monitoring.
+     */
+    public static SimulationDefinition loadPresentationScenario2() throws IOException {
+        return loadFromResource("/simulations/presentation_scenario_2_temperature_alert.json");
+    }
+    
+    /**
+     * Load Presentation Scenario 3: Quality Journey Demo (2 minutes).
+     * Demonstrates complete product journey with quality tracking and consumer verification.
+     */
+    public static SimulationDefinition loadPresentationScenario3() throws IOException {
+        return loadFromResource("/simulations/presentation_scenario_3_quality_journey.json");
+    }
+    
+    /**
+     * Load a presentation scenario by number (1, 2, or 3).
+     * 
+     * @param scenarioNumber Scenario number (1-3)
+     * @return Loaded simulation definition
+     * @throws IOException if the scenario file cannot be read
+     * @throws IllegalArgumentException if scenario number is invalid
+     */
+    public static SimulationDefinition loadPresentationScenario(int scenarioNumber) throws IOException {
+        switch (scenarioNumber) {
+            case 1:
+                return loadPresentationScenario1();
+            case 2:
+                return loadPresentationScenario2();
+            case 3:
+                return loadPresentationScenario3();
+            default:
+                throw new IllegalArgumentException("Invalid scenario number: " + scenarioNumber + ". Valid values are 1, 2, or 3.");
+        }
     }
     
     /**

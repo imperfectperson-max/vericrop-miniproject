@@ -1,0 +1,112 @@
+{
+  "id": "presentation_scenario_3_quality_journey",
+  "name": "Scenario 3: Quality Journey & Consumer Verification",
+  "description": "2-minute demonstration focusing on the complete product journey from producer to consumer, emphasizing quality tracking, final quality score calculation, and consumer verification capabilities.",
+  "durationMinutes": 2,
+  "timeScale": 20.0,
+  "simulatedDurationMinutes": 40,
+  "origin": {
+    "name": "Sunrise Orchards",
+    "latitude": 42.3401,
+    "longitude": -71.0289,
+    "description": "Premium apple and fruit orchard with on-site QC"
+  },
+  "warehouse": {
+    "name": "FreshChain Cold Hub",
+    "latitude": 42.3568,
+    "longitude": -71.0689,
+    "description": "Automated cold chain verification hub"
+  },
+  "destination": {
+    "name": "Consumer Mart Express",
+    "latitude": 42.3736,
+    "longitude": -71.1097,
+    "description": "Consumer-facing retail with QR verification station"
+  },
+  "waypoints": [
+    {"name": "📦 Orchard Packaging", "lat": 42.3401, "lng": -71.0289, "minuteFromStart": 0, "temperature": 4.0, "humidity": 82},
+    {"name": "✅ Initial QC Check", "lat": 42.3420, "lng": -71.0320, "minuteFromStart": 2, "temperature": 4.0, "humidity": 81},
+    {"name": "Farm Gate Departure", "lat": 42.3440, "lng": -71.0360, "minuteFromStart": 4, "temperature": 4.2, "humidity": 80},
+    {"name": "Rural Road Section", "lat": 42.3470, "lng": -71.0420, "minuteFromStart": 7, "temperature": 4.4, "humidity": 78},
+    {"name": "Highway Merge", "lat": 42.3500, "lng": -71.0500, "minuteFromStart": 11, "temperature": 4.6, "humidity": 76},
+    {"name": "Highway Transit", "lat": 42.3520, "lng": -71.0560, "minuteFromStart": 14, "temperature": 5.0, "humidity": 74},
+    {"name": "📍 Checkpoint Alpha", "lat": 42.3540, "lng": -71.0620, "minuteFromStart": 17, "temperature": 4.8, "humidity": 75},
+    {"name": "🏢 Cold Hub Intake", "lat": 42.3568, "lng": -71.0689, "minuteFromStart": 20, "temperature": 3.5, "humidity": 72},
+    {"name": "✅ Hub Quality Scan", "lat": 42.3575, "lng": -71.0720, "minuteFromStart": 22, "temperature": 3.2, "humidity": 73},
+    {"name": "Hub Reload Ready", "lat": 42.3590, "lng": -71.0780, "minuteFromStart": 25, "temperature": 3.5, "humidity": 74},
+    {"name": "Urban Highway Entry", "lat": 42.3630, "lng": -71.0860, "minuteFromStart": 29, "temperature": 3.9, "humidity": 75},
+    {"name": "📍 Checkpoint Beta", "lat": 42.3680, "lng": -71.0960, "minuteFromStart": 33, "temperature": 4.2, "humidity": 76},
+    {"name": "Consumer Zone", "lat": 42.3710, "lng": -71.1040, "minuteFromStart": 37, "temperature": 4.0, "humidity": 77},
+    {"name": "✅ Consumer Mart Dock", "lat": 42.3736, "lng": -71.1097, "minuteFromStart": 40, "temperature": 3.8, "humidity": 78}
+  ],
+  "productType": "Premium Apples - Grade A",
+  "batchPrefix": "QUALITY",
+  "initialQuality": 100.0,
+  "qualityDecay": {
+    "decayRatePerHour": 0.4,
+    "temperaturePenaltyPerDegree": 0.25,
+    "humidityPenaltyPerPercent": 0.08,
+    "idealTempMin": 3.0,
+    "idealTempMax": 5.0,
+    "idealHumidityMin": 72.0,
+    "idealHumidityMax": 82.0
+  },
+  "temperature": {
+    "target": 4.0,
+    "minAllowed": 2.0,
+    "maxAllowed": 8.0,
+    "variance": 1.0
+  },
+  "humidity": {
+    "target": 77.0,
+    "minAllowed": 68.0,
+    "maxAllowed": 88.0,
+    "variance": 4.0
+  },
+  "temperatureEvents": [
+    {
+      "atMinute": 14,
+      "durationMinutes": 2,
+      "temperature": 5.5,
+      "description": "Minor temperature rise during highway transit - within safe limits"
+    }
+  ],
+  "stageTransitions": {
+    "available": {"progressStart": 0, "progressEnd": 5, "description": "Batch created and initial quality verified"},
+    "inTransit": {"progressStart": 5, "progressEnd": 75, "description": "Tracked delivery with quality monitoring"},
+    "approaching": {"progressStart": 75, "progressEnd": 95, "description": "Final leg - consumer zone approach"},
+    "completed": {"progressStart": 95, "progressEnd": 100, "description": "Delivered - ready for consumer verification"}
+  },
+  "alerts": {
+    "temperatureThreshold": 7.0,
+    "qualityDropThreshold": 92.0,
+    "delayThresholdMinutes": 5
+  },
+  "waypointsPerSegment": 20,
+  "speedKmh": 48.0,
+  "scenario": "NORMAL",
+  "consumerView": {
+    "showJourney": true,
+    "showQualityDecay": true,
+    "showTemperatureHistory": true,
+    "showFinalQualityScore": true,
+    "showLifecycleTimeline": true,
+    "enableQRVerification": true
+  },
+  "presentationFeatures": {
+    "logistics": ["Timeline with quality checkpoints (✅ icons)", "Active Shipments with real-time updates", "Live Route Mapping with waypoint annotations", "Temperature chart showing stable journey"],
+    "consumer": ["📦 Full Product Journey visualization", "Final Quality Score display (95%+)", "Average Temperature display", "QR scan verification ready", "Journey milestone timeline"],
+    "producer": ["Batch creation with QR generation", "Quality metrics display", "Simulation monitoring"]
+  },
+  "qualityCheckpoints": [
+    {"atMinute": 2, "checkpoint": "Initial QC", "expectedQuality": 100.0, "description": "Farm quality certification"},
+    {"atMinute": 22, "checkpoint": "Hub QC", "expectedQuality": 97.0, "description": "Warehouse quality rescan"},
+    {"atMinute": 40, "checkpoint": "Final QC", "expectedQuality": 95.0, "description": "Consumer delivery verification"}
+  ],
+  "consumerVerification": {
+    "qrDataFields": ["batchId", "origin", "qualityScore", "temperature", "journey"],
+    "verificationTimestamp": true,
+    "showBlockchainHash": true
+  },
+  "notes": "SCENARIO 3: Quality Journey Demo - 2-minute presentation. Demonstrates complete traceability: (1) Quality tracking from 100% initial to ~95% final, (2) Full product journey visible in Consumer view, (3) Multiple quality checkpoints along route, (4) Final quality score prominently displayed, (5) Average temperature calculation, (6) QR verification capability. Use this to demonstrate the complete producer-to-consumer value proposition."
+}
