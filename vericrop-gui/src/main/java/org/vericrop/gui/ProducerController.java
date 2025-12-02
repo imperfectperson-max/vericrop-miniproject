@@ -46,6 +46,7 @@ import org.vericrop.kafka.services.InstanceRegistry;
 import org.vericrop.gui.util.BlockchainInitializer;
 import org.vericrop.service.simulation.SimulationListener;
 import org.vericrop.service.simulation.SimulationManager;
+import org.vericrop.service.simulation.SimulationLoader;
 import org.vericrop.gui.services.TemperatureComplianceService;
 import org.vericrop.gui.services.LogisticsService;
 import org.vericrop.kafka.producers.BatchUpdateEventProducer;
@@ -1442,27 +1443,35 @@ public class ProducerController implements SimulationListener {
                 return;
             }
             
-            // Allow selecting a batch from recent batches list
-            String selectedBatchId = selectBatchForAction("Select Batch for Delivery Simulation");
-            if (selectedBatchId == null) {
-                simStatusLabel.setText("⚠ Simulation cancelled");
+            // Select scenario for the simulation (supports 2-minute presentation scenarios)
+            SimulationLoader.SimulationDefinition selectedScenario = selectPresentationScenario();
+            if (selectedScenario == null) {
+                simStatusLabel.setText("⚠ Simulation cancelled - no scenario selected");
                 simStatusLabel.setStyle("-fx-text-fill: #DC2626;");
                 return;
             }
-
+            
+            // Use scenario batch prefix to generate unique batch ID
+            final String generatedBatchId = selectedScenario.generateBatchId();
+            
             // Get farmer ID from field or use default (make it final for lambda)
             final String farmerId = getFarmerIdOrDefault();
 
-            // Generate sample route: Farm to Warehouse
+            // Use scenario-defined origin, warehouse, and destination
             final var origin = new org.vericrop.service.DeliverySimulator.GeoCoordinate(
-                    42.3601, -71.0589, "Sunny Valley Farm"
+                    selectedScenario.getOrigin().getLatitude(),
+                    selectedScenario.getOrigin().getLongitude(),
+                    selectedScenario.getOrigin().getName()
             );
             final var destination = new org.vericrop.service.DeliverySimulator.GeoCoordinate(
-                    42.3736, -71.1097, "Metro Fresh Warehouse"
+                    selectedScenario.getDestination().getLatitude(),
+                    selectedScenario.getDestination().getLongitude(),
+                    selectedScenario.getDestination().getName()
             );
 
-            final Duration simulationDuration = Duration.ofMinutes(30); // Extended duration
-            final String finalBatchId = selectedBatchId; // Make final for lambda
+            final Duration simulationDuration = Duration.ofMinutes(selectedScenario.getDurationMinutes());
+            final String finalBatchId = generatedBatchId;
+            final SimulationLoader.SimulationDefinition finalScenario = selectedScenario;
             
             // Generate a unique simulation ID for cross-instance coordination
             final String simulationId = UUID.randomUUID().toString();
@@ -1498,11 +1507,13 @@ public class ProducerController implements SimulationListener {
                 activeSimulationId = finalBatchId;
                 updateSimulationButtonStates(true);
                 if (simStatusLabel != null) {
-                    simStatusLabel.setText("⏳ Starting simulation...");
+                    simStatusLabel.setText("⏳ Starting scenario: " + finalScenario.getName());
                     simStatusLabel.setStyle("-fx-text-fill: #F59E0B;");
                 }
                 
                 System.out.println("🔒 Acquired simulation lock for: " + finalBatchId);
+                System.out.println("📋 Selected scenario: " + finalScenario.getName() + 
+                                 " (" + finalScenario.getDurationMinutes() + " min)");
                 
                 // Run all blocking/long-running operations asynchronously
                 CompletableFuture.runAsync(() -> {
@@ -1510,42 +1521,38 @@ public class ProducerController implements SimulationListener {
                         // Publish simulation control event to notify other controllers across instances
                         if (simulationControlProducer != null) {
                             simulationControlProducer.sendStart(simulationId, instanceId, finalBatchId, farmerId);
-                            System.out.println("📡 Published simulation START control event: " + simulationId);
+                            System.out.println("📡 Published simulation START control event: " + simulationId + 
+                                             " | Scenario: " + finalScenario.getId());
                         }
                         
-                        // Publish batch lifecycle event: DISPATCHED (with quality metrics if available)
+                        // Publish batch lifecycle event: DISPATCHED (with quality metrics)
                         if (batchUpdateProducer != null) {
-                            Map<String, Double> metrics = batchMetricsMap.get(finalBatchId);
                             BatchUpdateEvent dispatchEvent = new BatchUpdateEvent(
-                                finalBatchId, "DISPATCHED", "Farm Location", null, 
-                                "Batch dispatched for delivery simulation"
+                                finalBatchId, "DISPATCHED", finalScenario.getOrigin().getName(), null, 
+                                "Batch dispatched for " + finalScenario.getName()
                             );
-                            // Add quality metrics to the event if available
-                            if (metrics != null) {
-                                if (metrics.containsKey("prime_rate")) {
-                                    dispatchEvent.setPrimeRate(metrics.get("prime_rate"));
-                                }
-                                if (metrics.containsKey("rejection_rate")) {
-                                    dispatchEvent.setRejectionRate(metrics.get("rejection_rate"));
-                                }
-                                if (metrics.containsKey("quality_score")) {
-                                    dispatchEvent.setQualityScore(metrics.get("quality_score"));
-                                }
-                            }
+                            // Add initial quality from scenario
+                            dispatchEvent.setQualityScore(finalScenario.getInitialQuality() / 100.0);
                             batchUpdateProducer.sendBatchUpdateEvent(dispatchEvent);
                             System.out.println("📦 Published DISPATCHED event for batch: " + finalBatchId + 
-                                             (metrics != null ? " with quality metrics" : ""));
+                                             " | Initial quality: " + finalScenario.getInitialQuality() + "%");
                         }
 
-                        // Use SimulationManager to start simulation with longer duration (20 waypoints instead of 10)
-                        System.out.println("🚀 Starting new simulation for batch: " + finalBatchId + 
-                                         " | Farmer: " + farmerId + " | Origin: " + origin.getName());
-                        manager.startSimulation(finalBatchId, farmerId, origin, destination, 20, 50.0, 10000);
+                        // Use SimulationManager to start simulation with scenario parameters
+                        int waypoints = finalScenario.getWaypointsPerSegment();
+                        double speedKmh = finalScenario.getSpeedKmh();
+                        // Calculate update interval based on scenario duration (2 min = 120s -> faster updates)
+                        long updateIntervalMs = (finalScenario.getDurationMinutes() * 60 * 1000L) / (waypoints * 3);
+                        
+                        System.out.println("🚀 Starting scenario simulation for batch: " + finalBatchId + 
+                                         " | Farmer: " + farmerId + " | Origin: " + origin.getName() +
+                                         " | Waypoints: " + waypoints + " | Speed: " + speedKmh + " km/h");
+                        manager.startSimulation(finalBatchId, farmerId, origin, destination, waypoints, speedKmh, updateIntervalMs);
 
                         // Start map simulation and temperature compliance together via LogisticsService
                         if (logisticsService != null) {
                             logisticsService.startMapAndCompliance(
-                                finalBatchId, simulationDuration, temperatureComplianceService, "example-01"
+                                finalBatchId, simulationDuration, temperatureComplianceService, finalScenario.getId()
                             );
                         }
 
@@ -1556,13 +1563,15 @@ public class ProducerController implements SimulationListener {
                         // Create alert on UI thread
                         Platform.runLater(() -> {
                             var alertService = MainApp.getInstance().getApplicationContext().getAlertService();
-                            alertService.info("Simulation Started",
-                                    "Extended delivery simulation for " + finalBatchId + " is now running with " +
-                                    "map tracking and temperature compliance monitoring",
+                            alertService.info("Scenario Started: " + finalScenario.getName(),
+                                    "Running " + finalScenario.getDurationMinutes() + "-minute simulation for " + 
+                                    finalBatchId + " (" + finalScenario.getProductType() + ")\n" +
+                                    "From: " + origin.getName() + " → To: " + destination.getName(),
                                     "simulator");
                         });
 
-                        System.out.println("✅ Extended simulation started for: " + finalBatchId);
+                        System.out.println("✅ Scenario simulation started: " + finalScenario.getName() + 
+                                         " for batch: " + finalBatchId);
 
                     } catch (Exception e) {
                         // Handle errors and restore button states on UI thread
@@ -1581,6 +1590,65 @@ public class ProducerController implements SimulationListener {
             e.printStackTrace();
             handleSimulationError(e.getMessage());
         }
+    }
+    
+    /**
+     * Show a dialog to select a presentation scenario for the simulation.
+     * Returns the selected SimulationDefinition or null if cancelled.
+     * 
+     * Presentation scenarios are 2-minute simulations designed for multi-instance demos:
+     * - Scenario 1: Smooth Cold Chain Delivery (normal operation)
+     * - Scenario 2: Temperature Alert Demo (with temperature spikes and alerts)
+     * - Scenario 3: Quality Journey Demo (quality tracking and consumer verification)
+     */
+    private SimulationLoader.SimulationDefinition selectPresentationScenario() {
+        // Build list of scenario options with descriptions
+        List<String> scenarioOptions = Arrays.asList(
+            "1. Smooth Delivery (2 min) - Normal cold chain, stable temps, high quality",
+            "2. Temperature Alert (2 min) - Temperature spikes trigger alerts",
+            "3. Quality Journey (2 min) - Full journey with quality checkpoints"
+        );
+        
+        ChoiceDialog<String> dialog = new ChoiceDialog<>(scenarioOptions.get(0), scenarioOptions);
+        dialog.setTitle("Select Presentation Scenario");
+        dialog.setHeaderText("Choose a 2-minute scenario for multi-instance demonstration");
+        dialog.setContentText("Scenario:");
+        
+        // Add information about what each scenario demonstrates
+        dialog.setContentText(
+            "Scenario:\n\n" +
+            "Each scenario runs for 2 minutes and demonstrates\n" +
+            "different aspects across Producer, Logistics, and Consumer views."
+        );
+        
+        Optional<String> result = dialog.showAndWait();
+        if (result.isPresent()) {
+            String selected = result.get();
+            int scenarioNumber;
+            
+            // Extract scenario number from selection
+            if (selected.startsWith("1.")) {
+                scenarioNumber = 1;
+            } else if (selected.startsWith("2.")) {
+                scenarioNumber = 2;
+            } else if (selected.startsWith("3.")) {
+                scenarioNumber = 3;
+            } else {
+                scenarioNumber = 1; // Default
+            }
+            
+            try {
+                SimulationLoader.SimulationDefinition definition = SimulationLoader.loadPresentationScenario(scenarioNumber);
+                System.out.println("✅ Selected presentation scenario " + scenarioNumber + ": " + definition.getName());
+                return definition;
+            } catch (IOException e) {
+                System.err.println("❌ Failed to load presentation scenario " + scenarioNumber + ": " + e.getMessage());
+                showError("Failed to load scenario: " + e.getMessage());
+                return null;
+            }
+        }
+        
+        return null;
     }
     
     /**

@@ -1,0 +1,93 @@
+{
+  "id": "presentation_scenario_1_smooth_delivery",
+  "name": "Scenario 1: Smooth Cold Chain Delivery",
+  "description": "2-minute demonstration of normal cold chain operations with consistent temperature control. Perfect for showing baseline system functionality across all three controllers.",
+  "durationMinutes": 2,
+  "timeScale": 20.0,
+  "simulatedDurationMinutes": 40,
+  "origin": {
+    "name": "Valley View Organic Farm",
+    "latitude": 42.3601,
+    "longitude": -71.0589,
+    "description": "Premium organic produce farm"
+  },
+  "warehouse": {
+    "name": "Metro Cold Storage Hub",
+    "latitude": 42.3668,
+    "longitude": -71.0843,
+    "description": "State-of-the-art cold storage facility"
+  },
+  "destination": {
+    "name": "FreshMart Consumer Store",
+    "latitude": 42.3736,
+    "longitude": -71.1097,
+    "description": "Final retail destination for consumers"
+  },
+  "waypoints": [
+    {"name": "Farm Packaging Center", "lat": 42.3601, "lng": -71.0589, "minuteFromStart": 0, "temperature": 4.0, "humidity": 78},
+    {"name": "Quality Check Station", "lat": 42.3610, "lng": -71.0610, "minuteFromStart": 3, "temperature": 4.0, "humidity": 77},
+    {"name": "Farm Exit Gate", "lat": 42.3620, "lng": -71.0650, "minuteFromStart": 5, "temperature": 4.2, "humidity": 76},
+    {"name": "County Road Section A", "lat": 42.3635, "lng": -71.0700, "minuteFromStart": 8, "temperature": 4.3, "humidity": 75},
+    {"name": "Highway Entry Point", "lat": 42.3650, "lng": -71.0760, "minuteFromStart": 12, "temperature": 4.4, "humidity": 74},
+    {"name": "Highway Mile Marker 5", "lat": 42.3660, "lng": -71.0800, "minuteFromStart": 15, "temperature": 4.5, "humidity": 73},
+    {"name": "Cold Hub Approach", "lat": 42.3665, "lng": -71.0830, "minuteFromStart": 18, "temperature": 4.3, "humidity": 72},
+    {"name": "Cold Hub Intake", "lat": 42.3668, "lng": -71.0843, "minuteFromStart": 20, "temperature": 3.8, "humidity": 70},
+    {"name": "Hub Quality Rescan", "lat": 42.3670, "lng": -71.0860, "minuteFromStart": 22, "temperature": 3.5, "humidity": 71},
+    {"name": "Hub Reload Complete", "lat": 42.3680, "lng": -71.0900, "minuteFromStart": 25, "temperature": 3.6, "humidity": 72},
+    {"name": "City Highway Entry", "lat": 42.3700, "lng": -71.0960, "minuteFromStart": 30, "temperature": 3.9, "humidity": 73},
+    {"name": "Downtown Approach", "lat": 42.3720, "lng": -71.1030, "minuteFromStart": 35, "temperature": 4.1, "humidity": 74},
+    {"name": "FreshMart Receiving Dock", "lat": 42.3736, "lng": -71.1097, "minuteFromStart": 40, "temperature": 4.0, "humidity": 75}
+  ],
+  "productType": "Organic Lettuce & Greens",
+  "batchPrefix": "SMOOTH",
+  "initialQuality": 98.0,
+  "qualityDecay": {
+    "decayRatePerHour": 0.3,
+    "temperaturePenaltyPerDegree": 0.2,
+    "humidityPenaltyPerPercent": 0.05,
+    "idealTempMin": 3.0,
+    "idealTempMax": 6.0,
+    "idealHumidityMin": 70.0,
+    "idealHumidityMax": 85.0
+  },
+  "temperature": {
+    "target": 4.0,
+    "minAllowed": 2.0,
+    "maxAllowed": 8.0,
+    "variance": 0.8
+  },
+  "humidity": {
+    "target": 75.0,
+    "minAllowed": 65.0,
+    "maxAllowed": 85.0,
+    "variance": 3.0
+  },
+  "temperatureEvents": [],
+  "stageTransitions": {
+    "available": {"progressStart": 0, "progressEnd": 5, "description": "Batch created and ready for pickup"},
+    "inTransit": {"progressStart": 5, "progressEnd": 80, "description": "Active delivery in progress"},
+    "approaching": {"progressStart": 80, "progressEnd": 95, "description": "Nearing destination"},
+    "completed": {"progressStart": 95, "progressEnd": 100, "description": "Delivery completed successfully"}
+  },
+  "alerts": {
+    "temperatureThreshold": 7.0,
+    "qualityDropThreshold": 90.0,
+    "delayThresholdMinutes": 5
+  },
+  "waypointsPerSegment": 15,
+  "speedKmh": 55.0,
+  "scenario": "NORMAL",
+  "consumerView": {
+    "showJourney": true,
+    "showQualityDecay": true,
+    "showTemperatureHistory": true,
+    "showFinalQualityScore": true,
+    "showLifecycleTimeline": true
+  },
+  "presentationFeatures": {
+    "logistics": ["Timeline progression", "Active Shipments table updates", "Live Route Mapping animation", "Temperature chart (stable)"],
+    "consumer": ["Product Journey visualization", "Final Quality Score display", "Average Temperature display"],
+    "producer": ["Simulation status updates", "QR code generation ready"]
+  },
+  "notes": "SCENARIO 1: Smooth Delivery - 2-minute presentation demo. Demonstrates baseline functionality: (1) Normal cold chain operation with minimal variance, (2) All lifecycle stages visible on Timeline, (3) Stable temperature readings on chart, (4) High final quality score (95%+). Use this to show how the system operates under ideal conditions across 3 instances."
+}

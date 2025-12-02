@@ -1,0 +1,110 @@
+{
+  "id": "presentation_scenario_2_temperature_alert",
+  "name": "Scenario 2: Temperature Alert Demo",
+  "description": "2-minute demonstration showcasing temperature breach alerts and cold chain monitoring. Features multiple temperature spikes that trigger real-time alerts across all controllers.",
+  "durationMinutes": 2,
+  "timeScale": 20.0,
+  "simulatedDurationMinutes": 40,
+  "origin": {
+    "name": "Green Fields Farm",
+    "latitude": 42.3501,
+    "longitude": -71.0389,
+    "description": "Premium dairy and produce farm"
+  },
+  "warehouse": {
+    "name": "Regional Distribution Center",
+    "latitude": 42.3601,
+    "longitude": -71.0689,
+    "description": "Temperature-controlled distribution hub"
+  },
+  "destination": {
+    "name": "Premium Grocers Downtown",
+    "latitude": 42.3736,
+    "longitude": -71.1097,
+    "description": "High-end retail destination"
+  },
+  "waypoints": [
+    {"name": "Farm Cold Storage Exit", "lat": 42.3501, "lng": -71.0389, "minuteFromStart": 0, "temperature": 4.0, "humidity": 80},
+    {"name": "Initial Transport", "lat": 42.3515, "lng": -71.0420, "minuteFromStart": 2, "temperature": 4.2, "humidity": 79},
+    {"name": "County Road", "lat": 42.3530, "lng": -71.0480, "minuteFromStart": 5, "temperature": 4.5, "humidity": 77},
+    {"name": "Highway Entrance", "lat": 42.3545, "lng": -71.0530, "minuteFromStart": 8, "temperature": 5.0, "humidity": 75},
+    {"name": "🔥 Highway Traffic Stop", "lat": 42.3560, "lng": -71.0580, "minuteFromStart": 12, "temperature": 8.5, "humidity": 70},
+    {"name": "Traffic Cleared", "lat": 42.3575, "lng": -71.0630, "minuteFromStart": 15, "temperature": 7.0, "humidity": 72},
+    {"name": "Cooling Recovery", "lat": 42.3590, "lng": -71.0670, "minuteFromStart": 17, "temperature": 5.5, "humidity": 74},
+    {"name": "Distribution Center", "lat": 42.3601, "lng": -71.0689, "minuteFromStart": 20, "temperature": 3.5, "humidity": 70},
+    {"name": "DC Reloading", "lat": 42.3610, "lng": -71.0720, "minuteFromStart": 23, "temperature": 3.8, "humidity": 72},
+    {"name": "City Highway Entry", "lat": 42.3640, "lng": -71.0800, "minuteFromStart": 27, "temperature": 4.2, "humidity": 74},
+    {"name": "🔥 Urban Heat Zone", "lat": 42.3680, "lng": -71.0900, "minuteFromStart": 33, "temperature": 9.0, "humidity": 68},
+    {"name": "Emergency Cooling", "lat": 42.3710, "lng": -71.1000, "minuteFromStart": 36, "temperature": 6.0, "humidity": 72},
+    {"name": "Premium Grocers Dock", "lat": 42.3736, "lng": -71.1097, "minuteFromStart": 40, "temperature": 4.5, "humidity": 75}
+  ],
+  "productType": "Fresh Dairy Products",
+  "batchPrefix": "ALERT",
+  "initialQuality": 96.0,
+  "qualityDecay": {
+    "decayRatePerHour": 0.8,
+    "temperaturePenaltyPerDegree": 0.5,
+    "humidityPenaltyPerPercent": 0.15,
+    "idealTempMin": 2.0,
+    "idealTempMax": 6.0,
+    "idealHumidityMin": 70.0,
+    "idealHumidityMax": 80.0
+  },
+  "temperature": {
+    "target": 4.0,
+    "minAllowed": 2.0,
+    "maxAllowed": 8.0,
+    "variance": 2.5
+  },
+  "humidity": {
+    "target": 75.0,
+    "minAllowed": 65.0,
+    "maxAllowed": 85.0,
+    "variance": 6.0
+  },
+  "temperatureEvents": [
+    {
+      "atMinute": 12,
+      "durationMinutes": 3,
+      "temperature": 8.5,
+      "description": "Highway traffic jam - vehicle idling, cooling system stressed"
+    },
+    {
+      "atMinute": 33,
+      "durationMinutes": 3,
+      "temperature": 9.0,
+      "description": "Urban heat island effect - external temperature spike"
+    }
+  ],
+  "stageTransitions": {
+    "available": {"progressStart": 0, "progressEnd": 5, "description": "Batch created and ready for pickup"},
+    "inTransit": {"progressStart": 5, "progressEnd": 80, "description": "Active delivery in progress"},
+    "approaching": {"progressStart": 80, "progressEnd": 95, "description": "Nearing destination"},
+    "completed": {"progressStart": 95, "progressEnd": 100, "description": "Delivery completed successfully"}
+  },
+  "alerts": {
+    "temperatureThreshold": 7.0,
+    "qualityDropThreshold": 85.0,
+    "delayThresholdMinutes": 3
+  },
+  "waypointsPerSegment": 18,
+  "speedKmh": 50.0,
+  "scenario": "TEMPERATURE_SPIKE",
+  "consumerView": {
+    "showJourney": true,
+    "showQualityDecay": true,
+    "showTemperatureHistory": true,
+    "showFinalQualityScore": true,
+    "showLifecycleTimeline": true
+  },
+  "presentationFeatures": {
+    "logistics": ["Timeline progression", "Active Shipments table updates", "Live Route Mapping animation", "Temperature chart spikes", "🔥 ALERT notifications in real-time"],
+    "consumer": ["Product Journey visualization", "Final Quality Score (degraded)", "Average Temperature display (higher)"],
+    "producer": ["Simulation status updates", "Alert acknowledgment"]
+  },
+  "alertSequence": [
+    {"atMinute": 12, "type": "TEMPERATURE_HIGH", "severity": "HIGH", "message": "Temperature exceeded 8°C threshold"},
+    {"atMinute": 33, "type": "TEMPERATURE_HIGH", "severity": "CRITICAL", "message": "Temperature exceeded 8°C in urban zone"}
+  ],
+  "notes": "SCENARIO 2: Temperature Alert Demo - 2-minute presentation. Demonstrates alert system: (1) Two temperature breach events at ~30% and ~80% progress, (2) Real-time alerts appear in LogisticsController Alert panel, (3) Temperature chart shows visible spikes, (4) Quality decay is visible in final score (85-90%), (5) Consumer can see impact on quality. Use this to demonstrate cold chain monitoring and alert capabilities."
+}
