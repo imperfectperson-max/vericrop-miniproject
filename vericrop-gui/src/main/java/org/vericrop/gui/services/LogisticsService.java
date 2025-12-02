@@ -23,8 +23,12 @@ public class LogisticsService {
     private static final double DEST_LAT = 42.3736;
     private static final double DEST_LON = -71.1097;
     
-    // Update interval for map position (seconds)
-    private static final int UPDATE_INTERVAL_SECONDS = 10;
+    // Update interval for map position (milliseconds) - default 3 seconds for 2-minute presentations
+    // This provides ~40 updates for a 2-minute simulation, giving smooth map animation
+    private static final int DEFAULT_UPDATE_INTERVAL_MS = 3000;
+    
+    // Minimum number of updates for any simulation (ensures smooth animation)
+    private static final int MIN_UPDATES = 40;
     
     public LogisticsService() {
         this.producer = new MapSimulationEventProducer();
@@ -108,6 +112,15 @@ public class LogisticsService {
         long startTime = System.currentTimeMillis();
         long endTime = startTime + duration.toMillis();
         
+        // Calculate update interval to ensure smooth animation
+        // For 2-minute simulation: 120000ms / 40 updates = 3000ms per update
+        long updateIntervalMs = Math.min(DEFAULT_UPDATE_INTERVAL_MS, 
+                                          duration.toMillis() / MIN_UPDATES);
+        // Ensure at least 1 second between updates
+        updateIntervalMs = Math.max(updateIntervalMs, 1000);
+        
+        System.out.println("🗺️ Map simulation config: duration=" + duration.toSeconds() + "s, updateInterval=" + updateIntervalMs + "ms");
+        
         // Publish start event with initial environmental data
         publishMapEvent(batchId, ORIGIN_LAT, ORIGIN_LON, "Farm Location", 0.0, "STARTED", 4.0, 65.0);
         
@@ -137,7 +150,7 @@ public class LogisticsService {
             publishMapEvent(batchId, currentLat, currentLon, locationName, progress, status, temperature, humidity);
             
             // Wait for next update
-            Thread.sleep(UPDATE_INTERVAL_SECONDS * 1000);
+            Thread.sleep(updateIntervalMs);
         }
         
         // Publish final event
@@ -160,21 +173,34 @@ public class LogisticsService {
     }
     
     /**
-     * Get location name based on progress
+     * Get location name based on progress.
+     * Provides detailed waypoint names suitable for 2-minute presentation scenarios.
      */
     private String getLocationName(double progress) {
-        if (progress < 0.1) {
-            return "Farm Location";
-        } else if (progress < 0.3) {
-            return "Highway - Mile 10";
-        } else if (progress < 0.5) {
-            return "Highway - Mile 30";
-        } else if (progress < 0.7) {
-            return "Highway - Mile 50";
-        } else if (progress < 0.9) {
-            return "Distribution Center Entrance";
+        if (progress < 0.05) {
+            return "Farm Packaging Center";
+        } else if (progress < 0.10) {
+            return "Quality Check Station";
+        } else if (progress < 0.15) {
+            return "Farm Exit Gate";
+        } else if (progress < 0.25) {
+            return "County Road Section";
+        } else if (progress < 0.35) {
+            return "Highway Entry Point";
+        } else if (progress < 0.45) {
+            return "Highway - Mile 5";
+        } else if (progress < 0.55) {
+            return "Cold Hub Approach";
+        } else if (progress < 0.65) {
+            return "Cold Hub Intake";
+        } else if (progress < 0.75) {
+            return "Hub Quality Rescan";
+        } else if (progress < 0.85) {
+            return "City Highway Entry";
+        } else if (progress < 0.95) {
+            return "Downtown Approach";
         } else {
-            return "Warehouse";
+            return "Warehouse Receiving Dock";
         }
     }
     

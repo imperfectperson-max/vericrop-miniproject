@@ -11,7 +11,7 @@ public class TemperatureScenario {
     private String id;
     private String description;
     private TargetRange target;
-    private int durationMinutes;
+    private double durationMinutes;
     private List<TemperatureSpike> spikes;
     
     public TemperatureScenario() {}
@@ -26,15 +26,15 @@ public class TemperatureScenario {
     public void setTarget(TargetRange target) { this.target = target; }
     
     @JsonProperty("duration_minutes")
-    public int getDurationMinutes() { return durationMinutes; }
-    public void setDurationMinutes(int durationMinutes) { this.durationMinutes = durationMinutes; }
+    public double getDurationMinutes() { return durationMinutes; }
+    public void setDurationMinutes(double durationMinutes) { this.durationMinutes = durationMinutes; }
     
     public List<TemperatureSpike> getSpikes() { return spikes; }
     public void setSpikes(List<TemperatureSpike> spikes) { this.spikes = spikes; }
     
     @Override
     public String toString() {
-        return String.format("TemperatureScenario{id='%s', target=%.1f-%.1f°C, duration=%dmin, spikes=%d}",
+        return String.format("TemperatureScenario{id='%s', target=%.1f-%.1f°C, duration=%.1fmin, spikes=%d}",
                 id, target != null ? target.getMin() : 0, target != null ? target.getMax() : 0, 
                 durationMinutes, spikes != null ? spikes.size() : 0);
     }
@@ -78,30 +78,43 @@ public class TemperatureScenario {
     }
     
     /**
-     * Represents a planned temperature spike in the scenario
+     * Represents a planned temperature spike in the scenario.
+     * Uses double for atMinute and durationMinutes to support fractional minutes
+     * needed for short 2-minute presentation scenarios.
      */
     public static class TemperatureSpike {
-        private int atMinute;
-        private int durationMinutes;
+        private double atMinute;
+        private double durationMinutes;
         private double temperature;
+        private String description;
         
         public TemperatureSpike() {}
         
-        public TemperatureSpike(int atMinute, int durationMinutes, double temperature) {
+        public TemperatureSpike(double atMinute, double durationMinutes, double temperature) {
             this.atMinute = atMinute;
             this.durationMinutes = durationMinutes;
             this.temperature = temperature;
         }
         
+        public TemperatureSpike(double atMinute, double durationMinutes, double temperature, String description) {
+            this.atMinute = atMinute;
+            this.durationMinutes = durationMinutes;
+            this.temperature = temperature;
+            this.description = description;
+        }
+        
         @JsonProperty("at_minute")
-        public int getAtMinute() { return atMinute; }
-        public void setAtMinute(int atMinute) { this.atMinute = atMinute; }
+        public double getAtMinute() { return atMinute; }
+        public void setAtMinute(double atMinute) { this.atMinute = atMinute; }
         
         @JsonProperty("duration_minutes")
-        public int getDurationMinutes() { return durationMinutes; }
-        public void setDurationMinutes(int durationMinutes) { this.durationMinutes = durationMinutes; }
+        public double getDurationMinutes() { return durationMinutes; }
+        public void setDurationMinutes(double durationMinutes) { this.durationMinutes = durationMinutes; }
         
         public double getTemperature() { return temperature; }
         public void setTemperature(double temperature) { this.temperature = temperature; }
+        
+        public String getDescription() { return description; }
+        public void setDescription(String description) { this.description = description; }
     }
 }
