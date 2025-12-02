@@ -11,7 +11,7 @@ public class TemperatureScenario {
     private String id;
     private String description;
     private TargetRange target;
-    private int durationMinutes;
+    private double durationMinutes;
     private List<TemperatureSpike> spikes;
     
     public TemperatureScenario() {}
@@ -26,15 +26,15 @@ public class TemperatureScenario {
     public void setTarget(TargetRange target) { this.target = target; }
     
     @JsonProperty("duration_minutes")
-    public int getDurationMinutes() { return durationMinutes; }
-    public void setDurationMinutes(int durationMinutes) { this.durationMinutes = durationMinutes; }
+    public double getDurationMinutes() { return durationMinutes; }
+    public void setDurationMinutes(double durationMinutes) { this.durationMinutes = durationMinutes; }
     
     public List<TemperatureSpike> getSpikes() { return spikes; }
     public void setSpikes(List<TemperatureSpike> spikes) { this.spikes = spikes; }
     
     @Override
     public String toString() {
-        return String.format("TemperatureScenario{id='%s', target=%.1f-%.1f°C, duration=%dmin, spikes=%d}",
+        return String.format("TemperatureScenario{id='%s', target=%.1f-%.1f°C, duration=%.1fmin, spikes=%d}",
                 id, target != null ? target.getMin() : 0, target != null ? target.getMax() : 0, 
                 durationMinutes, spikes != null ? spikes.size() : 0);
     }
@@ -94,6 +94,13 @@ public class TemperatureScenario {
             this.atMinute = atMinute;
             this.durationMinutes = durationMinutes;
             this.temperature = temperature;
+        }
+        
+        public TemperatureSpike(double atMinute, double durationMinutes, double temperature, String description) {
+            this.atMinute = atMinute;
+            this.durationMinutes = durationMinutes;
+            this.temperature = temperature;
+            this.description = description;
         }
         
         @JsonProperty("at_minute")
