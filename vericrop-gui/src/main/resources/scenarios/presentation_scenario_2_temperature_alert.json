@@ -1,0 +1,23 @@
+{
+  "id": "presentation_scenario_2_temperature_alert",
+  "description": "Temperature alert demo - features temperature spikes that trigger alerts",
+  "target": {
+    "min": 2.0,
+    "max": 8.0
+  },
+  "duration_minutes": 2,
+  "spikes": [
+    {
+      "at_minute": 0.4,
+      "duration_minutes": 0.3,
+      "temperature": 8.5,
+      "description": "Highway traffic jam - cooling system stressed"
+    },
+    {
+      "at_minute": 1.3,
+      "duration_minutes": 0.3,
+      "temperature": 9.0,
+      "description": "Urban heat island effect - external temperature spike"
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "id": "presentation_scenario_3_quality_journey",
+  "description": "Quality journey demo - complete product traceability with quality checkpoints",
+  "target": {
+    "min": 2.0,
+    "max": 8.0
+  },
+  "duration_minutes": 2,
+  "spikes": [
+    {
+      "at_minute": 0.7,
+      "duration_minutes": 0.2,
+      "temperature": 5.5,
+      "description": "Minor temperature rise during highway transit - within safe limits"
+    }
+  ]
+}

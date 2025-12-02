@@ -78,30 +78,36 @@ public class TemperatureScenario {
     }
     
     /**
-     * Represents a planned temperature spike in the scenario
+     * Represents a planned temperature spike in the scenario.
+     * Uses double for atMinute and durationMinutes to support fractional minutes
+     * needed for short 2-minute presentation scenarios.
      */
     public static class TemperatureSpike {
-        private int atMinute;
-        private int durationMinutes;
+        private double atMinute;
+        private double durationMinutes;
         private double temperature;
+        private String description;
         
         public TemperatureSpike() {}
         
-        public TemperatureSpike(int atMinute, int durationMinutes, double temperature) {
+        public TemperatureSpike(double atMinute, double durationMinutes, double temperature) {
             this.atMinute = atMinute;
             this.durationMinutes = durationMinutes;
             this.temperature = temperature;
         }
         
         @JsonProperty("at_minute")
-        public int getAtMinute() { return atMinute; }
-        public void setAtMinute(int atMinute) { this.atMinute = atMinute; }
+        public double getAtMinute() { return atMinute; }
+        public void setAtMinute(double atMinute) { this.atMinute = atMinute; }
         
         @JsonProperty("duration_minutes")
-        public int getDurationMinutes() { return durationMinutes; }
-        public void setDurationMinutes(int durationMinutes) { this.durationMinutes = durationMinutes; }
+        public double getDurationMinutes() { return durationMinutes; }
+        public void setDurationMinutes(double durationMinutes) { this.durationMinutes = durationMinutes; }
         
         public double getTemperature() { return temperature; }
         public void setTemperature(double temperature) { this.temperature = temperature; }
+        
+        public String getDescription() { return description; }
+        public void setDescription(String description) { this.description = description; }
     }
 }

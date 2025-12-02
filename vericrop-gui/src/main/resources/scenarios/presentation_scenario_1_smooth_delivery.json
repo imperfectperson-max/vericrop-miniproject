@@ -1,0 +1,10 @@
+{
+  "id": "presentation_scenario_1_smooth_delivery",
+  "description": "Smooth cold-chain delivery - stable temperatures within optimal range",
+  "target": {
+    "min": 2.0,
+    "max": 8.0
+  },
+  "duration_minutes": 2,
+  "spikes": []
+}
