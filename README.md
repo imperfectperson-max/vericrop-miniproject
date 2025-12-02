@@ -899,7 +899,122 @@ Apache Airflow workflow orchestration:
 Docker configurations and compose files:
 - `docker-compose.yml`: Complete stack (PostgreSQL, Kafka, ML Service, Airflow)
 - `docker-compose-kafka.yml`: Kafka-only setup
+- `docker-compose-simulation.yml`: Multi-instance simulation environment
 - `ml-service/Dockerfile`: ML service container
+
+## Multi-Instance Simulation Scenarios
+
+VeriCrop includes end-to-end simulation scenarios that demonstrate multiple instances (3) of each controller type running in parallel. Each scenario runs for approximately 2 minutes and integrates Kafka for messaging and Airflow for orchestration.
+
+### Scenarios
+
+| Scenario | Description | Expected Outcome |
+|----------|-------------|------------------|
+| **Normal Transit** | All shipments complete successfully | High final quality (>90%) for all batches |
+| **Temperature Breach** | One shipment exceeds temperature thresholds | Alerts triggered, quality degradation on affected batch |
+| **Route Disruption** | Simulated delay affects one delivery | Extended transit time, moderate quality impact |
+
+### Quick Start (2 minutes)
+
+```bash
+# Start infrastructure (Kafka, PostgreSQL, Airflow)
+docker-compose -f docker-compose-simulation.yml up -d
+
+# Run normal scenario (default: 2 minutes)
+./scripts/run-multi-instance-simulation.sh normal
+
+# Run temperature breach scenario
+./scripts/run-multi-instance-simulation.sh temperature_breach
+
+# Run route disruption scenario
+./scripts/run-multi-instance-simulation.sh route_disruption
+
+# Run all scenarios sequentially
+./scripts/run-multi-instance-simulation.sh all
+```
+
+### Configuration Options
+
+```bash
+# Custom duration (in seconds)
+./scripts/run-multi-instance-simulation.sh normal --duration 90
+
+# Custom number of instances
+./scripts/run-multi-instance-simulation.sh normal --instances 5
+
+# Use existing Kafka (don't start Docker)
+./scripts/run-multi-instance-simulation.sh normal --no-docker
+
+# Trigger via Airflow DAG
+./scripts/run-multi-instance-simulation.sh normal --airflow
+```
+
+### Airflow DAGs
+
+Three DAGs are available in the Airflow UI (`http://localhost:8080`):
+- `vericrop_multi_instance_normal`
+- `vericrop_multi_instance_temperature_breach`
+- `vericrop_multi_instance_route_disruption`
+
+Each DAG follows this workflow:
+1. **Initialize Scenario** - Create batch configurations
+2. **Start Producers** - Publish batch creation events
+3. **Start Simulation Control** - Broadcast start events to all instances
+4. **Simulate Logistics Updates** - Publish map/temperature events for 2 minutes
+5. **Stop Simulation Control** - Broadcast stop events
+6. **Compute Final Quality** - Aggregate quality scores across instances
+7. **Generate Report** - Create scenario summary
+
+### Kafka Topics
+
+| Topic | Purpose |
+|-------|---------|
+| `simulation-control` | Start/stop simulation commands |
+| `map-simulation` | Map position and location updates |
+| `temperature-compliance` | Temperature monitoring events |
+| `quality-alerts` | Temperature breach and delay alerts |
+| `batch-updates` | Batch creation and status updates |
+| `instance-registry` | Instance heartbeats for coordination |
+
+### GUI Features During Simulation
+
+During simulation runtime, the GUI displays:
+
+**LogisticsController:**
+- Timeline with real-time shipment events
+- Active Shipments table with status and ETA
+- Live Route Mapping with animated markers
+- Temperature monitoring chart
+- Alert banners for breaches and delays
+
+**ConsumerController:**
+- Product Journey visualization (4-step timeline)
+- Final Quality score with grade (PRIME/STANDARD/REJECT)
+- Average temperature during transit
+
+**ProducerController:**
+- Batch creation with quality metrics
+- Simulation control buttons (Start/Stop)
+- Dashboard with KPIs
+
+### Verification
+
+After running a simulation, verify the results:
+
+```bash
+# Verify normal scenario (mock data for testing without Kafka)
+python scripts/verify-simulation.py --scenario normal --mock
+
+# Verify with Kafka connection
+python scripts/verify-simulation.py --scenario temperature_breach
+
+# Save report to file
+python scripts/verify-simulation.py --scenario route_disruption --output report.json
+```
+
+### Documentation
+
+See [docs/simulation_notes.md](docs/simulation_notes.md) for detailed implementation notes.
 
 ## Quickstart
 

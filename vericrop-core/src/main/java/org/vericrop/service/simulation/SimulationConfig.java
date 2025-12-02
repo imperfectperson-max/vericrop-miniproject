@@ -172,6 +172,47 @@ public class SimulationConfig {
             .build();
     }
     
+    /**
+     * Simulated route duration in milliseconds (30 minutes of simulated time).
+     * This is the base duration that presentation mode scales into the real-time duration.
+     */
+    public static final long SIMULATED_ROUTE_DURATION_MS = 30 * 60 * 1000L;
+    
+    /**
+     * Get configuration for presentation mode (~2 minutes total).
+     * Designed for multi-instance simulation demonstrations with
+     * 3 instances of each controller type running in parallel.
+     */
+    public static SimulationConfig forPresentation() {
+        return new Builder()
+            .simulationDurationMs(120_000L) // 2 minutes
+            .timeScale(15.0) // 15x speed for faster completion
+            .interpolationIntervalMs(200L)
+            .waypointsPerSegment(24) // 24 waypoints for smooth animation
+            .progressUpdateIntervalMs(1000L)
+            .approachingThreshold(85.0) // Enter APPROACHING at 85%
+            .build();
+    }
+    
+    /**
+     * Get configuration with custom duration for presentation mode.
+     * @param durationSeconds Duration in seconds (default: 120)
+     * @return SimulationConfig configured for the specified duration
+     */
+    public static SimulationConfig forPresentation(int durationSeconds) {
+        // Calculate time scale to fit simulated route duration into the specified duration
+        double timeScale = (double) SIMULATED_ROUTE_DURATION_MS / (durationSeconds * 1000.0);
+        
+        return new Builder()
+            .simulationDurationMs(durationSeconds * 1000L)
+            .timeScale(timeScale)
+            .interpolationIntervalMs(200L)
+            .waypointsPerSegment(Math.max(12, durationSeconds / 5)) // Scale waypoints
+            .progressUpdateIntervalMs(1000L)
+            .approachingThreshold(85.0)
+            .build();
+    }
+    
     // Getters
     
     public long getSimulationDurationMs() {

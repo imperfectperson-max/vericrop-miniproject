@@ -185,4 +185,40 @@ public class SimulationConfigStateTest {
             prevState = currentState;
         }
     }
+    
+    @Test
+    public void testPresentationConfigDefaults() {
+        SimulationConfig presentationConfig = SimulationConfig.forPresentation();
+        
+        // Presentation mode should have 2-minute duration (120,000 ms)
+        assertEquals(120_000L, presentationConfig.getSimulationDurationMs());
+        
+        // Presentation should have 15x time scale for faster completion
+        assertEquals(15.0, presentationConfig.getTimeScale(), 0.01);
+        
+        // Presentation should have 85% approaching threshold
+        assertEquals(85.0, presentationConfig.getApproachingThreshold(), 0.01);
+        
+        // Presentation should have 24 waypoints
+        assertEquals(24, presentationConfig.getWaypointsPerSegment());
+    }
+    
+    @Test
+    public void testPresentationConfigWithCustomDuration() {
+        // Test 90-second presentation
+        SimulationConfig config90s = SimulationConfig.forPresentation(90);
+        assertEquals(90_000L, config90s.getSimulationDurationMs());
+        
+        // Test 180-second presentation
+        SimulationConfig config180s = SimulationConfig.forPresentation(180);
+        assertEquals(180_000L, config180s.getSimulationDurationMs());
+        
+        // Time scale should be calculated to fit 30 minutes of simulated time
+        // into the specified duration
+        // For 90s: scale = (30 * 60 * 1000) / (90 * 1000) = 20.0
+        assertEquals(20.0, config90s.getTimeScale(), 0.01);
+        
+        // For 180s: scale = (30 * 60 * 1000) / (180 * 1000) = 10.0
+        assertEquals(10.0, config180s.getTimeScale(), 0.01);
+    }
 }
