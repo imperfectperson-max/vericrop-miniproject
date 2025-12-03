@@ -417,8 +417,10 @@ public class ConsumerController implements SimulationListener {
                 String location = event.getLocationName();
                 String status = event.getStatus();
                 
-                // Skip if progress hasn't increased (prevent backward updates)
-                if (currentBatchId != null && currentBatchId.equals(batchId) && progressPercent <= lastProgress) {
+                // Skip backward progress updates (prevent restart issues)
+                // Use strict less-than to allow events at the same progress level to update
+                // temperature, location, and other fields
+                if (currentBatchId != null && currentBatchId.equals(batchId) && progressPercent < lastProgress) {
                     return;
                 }
                 
@@ -460,10 +462,15 @@ public class ConsumerController implements SimulationListener {
                 }
                 
                 // Update temperature display from event
-                if (temperatureLabel != null && event.getTemperature() != 0.0) {
-                    temperatureLabel.setText(String.format("%.1f°C", event.getTemperature()));
+                // Check if temperature data appears to be initialized (cold chain typically operates between 2-12°C)
+                // A value of exactly 0.0 with humidity also at 0.0 likely indicates uninitialized data
+                double temp = event.getTemperature();
+                double humidity = event.getHumidity();
+                boolean hasValidTempData = !(temp == 0.0 && humidity == 0.0);
+                
+                if (temperatureLabel != null && hasValidTempData) {
+                    temperatureLabel.setText(String.format("%.1f°C", temp));
                     // Color based on temperature compliance (2-8°C is optimal for cold chain)
-                    double temp = event.getTemperature();
                     if (temp >= 2.0 && temp <= 8.0) {
                         temperatureLabel.setStyle("-fx-text-fill: #10b981;"); // Green - compliant
                     } else if (temp < 2.0 || temp > 10.0) {

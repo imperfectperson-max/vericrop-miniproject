@@ -68,9 +68,8 @@ public final class ShipmentStatus {
             return AT_WAREHOUSE;
         } else if (progressPercent >= PROGRESS_APPROACHING_THRESHOLD) {
             return APPROACHING_DESTINATION;
-        } else if (progressPercent >= PROGRESS_EN_ROUTE_THRESHOLD) {
-            return IN_TRANSIT;
         } else if (progressPercent >= PROGRESS_DEPARTING_THRESHOLD) {
+            // From 10% to 70% - both departing and en route phases are IN_TRANSIT
             return IN_TRANSIT;
         } else {
             return CREATED;
@@ -116,8 +115,12 @@ public final class ShipmentStatus {
      * Normalize a status string to a canonical form.
      * Handles various formats from different sources (Kafka events, UI, etc.).
      * 
+     * <p>For recognized statuses, returns the canonical uppercase constant.
+     * For unrecognized statuses, returns the original string as-is to preserve
+     * new/unknown statuses from future features or external systems.</p>
+     * 
      * @param status Status string to normalize
-     * @return Normalized status string
+     * @return Normalized status string (canonical constant or original if not recognized)
      */
     public static String normalize(String status) {
         if (status == null || status.trim().isEmpty()) {
@@ -126,7 +129,7 @@ public final class ShipmentStatus {
         
         String normalized = status.trim().toUpperCase().replace(" ", "_").replace("-", "_");
         
-        // Map common variations
+        // Map common variations to canonical constants
         switch (normalized) {
             case "DELIVERED":
             case "COMPLETE":
@@ -163,7 +166,9 @@ public final class ShipmentStatus {
             case "ABORTED":
                 return STOPPED;
             default:
-                return status; // Return as-is if no match
+                // Return original string as-is to preserve unknown statuses
+                // from new features or external systems
+                return status;
         }
     }
 }

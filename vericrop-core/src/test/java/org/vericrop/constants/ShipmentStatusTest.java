@@ -31,9 +31,12 @@ class ShipmentStatusTest {
     
     @Test
     void testFromProgress_inTransit() {
-        assertEquals(ShipmentStatus.IN_TRANSIT, ShipmentStatus.fromProgress(30.0));
-        assertEquals(ShipmentStatus.IN_TRANSIT, ShipmentStatus.fromProgress(50.0));
-        assertEquals(ShipmentStatus.IN_TRANSIT, ShipmentStatus.fromProgress(69.9));
+        // Both departing (10-30%) and en route (30-70%) phases map to IN_TRANSIT
+        assertEquals(ShipmentStatus.IN_TRANSIT, ShipmentStatus.fromProgress(10.0)); // Departing threshold
+        assertEquals(ShipmentStatus.IN_TRANSIT, ShipmentStatus.fromProgress(15.0)); // Departing phase
+        assertEquals(ShipmentStatus.IN_TRANSIT, ShipmentStatus.fromProgress(30.0)); // En route threshold
+        assertEquals(ShipmentStatus.IN_TRANSIT, ShipmentStatus.fromProgress(50.0)); // En route phase
+        assertEquals(ShipmentStatus.IN_TRANSIT, ShipmentStatus.fromProgress(69.9)); // Just before approaching
     }
     
     @Test
