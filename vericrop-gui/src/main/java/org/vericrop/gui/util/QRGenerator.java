@@ -11,9 +11,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -26,6 +28,15 @@ public class QRGenerator {
     private static final Logger logger = LoggerFactory.getLogger(QRGenerator.class);
     private static final String QR_OUTPUT_DIR = "generated_qr";
     private static final int DEFAULT_QR_SIZE = 300;
+    
+    /** Current version of the QR payload format */
+    public static final int QR_FORMAT_VERSION = 1;
+    
+    /** Type identifier for batch QR codes */
+    public static final String TYPE_VERICROP_BATCH = "vericrop-batch";
+    
+    /** Type identifier for legacy product QR codes */
+    public static final String TYPE_PRODUCT = "product";
     
     /**
      * Generate a QR code for a product with the given ID.
@@ -59,6 +70,124 @@ public class QRGenerator {
         
         String fileName = String.format("product_%s.png", productId);
         return generateQRCode(payload, fileName, size);
+    }
+    
+    /**
+     * Generate a versioned QR code for a batch with quality information.
+     * Uses a stable, versioned JSON format for forward compatibility.
+     * 
+     * <p>The QR payload format (v1):</p>
+     * <pre>
+     * {
+     *   "type": "vericrop-batch",
+     *   "version": 1,
+     *   "batchId": "BATCH_123",
+     *   "seed": "farmer_id",
+     *   "quality": "PRIME",
+     *   "timestamp": "2024-01-01T12:00:00Z"
+     * }
+     * </pre>
+     * 
+     * @param batchId The unique batch ID
+     * @param farmerId The farmer/producer ID
+     * @param quality The quality classification (e.g., "PRIME", "STANDARD", "SUB-STANDARD", or null for unknown)
+     * @return Path to the generated QR code PNG file
+     * @throws IOException if file creation fails
+     * @throws WriterException if QR encoding fails
+     */
+    public static Path generateBatchQR(String batchId, String farmerId, String quality) throws IOException, WriterException {
+        return generateBatchQR(batchId, farmerId, quality, DEFAULT_QR_SIZE);
+    }
+    
+    /**
+     * Generate a versioned QR code for a batch with quality information and custom size.
+     * 
+     * @param batchId The unique batch ID
+     * @param farmerId The farmer/producer ID
+     * @param quality The quality classification (e.g., "PRIME", "STANDARD", "SUB-STANDARD", or null for unknown)
+     * @param size The width and height of the QR code in pixels
+     * @return Path to the generated QR code PNG file
+     * @throws IOException if file creation fails
+     * @throws WriterException if QR encoding fails
+     */
+    public static Path generateBatchQR(String batchId, String farmerId, String quality, int size) throws IOException, WriterException {
+        // Build the versioned JSON payload
+        String qualityValue = (quality != null && !quality.trim().isEmpty()) ? quality.trim() : null;
+        String timestamp = Instant.now().toString();
+        
+        // Create payload with stable, versioned JSON format
+        // Using explicit key order for consistency: type, version, batchId, seed, quality, timestamp
+        StringBuilder payloadBuilder = new StringBuilder();
+        payloadBuilder.append("{");
+        payloadBuilder.append("\"type\":\"").append(TYPE_VERICROP_BATCH).append("\",");
+        payloadBuilder.append("\"version\":").append(QR_FORMAT_VERSION).append(",");
+        payloadBuilder.append("\"batchId\":\"").append(escapeJsonString(batchId)).append("\",");
+        payloadBuilder.append("\"seed\":\"").append(escapeJsonString(farmerId != null ? farmerId : "unknown")).append("\",");
+        if (qualityValue != null) {
+            payloadBuilder.append("\"quality\":\"").append(escapeJsonString(qualityValue)).append("\",");
+        }
+        payloadBuilder.append("\"timestamp\":\"").append(timestamp).append("\"");
+        payloadBuilder.append("}");
+        
+        String payload = payloadBuilder.toString();
+        
+        // Ensure payload is UTF-8 encoded
+        byte[] utf8Bytes = payload.getBytes(StandardCharsets.UTF_8);
+        String utf8Payload = new String(utf8Bytes, StandardCharsets.UTF_8);
+        
+        String fileName = String.format("batch_%s.png", batchId);
+        
+        logger.info("Generating batch QR: batchId={}, quality={}, payload length={} chars", 
+            batchId, qualityValue != null ? qualityValue : "null", utf8Payload.length());
+        
+        return generateQRCode(utf8Payload, fileName, size);
+    }
+    
+    /**
+     * Escape special characters in a JSON string value.
+     * Handles quotes, backslashes, and control characters.
+     * 
+     * @param value The string value to escape
+     * @return The escaped string safe for JSON embedding
+     */
+    private static String escapeJsonString(String value) {
+        if (value == null) {
+            return "";
+        }
+        StringBuilder escaped = new StringBuilder();
+        for (char c : value.toCharArray()) {
+            switch (c) {
+                case '"':
+                    escaped.append("\\\"");
+                    break;
+                case '\\':
+                    escaped.append("\\\\");
+                    break;
+                case '\b':
+                    escaped.append("\\b");
+                    break;
+                case '\f':
+                    escaped.append("\\f");
+                    break;
+                case '\n':
+                    escaped.append("\\n");
+                    break;
+                case '\r':
+                    escaped.append("\\r");
+                    break;
+                case '\t':
+                    escaped.append("\\t");
+                    break;
+                default:
+                    if (c < ' ') {
+                        // Control characters as unicode escape
+                        escaped.append(String.format("\\u%04x", (int) c));
+                    } else {
+                        escaped.append(c);
+                    }
+            }
+        }
+        return escaped.toString();
     }
     
     /**

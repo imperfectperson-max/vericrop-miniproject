@@ -665,11 +665,25 @@ public class ConsumerController implements SimulationListener {
             try {
                 // Decode the QR code from the image
                 String qrContent = QRDecoder.decodeQRCode(selectedFile);
+                logger.info("Decoded QR content from {}: {} characters", selectedFile.getName(), qrContent.length());
                 
-                // Try to extract batch ID using the QRDecoder first
-                String batchId = QRDecoder.extractBatchId(qrContent);
+                // Parse the QR payload to extract batch ID and quality
+                QRDecoder.QRPayload payload = QRDecoder.parsePayload(qrContent);
                 
-                // If extractBatchId returns null or empty, try fallback parsing
+                String batchId = null;
+                String quality = null;
+                
+                if (payload != null) {
+                    batchId = payload.getBatchId();
+                    quality = payload.getQuality();
+                    logger.info("Parsed QR payload: type={}, batchId={}, quality={}", 
+                        payload.getType(), batchId, quality);
+                }
+                
+                // If parsing failed, try fallback extraction
+                if (batchId == null || batchId.trim().isEmpty()) {
+                    batchId = QRDecoder.extractBatchId(qrContent);
+                }
                 if (batchId == null || batchId.trim().isEmpty()) {
                     batchId = extractBatchIdFallback(qrContent);
                 }
@@ -678,19 +692,23 @@ public class ConsumerController implements SimulationListener {
                     // Set the batch ID in the text field
                     batchIdField.setText(batchId);
                     
-                    // Automatically verify the batch
-                    verifyBatch(batchId);
+                    // Verify the batch with quality information from QR
+                    verifyBatchWithQuality(batchId, quality);
                 } else {
+                    logger.warn("Could not extract batch ID from QR content");
                     showAlert(Alert.AlertType.WARNING, "Invalid QR Code", 
                         "Could not extract batch ID from the QR code.");
                 }
             } catch (NotFoundException e) {
+                logger.warn("No QR code found in image: {}", selectedFile.getAbsolutePath());
                 showAlert(Alert.AlertType.ERROR, "QR Code Not Found", 
                     "No QR code was found in the selected image. Please select an image containing a valid QR code.");
             } catch (IOException e) {
+                logger.error("Failed to read QR image file: {}", e.getMessage());
                 showAlert(Alert.AlertType.ERROR, "File Error", 
                     "Failed to read the image file: " + e.getMessage());
             } catch (Exception e) {
+                logger.error("Unexpected error reading QR code: {}", e.getMessage(), e);
                 showAlert(Alert.AlertType.ERROR, "Error Reading QR Code", 
                     "An unexpected error occurred while reading the QR code: " + e.getMessage());
             }
@@ -810,6 +828,19 @@ public class ConsumerController implements SimulationListener {
     }
 
     private void verifyBatch(String batchId) {
+        // Delegate to verifyBatchWithQuality with null quality (will be fetched from backend or use fallback)
+        verifyBatchWithQuality(batchId, null);
+    }
+    
+    /**
+     * Verify a batch with optional quality information from QR code.
+     * The QR-provided quality is used if available, otherwise quality is fetched from backend
+     * or determined using fallback logic.
+     * 
+     * @param batchId The batch ID to verify
+     * @param qrQuality Quality from QR code (may be null if not available)
+     */
+    private void verifyBatchWithQuality(String batchId, String qrQuality) {
         // Validation: if batchId non-empty -> attempt verification
         if (batchId == null || batchId.trim().isEmpty()) {
             showAlert(Alert.AlertType.WARNING, "Invalid Input", "Batch ID cannot be empty");
@@ -817,6 +848,13 @@ public class ConsumerController implements SimulationListener {
         }
 
         String trimmedBatchId = batchId.trim();
+        
+        // Log QR quality if available
+        if (qrQuality != null && !qrQuality.trim().isEmpty()) {
+            logger.info("Verifying batch {} with QR quality: {}", trimmedBatchId, qrQuality);
+        } else {
+            logger.info("Verifying batch {} (no quality from QR)", trimmedBatchId);
+        }
         
         // Check if batch ID exists in knownBatchIds (case-insensitive) - for demo mode
         if (shouldLoadDemoData() && !knownBatchIds.isEmpty()) {
@@ -838,14 +876,18 @@ public class ConsumerController implements SimulationListener {
             }
         }
 
-        // Variables for batch info
-        String productName;
-        String quality;
-        String origin;
-        double qualityScore;
+        // Variables for batch info - initialize with defaults
+        String productName = "Unknown Product";
+        String quality = null;
+        String origin = "Unknown Origin";
+        double qualityScore = 0.0;
         double primeRate = 0.0;
         double rejectionRate = 0.0;
         boolean realDataFetched = false;
+        boolean qualityFromQR = false;
+        
+        // Use QR quality if available and valid
+        String effectiveQrQuality = (qrQuality != null && !qrQuality.trim().isEmpty()) ? qrQuality.trim() : null;
         
         // If NOT in demo mode, try to fetch real batch data from backend
         if (!shouldLoadDemoData()) {
@@ -864,8 +906,12 @@ public class ConsumerController implements SimulationListener {
                 primeRate = safeGetDouble(batchData, "prime_rate", 0.0) * 100.0;
                 rejectionRate = safeGetDouble(batchData, "rejection_rate", 0.0) * 100.0;
                 
-                // Determine quality classification
-                if (qualityScore >= 80) {
+                // Determine quality classification - prefer QR quality, then compute from score
+                if (effectiveQrQuality != null) {
+                    quality = effectiveQrQuality;
+                    qualityFromQR = true;
+                    logger.info("Using quality from QR: {}", quality);
+                } else if (qualityScore >= 80) {
                     quality = "PRIME";
                 } else if (qualityScore >= 60) {
                     quality = "STANDARD";
@@ -880,7 +926,7 @@ public class ConsumerController implements SimulationListener {
                 updateJourneyForVerifiedBatch(trimmedBatchId, batchData);
             } else if (fetchResult.isNotFound()) {
                 // Backend explicitly returned 404 - batch does not exist
-                System.out.println("Batch NOT FOUND in backend (404): " + trimmedBatchId);
+                logger.warn("Batch NOT FOUND in backend (404): {}", trimmedBatchId);
                 showAlert(Alert.AlertType.WARNING, "Batch ID Not Found", 
                     "The batch ID '" + batchId + "' was not found in the backend system.");
                 
@@ -896,41 +942,67 @@ public class ConsumerController implements SimulationListener {
                 // Do NOT mark as verified, do NOT update UI
                 return;
             } else {
-                // Backend unavailable - use fallback verification
-                System.out.println("Backend UNAVAILABLE for batch: " + trimmedBatchId + " - using fallback verification");
+                // Backend unavailable - use fallback verification with QR quality if available
+                logger.warn("Backend UNAVAILABLE for batch: {} - using fallback verification", trimmedBatchId);
                 showAlert(Alert.AlertType.WARNING, "Backend Unavailable", 
                     "Backend unavailable - using fallback verification.");
                 productName = "Product (Batch " + batchId + ")";
-                quality = "VERIFIED";
                 qualityScore = 85.0;
                 origin = "Farm Network";
+                
+                // Use QR quality or default
+                if (effectiveQrQuality != null) {
+                    quality = effectiveQrQuality;
+                    qualityFromQR = true;
+                    logger.info("Using quality from QR (fallback mode): {}", quality);
+                } else {
+                    quality = "VERIFIED";
+                }
             }
         } else {
-            // Demo mode - use mock data patterns
+            // Demo mode - use mock data patterns, but prefer QR quality if available
+            if (effectiveQrQuality != null) {
+                quality = effectiveQrQuality;
+                qualityFromQR = true;
+            }
+            
             if (trimmedBatchId.toUpperCase().contains("A")) {
                 productName = "Summer Apples (demo)";
-                quality = "PRIME";
+                if (!qualityFromQR) quality = "PRIME";
                 qualityScore = 92.0;
                 origin = "Sunny Valley Orchards (demo)";
             } else if (trimmedBatchId.toUpperCase().contains("B")) {
                 productName = "Organic Carrots (demo)";
-                quality = "PRIME";
+                if (!qualityFromQR) quality = "PRIME";
                 qualityScore = 88.0;
                 origin = "Green Fields Farm (demo)";
             } else {
                 productName = "Mixed Vegetables (demo)";
-                quality = "STANDARD";
+                if (!qualityFromQR) quality = "STANDARD";
                 qualityScore = 85.0;
                 origin = "Valley Fresh Farms (demo)";
             }
         }
 
-        // Build verification result message
+        // Build verification result message - include quality with "Unknown" fallback
+        String displayQuality = (quality != null && !quality.trim().isEmpty()) ? quality : "Unknown";
+        
         StringBuilder verificationResult = new StringBuilder();
         verificationResult.append("✅ VERIFIED: Batch ").append(batchId)
                 .append("\nProduct: ").append(productName)
-                .append("\nQuality: ").append(quality).append(" (").append(String.format("%.1f", qualityScore)).append("%)")
-                .append("\nOrigin: ").append(origin);
+                .append("\nQuality: ").append(displayQuality);
+        
+        // Add quality score if available
+        if (qualityScore > 0) {
+            verificationResult.append(" (").append(String.format("%.1f", qualityScore)).append("%)");
+        }
+        
+        // Indicate if quality came from QR code
+        if (qualityFromQR) {
+            verificationResult.append(" [from QR]");
+        }
+        
+        verificationResult.append("\nOrigin: ").append(origin);
         
         // Include prime/rejection rates if real data was fetched
         if (realDataFetched) {
@@ -943,14 +1015,15 @@ public class ConsumerController implements SimulationListener {
 
         showAlert(Alert.AlertType.INFORMATION, "Verification Complete", verificationResult.toString());
 
-        // Add to history with proper formatting including quality score
+        // Add to history with proper formatting including quality
         final String historyProductName = productName;
         final double historyQualityScore = qualityScore;
+        final String historyQuality = displayQuality;
         final boolean updateQualityUI = realDataFetched;
         String historyEntry = java.time.LocalDateTime.now().format(
                 java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) + 
-                ": " + batchId + " - ✅ VERIFIED (" + historyProductName + ", " + 
-                String.format("%.1f", historyQualityScore) + "%)";
+                ": " + batchId + " - ✅ VERIFIED (" + historyProductName + ", Quality: " + historyQuality + 
+                (historyQualityScore > 0 ? " " + String.format("%.1f", historyQualityScore) + "%" : "") + ")";
         
         Platform.runLater(() -> {
             verificationHistory.add(0, historyEntry);

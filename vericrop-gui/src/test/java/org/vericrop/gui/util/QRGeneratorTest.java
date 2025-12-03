@@ -118,6 +118,130 @@ class QRGeneratorTest {
         assertTrue(id1.contains("-"), "Product ID should be UUID format");
     }
     
+    // ========== Tests for versioned batch QR with quality ==========
+    
+    @Test
+    void testGenerateBatchQR_WithQuality() throws Exception {
+        String batchId = "BATCH_Q001";
+        String farmerId = "farmer_quality";
+        String quality = "PRIME";
+        
+        Path qrPath = QRGenerator.generateBatchQR(batchId, farmerId, quality);
+        
+        assertNotNull(qrPath, "QR code path should not be null");
+        assertTrue(Files.exists(qrPath), "QR code file should exist");
+        assertTrue(qrPath.toString().endsWith(".png"), "QR code should be PNG format");
+        assertTrue(qrPath.toString().contains("batch_"), "File name should start with batch_");
+        
+        // Verify QR code is scannable and contains expected fields
+        String decoded = decodeQRCode(qrPath);
+        assertNotNull(decoded, "QR code should be decodable");
+        assertTrue(decoded.contains("\"type\":\"vericrop-batch\""), "Should have vericrop-batch type");
+        assertTrue(decoded.contains("\"version\":1"), "Should have version 1");
+        assertTrue(decoded.contains("\"batchId\":\"" + batchId + "\""), "Should contain batch ID");
+        assertTrue(decoded.contains("\"quality\":\"" + quality + "\""), "Should contain quality");
+        assertTrue(decoded.contains("\"seed\":\"" + farmerId + "\""), "Should contain farmer ID as seed");
+        assertTrue(decoded.contains("\"timestamp\":"), "Should contain timestamp");
+    }
+    
+    @Test
+    void testGenerateBatchQR_WithNullQuality() throws Exception {
+        String batchId = "BATCH_NOQAL";
+        String farmerId = "farmer_noqal";
+        
+        Path qrPath = QRGenerator.generateBatchQR(batchId, farmerId, null);
+        
+        assertNotNull(qrPath, "QR code path should not be null");
+        assertTrue(Files.exists(qrPath), "QR code file should exist");
+        
+        // Verify QR code is scannable
+        String decoded = decodeQRCode(qrPath);
+        assertNotNull(decoded, "QR code should be decodable");
+        assertTrue(decoded.contains("\"batchId\":\"" + batchId + "\""), "Should contain batch ID");
+        assertFalse(decoded.contains("\"quality\":"), "Should NOT contain quality field when null");
+    }
+    
+    @Test
+    void testGenerateBatchQR_WithEmptyQuality() throws Exception {
+        String batchId = "BATCH_EMPTYQAL";
+        String farmerId = "farmer_emptyqal";
+        
+        Path qrPath = QRGenerator.generateBatchQR(batchId, farmerId, "   ");
+        
+        assertNotNull(qrPath, "QR code path should not be null");
+        assertTrue(Files.exists(qrPath), "QR code file should exist");
+        
+        // Verify QR code is scannable
+        String decoded = decodeQRCode(qrPath);
+        assertNotNull(decoded, "QR code should be decodable");
+        assertTrue(decoded.contains("\"batchId\":\"" + batchId + "\""), "Should contain batch ID");
+        assertFalse(decoded.contains("\"quality\":"), "Should NOT contain quality field when empty");
+    }
+    
+    @Test
+    void testGenerateBatchQR_AllQualityLevels() throws Exception {
+        String[] qualityLevels = {"PRIME", "STANDARD", "SUB-STANDARD"};
+        
+        for (String quality : qualityLevels) {
+            String batchId = "BATCH_" + quality.replace("-", "_");
+            String farmerId = "farmer_" + quality.toLowerCase();
+            
+            Path qrPath = QRGenerator.generateBatchQR(batchId, farmerId, quality);
+            
+            assertNotNull(qrPath, "QR code path should not be null for " + quality);
+            assertTrue(Files.exists(qrPath), "QR code file should exist for " + quality);
+            
+            String decoded = decodeQRCode(qrPath);
+            assertTrue(decoded.contains("\"quality\":\"" + quality + "\""), 
+                "Should contain correct quality level: " + quality);
+        }
+    }
+    
+    @Test
+    void testGenerateBatchQR_CustomSize() throws Exception {
+        String batchId = "BATCH_SIZE";
+        String farmerId = "farmer_size";
+        String quality = "PRIME";
+        int customSize = 400;
+        
+        Path qrPath = QRGenerator.generateBatchQR(batchId, farmerId, quality, customSize);
+        
+        assertNotNull(qrPath, "QR code path should not be null");
+        assertTrue(Files.exists(qrPath), "QR code file should exist");
+        
+        // Verify image dimensions
+        BufferedImage image = ImageIO.read(qrPath.toFile());
+        assertEquals(customSize, image.getWidth(), "QR code width should match requested size");
+        assertEquals(customSize, image.getHeight(), "QR code height should match requested size");
+    }
+    
+    @Test
+    void testGenerateBatchQR_UTF8Encoding() throws Exception {
+        // Test with UTF-8 characters
+        String batchId = "BATCH_UTF8";
+        String farmerId = "Farmer Café";
+        String quality = "PRIME";
+        
+        Path qrPath = QRGenerator.generateBatchQR(batchId, farmerId, quality);
+        
+        assertNotNull(qrPath, "QR code path should not be null");
+        assertTrue(Files.exists(qrPath), "QR code file should exist");
+        
+        String decoded = decodeQRCode(qrPath);
+        assertTrue(decoded.contains("Caf"), "Should properly encode UTF-8 characters");
+    }
+    
+    @Test
+    void testQRFormatVersion() {
+        assertEquals(1, QRGenerator.QR_FORMAT_VERSION, "QR format version should be 1");
+    }
+    
+    @Test
+    void testTypeConstants() {
+        assertEquals("vericrop-batch", QRGenerator.TYPE_VERICROP_BATCH, "TYPE_VERICROP_BATCH should match");
+        assertEquals("product", QRGenerator.TYPE_PRODUCT, "TYPE_PRODUCT should match");
+    }
+    
     /**
      * Helper method to decode a QR code from an image file
      */
