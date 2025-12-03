@@ -861,13 +861,21 @@ public class ConsumerController implements SimulationListener {
             boolean found = isKnownBatchId(trimmedBatchId);
             
             if (!found) {
-                showAlert(Alert.AlertType.WARNING, "Batch ID Not Found", 
-                    "The batch ID '" + batchId + "' was not found in our system.");
+                // Build actionable error message for demo mode
+                String errorMessage = String.format(
+                    "Scanned batch ID: %s\n\n" +
+                    "This batch was not found in demo mode.\n" +
+                    "Demo mode only recognizes pre-defined batch IDs.\n\n" +
+                    "To test with real batches, disable demo mode by removing\n" +
+                    "the VERICROP_LOAD_DEMO environment variable.",
+                    trimmedBatchId);
+                    
+                showAlert(Alert.AlertType.WARNING, "Batch ID Not Found", errorMessage);
                 
-                // Add failure entry to verification history
+                // Add failure entry to verification history with parsed batch ID
                 String failureEntry = java.time.LocalDateTime.now().format(
                         java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) + 
-                        ": " + batchId + " - ❌ NOT FOUND";
+                        ": " + trimmedBatchId + " - ❌ NOT FOUND (demo mode)";
                 
                 Platform.runLater(() -> {
                     verificationHistory.add(0, failureEntry);
@@ -927,13 +935,24 @@ public class ConsumerController implements SimulationListener {
             } else if (fetchResult.isNotFound()) {
                 // Backend explicitly returned 404 - batch does not exist
                 logger.warn("Batch NOT FOUND in backend (404): {}", trimmedBatchId);
-                showAlert(Alert.AlertType.WARNING, "Batch ID Not Found", 
-                    "The batch ID '" + batchId + "' was not found in the backend system.");
                 
-                // Add failure entry to verification history
+                // Build actionable error message with parsed batch ID
+                String errorMessage = String.format(
+                    "Scanned batch ID: %s\n\n" +
+                    "This batch was not found in the backend system.\n\n" +
+                    "Possible causes:\n" +
+                    "• The batch has not been created yet in ProducerController\n" +
+                    "• The backend service was restarted and batch data was lost\n" +
+                    "• The QR code is from a different environment\n\n" +
+                    "Please verify the batch exists in the Producer dashboard or create a new batch.",
+                    trimmedBatchId);
+                
+                showAlert(Alert.AlertType.WARNING, "Batch ID Not Found", errorMessage);
+                
+                // Add failure entry to verification history with parsed batch ID
                 String failureEntry = java.time.LocalDateTime.now().format(
                         java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) + 
-                        ": " + batchId + " - ❌ NOT FOUND";
+                        ": " + trimmedBatchId + " - ❌ NOT FOUND (batch not in backend)";
                 
                 Platform.runLater(() -> {
                     verificationHistory.add(0, failureEntry);

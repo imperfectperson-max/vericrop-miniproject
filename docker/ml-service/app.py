@@ -657,6 +657,34 @@ async def get_batches():
         "timestamp": datetime.now().isoformat()
     }
 
+@app.get("/batches/{batch_id}")
+async def get_batch_by_id(batch_id: str):
+    """
+    Get a single batch by its batch ID.
+    
+    This endpoint enables ConsumerController to verify batches scanned via QR code.
+    Returns 404 if the batch is not found in the database.
+    
+    Args:
+        batch_id: The unique batch identifier (e.g., "BATCH_1764759800_304")
+    
+    Returns:
+        The batch record if found
+        
+    Raises:
+        HTTPException 404 if batch not found
+    """
+    # Perform case-insensitive search for the batch ID
+    for batch in batches_db:
+        stored_batch_id = batch.get('batch_id', '')
+        if stored_batch_id.lower() == batch_id.lower():
+            logger.info(f"✅ Batch found: {batch_id}")
+            return batch
+    
+    # Batch not found
+    logger.warning(f"⚠️ Batch not found: {batch_id}")
+    raise HTTPException(status_code=404, detail=f"Batch '{batch_id}' not found")
+
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
     """Predict fruit quality"""
