@@ -167,6 +167,9 @@ public class ConsumerController implements SimulationListener {
     /** Pattern for extracting batch ID from URL path like /batches/{id} or /batch/{id} */
     private static final Pattern URL_PATH_PATTERN = Pattern.compile("/batch(?:es)?/([^/?#]+)", Pattern.CASE_INSENSITIVE);
     
+    /** Pattern for extracting batch ID from URL path like /verify/{id} (common QR tool format) */
+    private static final Pattern VERIFY_PATH_PATTERN = Pattern.compile("/verify/([^/?#]+)", Pattern.CASE_INSENSITIVE);
+    
     /** Pattern for extracting batch ID from query parameters like batchId=, batch=, or id= */
     private static final Pattern QUERY_PARAM_PATTERN = Pattern.compile("[?&](?:batchId|batch|id)=([^&]+)", Pattern.CASE_INSENSITIVE);
     
@@ -719,51 +722,96 @@ public class ConsumerController implements SimulationListener {
      * Fallback batch ID extraction from QR content.
      * Attempts to parse common QR payload formats when QRDecoder.extractBatchId fails.
      * 
+     * <p>Supported formats:</p>
+     * <ul>
+     *   <li>Plain batch ID: "BATCH_123456"</li>
+     *   <li>Batch ID with whitespace: "  BATCH_123456  "</li>
+     *   <li>URL-encoded batch ID: "BATCH%5F123456"</li>
+     *   <li>Full URL with /verify/ path: "https://example.com/verify/BATCH_123456"</li>
+     *   <li>Full URL with /batch/ path: "https://example.com/batch/BATCH_123456"</li>
+     *   <li>Full URL with query param: "https://example.com?batchId=BATCH_123456"</li>
+     * </ul>
+     * 
      * @param qrContent The decoded QR code content
      * @return Extracted batch ID, or null if not found
      */
     private String extractBatchIdFallback(String qrContent) {
         if (qrContent == null || qrContent.trim().isEmpty()) {
+            logger.warn("QR fallback parsing: input is null or empty");
             return null;
         }
         
+        // Step 1: Trim whitespace first
         String content = qrContent.trim();
-        System.out.println("QR fallback parsing: attempting to extract batch ID from: " + content);
+        logger.info("QR fallback parsing: attempting to extract batch ID from: {}", content);
         
-        // 1. Try to extract from URL path: /batches/{id} or /batch/{id}
-        Matcher pathMatcher = URL_PATH_PATTERN.matcher(content);
+        // Step 2: URL-decode the content if it contains encoded characters
+        String decodedContent = urlDecode(content);
+        if (!decodedContent.equals(content)) {
+            logger.info("QR fallback parsing: URL-decoded content: {}", decodedContent);
+        }
+        
+        // Step 3: Try to extract from URL path: /verify/{id} (common QR tool format)
+        Matcher verifyMatcher = VERIFY_PATH_PATTERN.matcher(decodedContent);
+        if (verifyMatcher.find()) {
+            String batchId = verifyMatcher.group(1).trim();
+            logger.info("QR fallback parsing: extracted from /verify/ path: {}", batchId);
+            return batchId;
+        }
+        
+        // Step 4: Try to extract from URL path: /batches/{id} or /batch/{id}
+        Matcher pathMatcher = URL_PATH_PATTERN.matcher(decodedContent);
         if (pathMatcher.find()) {
-            String batchId = pathMatcher.group(1);
-            System.out.println("QR fallback parsing: extracted from URL path: " + batchId);
+            String batchId = pathMatcher.group(1).trim();
+            logger.info("QR fallback parsing: extracted from /batch/ path: {}", batchId);
             return batchId;
         }
         
-        // 2. Try to extract from query parameters: batchId=, batch=, or id=
-        Matcher queryMatcher = QUERY_PARAM_PATTERN.matcher(content);
+        // Step 5: Try to extract from query parameters: batchId=, batch=, or id=
+        Matcher queryMatcher = QUERY_PARAM_PATTERN.matcher(decodedContent);
         if (queryMatcher.find()) {
-            String batchId = queryMatcher.group(1);
-            System.out.println("QR fallback parsing: extracted from query parameter: " + batchId);
+            String batchId = urlDecode(queryMatcher.group(1)).trim();
+            logger.info("QR fallback parsing: extracted from query parameter: {}", batchId);
             return batchId;
         }
         
-        // 3. Try regex for BATCH_* pattern
-        Matcher batchMatcher = BATCH_ID_PATTERN.matcher(content);
+        // Step 6: Try regex for BATCH_* pattern anywhere in the content
+        Matcher batchMatcher = BATCH_ID_PATTERN.matcher(decodedContent);
         if (batchMatcher.find()) {
-            String batchId = batchMatcher.group();
-            System.out.println("QR fallback parsing: extracted BATCH_* pattern: " + batchId);
+            String batchId = batchMatcher.group().trim();
+            logger.info("QR fallback parsing: extracted BATCH_* pattern: {}", batchId);
             return batchId;
         }
         
-        // 4. Last resort: look for alphanumeric token at least 4 characters
-        Matcher alphanumMatcher = ALPHANUMERIC_TOKEN_PATTERN.matcher(content);
+        // Step 7: Last resort - look for alphanumeric token at least 4 characters
+        Matcher alphanumMatcher = ALPHANUMERIC_TOKEN_PATTERN.matcher(decodedContent);
         if (alphanumMatcher.find()) {
-            String batchId = alphanumMatcher.group();
-            System.out.println("QR fallback parsing: extracted alphanumeric token: " + batchId);
+            String batchId = alphanumMatcher.group().trim();
+            logger.info("QR fallback parsing: extracted alphanumeric token: {}", batchId);
             return batchId;
         }
         
-        System.out.println("QR fallback parsing: could not extract batch ID from content");
+        logger.warn("QR fallback parsing: could not extract batch ID from content: {}", content);
         return null;
+    }
+    
+    /**
+     * URL-decode a string, handling errors gracefully.
+     * 
+     * @param input The input string to decode
+     * @return The decoded string, or the original input if decoding fails
+     */
+    private String urlDecode(String input) {
+        if (input == null) {
+            return null;
+        }
+        try {
+            return java.net.URLDecoder.decode(input, StandardCharsets.UTF_8.toString());
+        } catch (Exception e) {
+            // If decoding fails, return the original input
+            logger.debug("URL decode failed for input '{}': {}", input, e.getMessage());
+            return input;
+        }
     }
 
     @FXML

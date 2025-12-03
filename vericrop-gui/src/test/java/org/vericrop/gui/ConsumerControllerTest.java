@@ -501,4 +501,110 @@ public class ConsumerControllerTest {
             "https://api.vericrop.example/v2/batches/PROD_ABC123?token=xyz");
         assertEquals("PROD_ABC123", result, "Should extract from URL path even with query params");
     }
+    
+    // ========== New Tests for QR Scanning Issue Fix ==========
+    
+    @Test
+    public void testExtractBatchIdFallback_VerifyPath() throws Exception {
+        // Test /verify/{id} format (common QR tool format from issue)
+        String result = (String) extractBatchIdFallbackMethod.invoke(controller, 
+            "https://example.com/verify/BATCH_1764759800_304");
+        assertEquals("BATCH_1764759800_304", result, "Should extract batch ID from /verify/ path");
+        
+        result = (String) extractBatchIdFallbackMethod.invoke(controller, 
+            "http://api.vericrop.io/verify/BATCH_A2386");
+        assertEquals("BATCH_A2386", result, "Should extract batch ID from /verify/ path without https");
+    }
+    
+    @Test
+    public void testExtractBatchIdFallback_VerifyPathWithQueryParams() throws Exception {
+        // Test /verify/ path with query parameters
+        String result = (String) extractBatchIdFallbackMethod.invoke(controller, 
+            "https://example.com/verify/BATCH_12345?source=qr&timestamp=123456");
+        assertEquals("BATCH_12345", result, "Should extract from /verify/ path even with query params");
+    }
+    
+    @Test
+    public void testExtractBatchIdFallback_WhitespaceHandling() throws Exception {
+        // Test batch ID with leading/trailing whitespace
+        String result = (String) extractBatchIdFallbackMethod.invoke(controller, 
+            "  BATCH_A2386  ");
+        assertEquals("BATCH_A2386", result, "Should trim whitespace and extract batch ID");
+        
+        result = (String) extractBatchIdFallbackMethod.invoke(controller, 
+            "\t\nBATCH_12345\n\t");
+        assertEquals("BATCH_12345", result, "Should trim tabs/newlines and extract batch ID");
+    }
+    
+    @Test
+    public void testExtractBatchIdFallback_UrlEncodedBatchId() throws Exception {
+        // Test URL-encoded batch ID (e.g., underscore encoded as %5F)
+        String result = (String) extractBatchIdFallbackMethod.invoke(controller, 
+            "BATCH%5F123456");
+        assertEquals("BATCH_123456", result, "Should URL-decode and extract batch ID");
+        
+        // Test URL-encoded spaces (%20)
+        result = (String) extractBatchIdFallbackMethod.invoke(controller, 
+            "%20BATCH_ABCDEF%20");
+        assertEquals("BATCH_ABCDEF", result, "Should URL-decode spaces and extract batch ID");
+    }
+    
+    @Test
+    public void testExtractBatchIdFallback_UrlEncodedVerifyPath() throws Exception {
+        // Test URL-encoded full URL with /verify/ path
+        String result = (String) extractBatchIdFallbackMethod.invoke(controller, 
+            "https%3A%2F%2Fexample.com%2Fverify%2FBATCH_789XYZ");
+        assertEquals("BATCH_789XYZ", result, "Should URL-decode full URL and extract from /verify/ path");
+    }
+    
+    @Test
+    public void testExtractBatchIdFallback_UrlEncodedQueryParam() throws Exception {
+        // Test URL-encoded query parameter value
+        String result = (String) extractBatchIdFallbackMethod.invoke(controller, 
+            "https://example.com/?batchId=BATCH%5FA2386");
+        assertEquals("BATCH_A2386", result, "Should URL-decode query parameter value");
+    }
+    
+    @Test
+    public void testExtractBatchIdFallback_InvalidStrings() throws Exception {
+        // Test completely invalid strings that don't contain batch IDs
+        String result = (String) extractBatchIdFallbackMethod.invoke(controller, 
+            "???");
+        assertNull(result, "Should return null for invalid special characters");
+        
+        result = (String) extractBatchIdFallbackMethod.invoke(controller, 
+            "---");
+        assertNull(result, "Should return null for only dashes");
+        
+        result = (String) extractBatchIdFallbackMethod.invoke(controller, 
+            "   \t\n   ");
+        assertNull(result, "Should return null for only whitespace");
+    }
+    
+    @Test
+    public void testExtractBatchIdFallback_MixedCaseVerifyPath() throws Exception {
+        // Test case-insensitive /verify/ matching
+        String result = (String) extractBatchIdFallbackMethod.invoke(controller, 
+            "https://example.com/VERIFY/BATCH_MIXED123");
+        assertEquals("BATCH_MIXED123", result, "Should extract from uppercase /VERIFY/ path");
+        
+        result = (String) extractBatchIdFallbackMethod.invoke(controller, 
+            "https://example.com/Verify/BATCH_MIXED456");
+        assertEquals("BATCH_MIXED456", result, "Should extract from mixed case /Verify/ path");
+    }
+    
+    @Test
+    public void testExtractBatchIdFallback_RealWorldIssueCase() throws Exception {
+        // Test the exact case from the issue: BATCH_1764759800_304
+        String result = (String) extractBatchIdFallbackMethod.invoke(controller, 
+            "https://example.com/verify/BATCH_1764759800_304");
+        assertEquals("BATCH_1764759800_304", result, 
+            "Should extract the batch ID from the issue's example URL");
+        
+        // Also test without URL
+        result = (String) extractBatchIdFallbackMethod.invoke(controller, 
+            "BATCH_1764759800_304");
+        assertEquals("BATCH_1764759800_304", result, 
+            "Should extract the batch ID directly from the issue's example");
+    }
 }

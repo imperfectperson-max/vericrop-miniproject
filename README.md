@@ -802,6 +802,22 @@ JavaFX desktop application with Spring Boot integration. Provides four interacti
 
 **Tech Stack**: Java 17, JavaFX, Spring Boot, HikariCP, BCrypt, Flyway, Kafka Client, ZXing (QR codes), iText (PDF generation)
 
+**Supported QR Code Formats for Consumer Verification:**
+
+The consumer verification scanner supports multiple QR payload formats for maximum compatibility with QR generation tools:
+
+| Format | Example | Description |
+|--------|---------|-------------|
+| Plain batch ID | `BATCH_123456` | Raw batch identifier |
+| With whitespace | `  BATCH_123456  ` | Automatically trimmed |
+| URL-encoded | `BATCH%5F123456` | URL-decoded before extraction |
+| `/verify/` URL | `https://example.com/verify/BATCH_123456` | Common QR tool format |
+| `/batch/` URL | `https://example.com/batch/BATCH_123456` | Path-based extraction |
+| Query parameter | `https://example.com?batchId=BATCH_123456` | Supports `batchId=`, `batch=`, `id=` |
+| JSON payload | `{"type":"vericrop-batch","batchId":"BATCH_123456"}` | Structured QR format |
+
+The scanner normalizes all formats by trimming whitespace, URL-decoding, and extracting the batch ID using pattern matching. Invalid or unrecognized formats will display a helpful error message.
+
 **Details**: See [vericrop-gui/README.md](vericrop-gui/README.md) and [docs/GUI-setup.md](docs/GUI-setup.md)
 
 ### vericrop-core
