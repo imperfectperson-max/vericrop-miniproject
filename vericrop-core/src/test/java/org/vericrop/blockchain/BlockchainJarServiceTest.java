@@ -33,10 +33,9 @@ class BlockchainJarServiceTest {
     }
     
     @Test
-    void testIsAvailable_ReturnsBoolean() {
-        boolean available = service.isAvailable();
-        // Just verify it returns a boolean without throwing
-        assertTrue(available || !available);
+    void testIsAvailable_DoesNotThrow() {
+        // Verify the method executes without throwing exceptions
+        assertDoesNotThrow(() -> service.isAvailable());
     }
     
     @Test
@@ -135,9 +134,10 @@ class BlockchainJarServiceTest {
     void testMultipleInitCalls_Succeeds() {
         if (service.isAvailable()) {
             boolean first = service.init();
+            assertTrue(first, "First init() should succeed when jar is available");
             boolean second = service.init();
-            // Both calls should succeed (idempotent or reinit)
-            assertTrue(first || second || (!first && !second));
+            // Second init should also work (reinitializes or stays initialized)
+            assertTrue(second, "Second init() should also succeed");
         }
     }
     
@@ -145,8 +145,9 @@ class BlockchainJarServiceTest {
     void testGetChainAsString_WhenInitialized_ReturnsValue() {
         if (service.isAvailable() && service.init()) {
             Optional<String> result = service.getChainAsString();
-            // Should return some string representation
-            assertTrue(result.isPresent() || result.isEmpty());
+            // When initialized, should return a non-empty string representation
+            assertTrue(result.isPresent(), "Should return chain string when initialized");
+            assertFalse(result.get().isEmpty(), "Chain string should not be empty");
         }
     }
 }

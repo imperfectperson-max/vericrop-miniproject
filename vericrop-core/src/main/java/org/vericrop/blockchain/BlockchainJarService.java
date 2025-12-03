@@ -141,11 +141,18 @@ public class BlockchainJarService {
             // The external Blockchain may have different API, so we try common patterns
             Object transaction = txInstance.get();
             
+            // Get the Transaction class for method parameter type
+            Optional<Class<?>> txClassOpt = loader.loadClass(TRANSACTION_CLASS);
+            if (txClassOpt.isEmpty()) {
+                logger.error("Cannot invoke addTransaction: Transaction class not available");
+                return false;
+            }
+            
             // Try addTransaction method first
             Optional<Object> result = loader.invoke(
                 blockchainInstance,
                 "addTransaction",
-                new Class<?>[]{loader.loadClass(TRANSACTION_CLASS).orElse(Object.class)},
+                new Class<?>[]{txClassOpt.get()},
                 new Object[]{transaction}
             );
             
@@ -154,9 +161,8 @@ public class BlockchainJarService {
                 return true;
             }
             
-            // If addTransaction doesn't exist, try addBlock with single transaction
-            // This is a fallback for different API patterns
-            logger.debug("addTransaction method not found, trying alternative methods");
+            // addTransaction method not available in this blockchain implementation
+            logger.debug("addTransaction method not found or returned null");
             
             return false;
         } catch (Exception e) {

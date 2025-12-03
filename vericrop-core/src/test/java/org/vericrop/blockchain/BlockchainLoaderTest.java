@@ -35,11 +35,9 @@ class BlockchainLoaderTest {
     }
     
     @Test
-    void testIsAvailable_ReturnsBoolean() {
-        // The result depends on whether blockchain.jar is found in the test environment
-        boolean available = loader.isAvailable();
-        // Just verify it doesn't throw and returns a boolean
-        assertTrue(available || !available);
+    void testIsAvailable_DoesNotThrow() {
+        // Verify the method executes without throwing exceptions
+        assertDoesNotThrow(() -> loader.isAvailable());
     }
     
     @Test
