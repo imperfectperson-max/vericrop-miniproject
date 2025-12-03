@@ -657,6 +657,42 @@ async def get_batches():
         "timestamp": datetime.now().isoformat()
     }
 
+@app.get("/batches/{batch_id}")
+async def get_batch_by_id(batch_id: str):
+    """
+    Get a single batch by its batch ID.
+    
+    This endpoint enables ConsumerController to verify batches scanned via QR code.
+    Returns 404 if the batch is not found in the database.
+    
+    Args:
+        batch_id: The unique batch identifier (e.g., "BATCH_1764759800_304")
+    
+    Returns:
+        The batch record if found
+        
+    Raises:
+        HTTPException 404 if batch not found
+    
+    Note:
+        Current implementation uses O(n) linear search which is acceptable for
+        development/demo use with small datasets. For production with large
+        datasets, consider using a dictionary indexed by lowercase batch_id
+        for O(1) lookups, or migrating to a proper database with indexing.
+    """
+    # Perform case-insensitive search for the batch ID
+    # O(n) complexity - acceptable for demo/development use case
+    batch_id_lower = batch_id.lower()
+    for batch in batches_db:
+        stored_batch_id = batch.get('batch_id', '')
+        if stored_batch_id.lower() == batch_id_lower:
+            logger.info(f"✅ Batch found: {batch_id}")
+            return batch
+    
+    # Batch not found
+    logger.warning(f"⚠️ Batch not found: {batch_id}")
+    raise HTTPException(status_code=404, detail=f"Batch '{batch_id}' not found")
+
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
     """Predict fruit quality"""
