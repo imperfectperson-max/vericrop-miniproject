@@ -40,5 +40,19 @@
     "data_hash": "a4ed0c7acbac508fe85f97d8318c51749477426d87d995bd72b4cdbd72f37a38",
     "prime_rate": 0.104,
     "rejection_rate": 0.026
+  },
+  {
+    "batch_id": "BATCH_1764759800_304",
+    "name": "Carrots",
+    "farmer": "Farmer",
+    "product_type": "Carrots",
+    "quantity": 8,
+    "quality_score": 0.98,
+    "quality_label": "fresh",
+    "timestamp": "2025-12-03T11:03:20.306933",
+    "status": "created",
+    "data_hash": "5f9791bfd80c6ae9ac891cda148e672bb57ef6433655e0203b90385b19394772",
+    "prime_rate": 0.996,
+    "rejection_rate": 0.0008
   }
 ]

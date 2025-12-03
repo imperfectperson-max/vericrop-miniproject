@@ -26,8 +26,8 @@ RUN gradle :vericrop-gui:bootJar --no-daemon -x test
 # Stage 2: Runtime image (same as before)
 FROM eclipse-temurin:17-jre-jammy
 
-WORKDIR /app
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+WORKDIR /appc
+RUN apt-get update && apt-get instalsl -y curl && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /workspace/vericrop-gui/build/libs/vericrop-gui-*.jar app.jar
 RUN mkdir -p /app/ledger /app/data
 EXPOSE 8080

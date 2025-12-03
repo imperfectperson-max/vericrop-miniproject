@@ -35,7 +35,7 @@ import java.util.stream.Collectors;
 public class InstanceRegistry implements AutoCloseable {
     
     /** Default heartbeat interval in milliseconds */
-    private static final long HEARTBEAT_INTERVAL_MS = 5000; // 5 seconds
+    private static final long HEARTBEAT_INTERVAL_MS = 5000; // 5 secondspr
     
     /** Time after which an instance is considered dead if no heartbeat received */
     private static final long INSTANCE_TIMEOUT_MS = 15000; // 15 seconds
