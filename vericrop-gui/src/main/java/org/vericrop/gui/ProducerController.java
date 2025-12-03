@@ -57,6 +57,12 @@ import java.util.regex.Pattern;
 public class ProducerController implements SimulationListener {
     private static final int SHIPMENT_UPDATE_INTERVAL_MS = 2000;
     
+    /** Quality score threshold for PRIME classification (80% and above) */
+    private static final double QUALITY_THRESHOLD_PRIME = 0.8;
+    
+    /** Quality score threshold for STANDARD classification (60% to 79.99%) */
+    private static final double QUALITY_THRESHOLD_STANDARD = 0.6;
+    
     // Pre-compiled patterns for error message cleaning (performance optimization)
     // Pattern to match fully-qualified exception/error class names including inner classes (e.g., "org.vericrop.gui.ProducerController$BatchCreationException: ")
     private static final Pattern FULLY_QUALIFIED_EXCEPTION_PATTERN = 
@@ -1860,6 +1866,7 @@ public class ProducerController implements SimulationListener {
     
     /**
      * Get quality classification for a batch from stored metrics or batch info.
+     * Quality scores are expected on a 0-1 scale. Scores > 1.0 are normalized by dividing by 100.
      * 
      * @param batchId The batch ID to look up
      * @return Quality classification (PRIME, STANDARD, SUB-STANDARD) or null if not found
@@ -1873,24 +1880,12 @@ public class ProducerController implements SimulationListener {
             
             // Classify based on quality score (0-1 scale)
             if (qualityScore != null) {
-                if (qualityScore >= 0.8) {
-                    return "PRIME";
-                } else if (qualityScore >= 0.6) {
-                    return "STANDARD";
-                } else {
-                    return "SUB-STANDARD";
-                }
+                return classifyQualityScore(qualityScore);
             }
             
             // Alternative: classify based on prime rate
             if (primeRate != null) {
-                if (primeRate >= 0.8) {
-                    return "PRIME";
-                } else if (primeRate >= 0.6) {
-                    return "STANDARD";
-                } else {
-                    return "SUB-STANDARD";
-                }
+                return classifyQualityScore(primeRate);
             }
         }
         
@@ -1902,18 +1897,8 @@ public class ProducerController implements SimulationListener {
                 // Try to extract quality from stored batch info
                 Object qualityScoreObj = batchInfo.get("quality_score");
                 if (qualityScoreObj instanceof Number) {
-                    double score = ((Number) qualityScoreObj).doubleValue();
-                    // Handle both 0-1 and 0-100 scales
-                    if (score > 1.0) {
-                        score = score / 100.0;
-                    }
-                    if (score >= 0.8) {
-                        return "PRIME";
-                    } else if (score >= 0.6) {
-                        return "STANDARD";
-                    } else {
-                        return "SUB-STANDARD";
-                    }
+                    double score = normalizeQualityScore(((Number) qualityScoreObj).doubleValue());
+                    return classifyQualityScore(score);
                 }
                 
                 // Check for label field (e.g., FRESH, LOW_QUALITY, ROTTEN)
@@ -1932,19 +1917,45 @@ public class ProducerController implements SimulationListener {
         if (currentPrediction != null) {
             Object qualityScoreObj = currentPrediction.get("quality_score");
             if (qualityScoreObj instanceof Number) {
-                double score = ((Number) qualityScoreObj).doubleValue();
-                if (score >= 0.8) {
-                    return "PRIME";
-                } else if (score >= 0.6) {
-                    return "STANDARD";
-                } else {
-                    return "SUB-STANDARD";
-                }
+                double score = normalizeQualityScore(((Number) qualityScoreObj).doubleValue());
+                return classifyQualityScore(score);
             }
         }
         
         System.out.println("⚠ Could not determine quality for batch: " + batchId);
         return null;
+    }
+    
+    /**
+     * Classify a quality score into PRIME, STANDARD, or SUB-STANDARD.
+     * Uses the threshold constants QUALITY_THRESHOLD_PRIME and QUALITY_THRESHOLD_STANDARD.
+     * 
+     * @param score Quality score on 0-1 scale
+     * @return Quality classification string
+     */
+    private String classifyQualityScore(double score) {
+        if (score >= QUALITY_THRESHOLD_PRIME) {
+            return "PRIME";
+        } else if (score >= QUALITY_THRESHOLD_STANDARD) {
+            return "STANDARD";
+        } else {
+            return "SUB-STANDARD";
+        }
+    }
+    
+    /**
+     * Normalize a quality score to 0-1 scale.
+     * Scores > 1.0 are assumed to be on 0-100 scale and divided by 100.
+     * 
+     * @param score Quality score (may be 0-1 or 0-100 scale)
+     * @return Normalized score on 0-1 scale
+     */
+    private double normalizeQualityScore(double score) {
+        if (score > 1.0) {
+            System.out.println("ℹ Normalizing quality score from 0-100 to 0-1 scale: " + score + " -> " + (score / 100.0));
+            return score / 100.0;
+        }
+        return score;
     }
 
 

@@ -283,11 +283,28 @@ public class QRDecoder {
             return null;
         }
         
-        // Handle number value (unquoted)
+        // Handle number value (unquoted) - properly validate JSON number format
         if (Character.isDigit(firstChar) || firstChar == '-') {
             int numEnd = valueStart;
-            while (numEnd < json.length() && (Character.isDigit(json.charAt(numEnd)) || json.charAt(numEnd) == '.' || json.charAt(numEnd) == '-')) {
-                numEnd++;
+            boolean hasDecimal = false;
+            boolean isStart = true;
+            
+            while (numEnd < json.length()) {
+                char c = json.charAt(numEnd);
+                if (Character.isDigit(c)) {
+                    isStart = false;
+                    numEnd++;
+                } else if (c == '.' && !hasDecimal && !isStart) {
+                    // Only one decimal point allowed, and not at the start
+                    hasDecimal = true;
+                    numEnd++;
+                } else if (c == '-' && isStart) {
+                    // Minus sign only allowed at the start
+                    numEnd++;
+                } else {
+                    // End of number
+                    break;
+                }
             }
             return json.substring(valueStart, numEnd);
         }
