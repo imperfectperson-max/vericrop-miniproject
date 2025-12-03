@@ -31,7 +31,8 @@ public class RegisterController {
     @FXML private ToggleButton farmerToggle;
     @FXML private ToggleButton consumerToggle;
     @FXML private ToggleButton supplierToggle;
-    @FXML private ToggleButton adminToggle;
+    // Admin toggle removed - Admin registration via public register flow is disabled
+    // Admin accounts should be created through secure administrative processes only
     
     @FXML private Label usernameError;
     @FXML private Label emailError;
@@ -54,11 +55,11 @@ public class RegisterController {
         userDao = appContext.getUserDao();
         
         // Create toggle group for role selection
+        // Admin role removed for production correctness - admin accounts created via admin processes
         roleGroup = new ToggleGroup();
         farmerToggle.setToggleGroup(roleGroup);
         consumerToggle.setToggleGroup(roleGroup);
         supplierToggle.setToggleGroup(roleGroup);
-        adminToggle.setToggleGroup(roleGroup);
         
         // Select farmer by default
         farmerToggle.setSelected(true);
@@ -323,14 +324,16 @@ public class RegisterController {
      * - Farmer → PRODUCER (producer/farmer operations)
      * - Consumer → CONSUMER (consumer operations)
      * - Supplier → LOGISTICS (logistics/supplier operations)
-     * - Admin → ADMIN (access to all UIs)
+     * 
+     * Admin role removed - Admin registration via public register flow is disabled.
+     * Admin accounts should be created through secure administrative processes only.
      */
     private String getSelectedRole() {
         Toggle selected = roleGroup.getSelectedToggle();
         if (selected == farmerToggle) return "PRODUCER";
         if (selected == consumerToggle) return "CONSUMER";
         if (selected == supplierToggle) return "LOGISTICS";
-        if (selected == adminToggle) return "ADMIN";
+        // Admin role removed for production correctness
         return null;
     }
     
@@ -403,6 +406,6 @@ public class RegisterController {
         farmerToggle.setDisable(disabled);
         consumerToggle.setDisable(disabled);
         supplierToggle.setDisable(disabled);
-        adminToggle.setDisable(disabled);
+        // Admin toggle removed - Admin registration disabled for production correctness
     }
 }

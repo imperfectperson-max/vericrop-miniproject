@@ -71,6 +71,8 @@
         </VBox>
 
         <!-- Role Selection -->
+        <!-- Admin role removed from public registration for production correctness.
+             Admin accounts should be created through secure administrative processes only. -->
         <VBox spacing="5">
             <Label text="Select Your Role *" style="-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #555;"/>
             <HBox spacing="10" alignment="CENTER">
@@ -79,8 +81,6 @@
                 <ToggleButton fx:id="consumerToggle" text="👥 Consumer" 
                               style="-fx-pref-width: 95px; -fx-pref-height: 40px;" toggleGroup="$roleGroup"/>
                 <ToggleButton fx:id="supplierToggle" text="🚚 Logistics" 
-                              style="-fx-pref-width: 95px; -fx-pref-height: 40px;" toggleGroup="$roleGroup"/>
-                <ToggleButton fx:id="adminToggle" text="🔧 Admin" 
                               style="-fx-pref-width: 95px; -fx-pref-height: 40px;" toggleGroup="$roleGroup"/>
             </HBox>
             <Label fx:id="roleError" style="-fx-text-fill: #d32f2f; -fx-font-size: 11px;" managed="false" visible="false"/>

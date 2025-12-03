@@ -13,13 +13,16 @@ import org.vericrop.gui.services.AuthenticationService;
 /**
  * Enhanced Login Controller with actual authentication.
  * Supports username/password authentication against the database.
+ * 
+ * Demo/skip-auth code removed for production correctness.
+ * Users must authenticate with valid credentials.
  */
 public class EnhancedLoginController {
     private static final Logger logger = LoggerFactory.getLogger(EnhancedLoginController.class);
     
     @FXML private TextField usernameField;
     @FXML private PasswordField passwordField;
-    @FXML private CheckBox demoModeCheckbox;
+    // Demo mode checkbox removed - users must authenticate with valid credentials
     @FXML private Label usernameError;
     @FXML private Label passwordError;
     @FXML private Label statusLabel;
@@ -45,8 +48,7 @@ public class EnhancedLoginController {
         usernameField.textProperty().addListener((obs, oldVal, newVal) -> clearError(usernameError));
         passwordField.textProperty().addListener((obs, oldVal, newVal) -> clearError(passwordError));
         
-        // Initialize demo mode checkbox based on auth service state
-        demoModeCheckbox.setSelected(authService.isDemoMode());
+        // Demo mode checkbox initialization removed - authentication required
         
         // Enable Enter key to submit
         usernameField.setOnAction(e -> passwordField.requestFocus());
@@ -129,26 +131,7 @@ public class EnhancedLoginController {
         }
     }
     
-    @FXML
-    private void handleDemoModeToggle() {
-        boolean demoMode = demoModeCheckbox.isSelected();
-        
-        // Update the authentication service demo mode setting
-        authService.setDemoMode(demoMode);
-        
-        logger.info("Demo mode: {}", demoMode ? "ENABLED" : "DISABLED");
-        
-        if (demoMode) {
-            showAlert(Alert.AlertType.WARNING, "Demo Mode Enabled",
-                    "⚠️ DEMO MODE ACTIVE\n\n" +
-                    "Demo credentials:\n" +
-                    "• admin / admin123\n" +
-                    "• farmer / farmer123\n" +
-                    "• supplier / supplier123\n" +
-                    "• consumer / consumer123\n\n" +
-                    "This mode should NOT be used in production!");
-        }
-    }
+    // Demo mode toggle removed - authentication required for production correctness
     
     /**
      * Navigate to the appropriate screen based on user role.
@@ -276,7 +259,7 @@ public class EnhancedLoginController {
     private void setFormDisabled(boolean disabled) {
         usernameField.setDisable(disabled);
         passwordField.setDisable(disabled);
-        demoModeCheckbox.setDisable(disabled);
+        // Demo mode checkbox removed - authentication required
     }
     
     /**
