@@ -3,6 +3,7 @@ package org.vericrop.gui.config;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -20,7 +21,12 @@ import java.util.List;
  * Data loader that seeds demo users on application startup.
  * This loader is idempotent - it only creates users if they don't already exist.
  * 
- * Demo users created:
+ * DISABLED BY DEFAULT for production correctness.
+ * Enable only in development/testing by setting:
+ *   - System property: vericrop.loadDemoUsers=true
+ *   - Environment variable: VERICROP_LOAD_DEMO_USERS=true
+ * 
+ * Demo users created (when enabled):
  * - producer_demo (PRODUCER role) - for producer/farmer operations
  * - logistics_demo (LOGISTICS role) - for logistics/supplier operations  
  * - consumer_demo (CONSUMER role) - for consumer operations
@@ -36,6 +42,10 @@ public class DemoUserDataLoader implements CommandLineRunner {
     
     private final DataSource dataSource;
     private final BCryptPasswordEncoder passwordEncoder;
+    
+    // Demo user seeding disabled by default for production correctness
+    @Value("${vericrop.loadDemoUsers:false}")
+    private boolean loadDemoUsersEnabled;
     
     // Demo user definitions
     private static final List<DemoUser> DEMO_USERS = List.of(
@@ -53,6 +63,17 @@ public class DemoUserDataLoader implements CommandLineRunner {
     
     @Override
     public void run(String... args) {
+        // Check if demo user loading is enabled via system property or environment variable
+        boolean enabledViaSysProp = "true".equalsIgnoreCase(System.getProperty("vericrop.loadDemoUsers"));
+        boolean enabledViaEnv = "true".equalsIgnoreCase(System.getenv("VERICROP_LOAD_DEMO_USERS"));
+        
+        if (!loadDemoUsersEnabled && !enabledViaSysProp && !enabledViaEnv) {
+            // Demo user seeding disabled by default for production correctness
+            logger.info("=== Demo User Data Loader: DISABLED (set vericrop.loadDemoUsers=true to enable) ===");
+            return;
+        }
+        
+        logger.warn("⚠️  Demo User Data Loader: ENABLED - This should be disabled in production");
         logger.info("=== Starting Demo User Data Loader ===");
         
         List<String> createdUsers = new ArrayList<>();
