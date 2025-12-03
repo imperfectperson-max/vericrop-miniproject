@@ -29,9 +29,12 @@ import org.vericrop.service.simulation.SimulationConfig;
 import org.vericrop.service.simulation.SimulationListener;
 import org.vericrop.service.simulation.SimulationManager;
 import org.vericrop.kafka.consumers.SimulationControlConsumer;
+import org.vericrop.kafka.consumers.MapSimulationEventConsumer;
 import org.vericrop.kafka.events.SimulationControlEvent;
 import org.vericrop.kafka.events.InstanceHeartbeatEvent;
 import org.vericrop.kafka.services.InstanceRegistry;
+import org.vericrop.dto.MapSimulationEvent;
+import org.vericrop.constants.ShipmentStatus;
 import com.google.zxing.NotFoundException;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -139,6 +142,7 @@ public class ConsumerController implements SimulationListener {
     
     // Kafka consumer for simulation control events
     private SimulationControlConsumer simulationControlConsumer;
+    private MapSimulationEventConsumer mapSimulationConsumer;
     private ExecutorService kafkaConsumerExecutor;
     
     // Instance registry for multi-instance tracking
@@ -243,12 +247,15 @@ public class ConsumerController implements SimulationListener {
     }
     
     /**
-     * Setup Kafka consumers for simulation control events.
+     * Setup Kafka consumers for simulation control and map simulation events.
+     * The MapSimulationEventConsumer is critical for receiving real-time progress
+     * updates when running controllers as separate processes.
      */
     private void setupKafkaConsumers() {
         try {
-            // Single thread executor for SimulationControl consumer
-            kafkaConsumerExecutor = Executors.newSingleThreadExecutor();
+            // Thread pool for Kafka consumers: SimulationControl and MapSimulation
+            final int KAFKA_CONSUMER_COUNT = 2;
+            kafkaConsumerExecutor = Executors.newFixedThreadPool(KAFKA_CONSUMER_COUNT);
             
             // Create simulation control consumer with unique group ID per instance
             // Using timestamp-based ID avoids UUID substring collisions
@@ -258,7 +265,15 @@ public class ConsumerController implements SimulationListener {
                 this::handleSimulationControlEvent
             );
             
-            // Start consumer in background thread
+            // Create map simulation consumer with unique group ID per instance
+            // This consumer receives real-time progress updates from the simulation
+            String mapGroupId = "consumer-map-simulation-" + System.currentTimeMillis();
+            mapSimulationConsumer = new MapSimulationEventConsumer(
+                mapGroupId,
+                this::handleMapSimulationEvent
+            );
+            
+            // Start simulation control consumer in background thread
             kafkaConsumerExecutor.submit(() -> {
                 try {
                     simulationControlConsumer.startConsuming();
@@ -267,7 +282,16 @@ public class ConsumerController implements SimulationListener {
                 }
             });
             
-            System.out.println("✅ Kafka consumers initialized for consumer verification");
+            // Start map simulation consumer in background thread
+            kafkaConsumerExecutor.submit(() -> {
+                try {
+                    mapSimulationConsumer.startConsuming();
+                } catch (Exception e) {
+                    System.err.println("Map simulation consumer error: " + e.getMessage());
+                }
+            });
+            
+            System.out.println("✅ Kafka consumers initialized for consumer verification (SimulationControl + MapSimulation)");
         } catch (Exception e) {
             System.err.println("⚠️ Failed to initialize Kafka consumers: " + e.getMessage());
             // Continue without Kafka - fallback to SimulationListener updates
@@ -370,6 +394,161 @@ public class ConsumerController implements SimulationListener {
                 e.printStackTrace();
             }
         });
+    }
+    
+    /**
+     * Handle map simulation event from Kafka.
+     * This provides real-time progress updates when running controllers as separate processes.
+     * Updates Product Journey UI with current status and progress.
+     */
+    private void handleMapSimulationEvent(MapSimulationEvent event) {
+        if (event == null || event.getBatchId() == null) {
+            logger.warn("Received null or invalid map simulation event");
+            return;
+        }
+        
+        logger.debug("🗺️  ConsumerController received map event: {} at progress {}% - {}", 
+                    event.getBatchId(), event.getProgress() * 100, event.getLocationName());
+        
+        Platform.runLater(() -> {
+            try {
+                String batchId = event.getBatchId();
+                double progressPercent = event.getProgress() * 100; // Convert from 0-1 to 0-100
+                String location = event.getLocationName();
+                String status = event.getStatus();
+                
+                // Skip if progress hasn't increased (prevent backward updates)
+                if (currentBatchId != null && currentBatchId.equals(batchId) && progressPercent <= lastProgress) {
+                    return;
+                }
+                
+                // Track this batch if not already tracking
+                if (currentBatchId == null || !currentBatchId.equals(batchId)) {
+                    currentBatchId = batchId;
+                    lastProgress = 0.0;
+                    // Initialize start time if not set
+                    if (simulationStartTimeMs == 0) {
+                        simulationStartTimeMs = System.currentTimeMillis();
+                    }
+                    
+                    // Initialize journey display for new batch
+                    String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"));
+                    updateJourneyStep(1, "✅", "Batch Created - " + batchId, 
+                        "Started tracking at " + timestamp);
+                    
+                    // Add to verification history
+                    String historyTimestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+                    String message = historyTimestamp + ": 🚚 Tracking batch " + batchId + " (via Kafka map events)";
+                    verificationHistory.add(0, message);
+                }
+                
+                // Update journey display based on progress
+                updateJourneyFromProgress(batchId, progressPercent, location);
+                
+                // Update status label
+                if (statusLabel != null) {
+                    String displayStatus = ShipmentStatus.normalize(status);
+                    if (ShipmentStatus.isDelivered(displayStatus)) {
+                        statusLabel.setText("Delivered");
+                    } else if (ShipmentStatus.isApproaching(displayStatus)) {
+                        statusLabel.setText("Approaching");
+                    } else if (ShipmentStatus.isInTransit(displayStatus)) {
+                        statusLabel.setText("In Transit");
+                    } else {
+                        statusLabel.setText(status != null ? status : "In Progress");
+                    }
+                }
+                
+                // Update temperature display from event
+                if (temperatureLabel != null && event.getTemperature() != 0.0) {
+                    temperatureLabel.setText(String.format("%.1f°C", event.getTemperature()));
+                    // Color based on temperature compliance (2-8°C is optimal for cold chain)
+                    double temp = event.getTemperature();
+                    if (temp >= 2.0 && temp <= 8.0) {
+                        temperatureLabel.setStyle("-fx-text-fill: #10b981;"); // Green - compliant
+                    } else if (temp < 2.0 || temp > 10.0) {
+                        temperatureLabel.setStyle("-fx-text-fill: #dc2626;"); // Red - out of range
+                    } else {
+                        temperatureLabel.setStyle("-fx-text-fill: #f59e0b;"); // Yellow - marginal
+                    }
+                }
+                
+                // Add milestone entries to history at key points
+                boolean isMilestone = (progressPercent >= 25 && lastProgress < 25) ||
+                                     (progressPercent >= 50 && lastProgress < 50) ||
+                                     (progressPercent >= 75 && lastProgress < 75) ||
+                                     (progressPercent >= 100 && lastProgress < 100);
+                
+                if (isMilestone) {
+                    String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+                    String message = String.format("%s: 📍 Batch %s - %.0f%% complete - %s (via Kafka)", 
+                                                 timestamp, batchId, progressPercent, location);
+                    verificationHistory.add(0, message);
+                    logger.info("ConsumerController: Journey milestone via Kafka - {} at {}%", batchId, progressPercent);
+                }
+                
+                // Update last progress
+                lastProgress = progressPercent;
+                
+                // Check if delivered and compute final quality
+                if (progressPercent >= 100.0 || ShipmentStatus.isDelivered(status)) {
+                    handleDeliveryComplete(batchId);
+                }
+                
+            } catch (Exception e) {
+                logger.error("Error handling map simulation event: {}", e.getMessage(), e);
+            }
+        });
+    }
+    
+    /**
+     * Handle delivery completion - compute and display final quality.
+     * Called when progress reaches 100% or status is DELIVERED.
+     */
+    private void handleDeliveryComplete(String batchId) {
+        logger.info("🎯 Delivery complete for batch: {} - computing final quality", batchId);
+        
+        // Compute final quality using QualityAssessmentService
+        double finalQuality = DEFAULT_FINAL_QUALITY;
+        try {
+            if (qualityAssessmentService != null && simulationStartTimeMs > 0) {
+                QualityAssessmentService.FinalQualityAssessment assessment =
+                    qualityAssessmentService.assessFinalQualityFromMonitoring(
+                        batchId, 100.0, simulationStartTimeMs);
+                
+                if (assessment != null) {
+                    finalQuality = assessment.getFinalQuality();
+                    logger.info("✅ Final quality computed for batch {}: {}% (grade: {})", 
+                               batchId, String.format("%.1f", finalQuality), assessment.getQualityGrade());
+                    
+                    // Update journey step with detailed quality info
+                    updateJourneyStep(4, "✅", "Delivered - " + assessment.getQualityGrade(),
+                        String.format("Final Quality: %.1f%% | Temp Violations: %d | Alerts: %d",
+                            finalQuality, assessment.getTemperatureViolations(), assessment.getAlertCount()));
+                }
+            } else if (SimulationManager.isInitialized()) {
+                finalQuality = SimulationManager.getInstance().getFinalQuality();
+            }
+        } catch (Exception e) {
+            logger.error("Could not compute final quality: {}", e.getMessage());
+        }
+        
+        // Display final quality
+        displayFinalQuality(batchId, finalQuality);
+        
+        // Get and display average temperature from TemperatureService
+        displayAverageTemperature(batchId);
+        
+        // Add delivery completion to history
+        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        String message = timestamp + ": ✅ Batch " + batchId + " delivered - Final Quality: " + 
+                        String.format("%.1f%%", finalQuality) + " - Ready for verification";
+        verificationHistory.add(0, message);
+        
+        // Update status label
+        if (statusLabel != null) {
+            statusLabel.setText("Delivered");
+        }
     }
     
     /**
@@ -983,6 +1162,9 @@ public class ConsumerController implements SimulationListener {
         // Stop Kafka consumers
         if (simulationControlConsumer != null) {
             simulationControlConsumer.stop();
+        }
+        if (mapSimulationConsumer != null) {
+            mapSimulationConsumer.stop();
         }
         if (kafkaConsumerExecutor != null && !kafkaConsumerExecutor.isShutdown()) {
             kafkaConsumerExecutor.shutdownNow();
