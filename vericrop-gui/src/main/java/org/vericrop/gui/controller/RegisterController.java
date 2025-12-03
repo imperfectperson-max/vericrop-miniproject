@@ -406,6 +406,7 @@ public class RegisterController {
         farmerToggle.setDisable(disabled);
         consumerToggle.setDisable(disabled);
         supplierToggle.setDisable(disabled);
-        // Admin toggle removed - Admin registration disabled for production correctness
+        // Note: Admin toggle was removed from registration form for production correctness.
+        // Admin accounts should be created through secure administrative processes only.
     }
 }
