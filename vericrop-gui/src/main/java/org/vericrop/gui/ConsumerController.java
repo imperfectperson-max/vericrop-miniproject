@@ -277,18 +277,21 @@ public class ConsumerController implements SimulationListener {
     /**
      * Handle simulation control event from Kafka.
      * Coordinates simulation start/stop across instances.
-     */
-    /**
-     * Handle simulation control event from Kafka.
-     * Coordinates simulation start/stop across instances.
      * Uses Platform.runLater to ensure UI updates happen on JavaFX thread.
+     * 
+     * <p>Key behaviors:</p>
+     * <ul>
+     *   <li>START events: Initialize journey tracking with batch details</li>
+     *   <li>STOP events: Compute final quality and update journey to Delivered status</li>
+     *   <li>Uses event timestamp as fallback for simulationStartTimeMs if consumer started after simulation began</li>
+     * </ul>
      */
     private void handleSimulationControlEvent(SimulationControlEvent event) {
         if (event == null) {
             return;
         }
         
-        System.out.println("📡 ConsumerController received simulation control event: " + event);
+        logger.info("📡 ConsumerController received simulation control event: {}", event);
         
         Platform.runLater(() -> {
             try {
@@ -305,16 +308,20 @@ public class ConsumerController implements SimulationListener {
                     String message = timestamp + ": 🚚 Batch " + batchId + " is now in transit from " + farmerId + " (via Kafka)";
                     verificationHistory.add(0, message);
                     
-                    // Reset and start journey display
-                    initializeJourneyDisplay();
+                    // Reset journey display and update with initial state
+                    // Don't call initializeJourneyDisplay() as it sets status to "Waiting"
+                    // Instead, directly set the journey steps to the started state
+                    if (finalQualityLabel != null) finalQualityLabel.setText("--");
+                    if (temperatureLabel != null) temperatureLabel.setText("Monitoring...");
+                    if (statusLabel != null) statusLabel.setText("In Transit");
+                    
                     updateJourneyStep(1, "✅", "Batch Created - " + batchId, 
                         "Started at " + timestamp + " | From: " + farmerId);
                     updateJourneyStep(2, "🚚", "In Transit", "Starting delivery...");
+                    updateJourneyStep(3, "⏳", "Approaching Destination", "--");
+                    updateJourneyStep(4, "⏳", "Delivered", "--");
                     
-                    if (statusLabel != null) statusLabel.setText("Started");
-                    if (temperatureLabel != null) temperatureLabel.setText("Monitoring...");
-                    
-                    System.out.println("✅ ConsumerController: Started tracking simulation via Kafka: " + batchId);
+                    logger.info("✅ ConsumerController: Started tracking simulation via Kafka: {}", batchId);
                     
                 } else if (event.isStop()) {
                     // Handle simulation STOP
@@ -324,18 +331,30 @@ public class ConsumerController implements SimulationListener {
                     String message = timestamp + ": ✅ Batch " + batchId + " delivered (via Kafka) - Ready for verification";
                     verificationHistory.add(0, message);
                     
-                    // Compute final quality using QualityAssessmentService (same as onSimulationStopped)
+                    // Compute final quality using QualityAssessmentService
+                    // FIX: Use event timestamp as fallback when simulationStartTimeMs is 0
+                    // This happens when ConsumerController started after the simulation began
+                    // or when receiving STOP without having received the START event
                     double finalQuality = DEFAULT_FINAL_QUALITY;
                     try {
-                        if (qualityAssessmentService != null && simulationStartTimeMs > 0) {
+                        long effectiveStartTime = simulationStartTimeMs;
+                        if (effectiveStartTime <= 0 && event.getTimestamp() > 0) {
+                            // Use event timestamp minus an estimated simulation duration (2 min = 120000 ms)
+                            // This is a reasonable fallback for computing quality decay
+                            final long ESTIMATED_SIMULATION_DURATION_MS = 120000L;
+                            effectiveStartTime = event.getTimestamp() - ESTIMATED_SIMULATION_DURATION_MS;
+                            logger.info("Using estimated start time from event timestamp for quality calculation");
+                        }
+                        
+                        if (qualityAssessmentService != null && effectiveStartTime > 0) {
                             QualityAssessmentService.FinalQualityAssessment assessment =
                                 qualityAssessmentService.assessFinalQualityFromMonitoring(
-                                    batchId, 100.0, simulationStartTimeMs);
+                                    batchId, 100.0, effectiveStartTime);
                             
                             if (assessment != null) {
                                 finalQuality = assessment.getFinalQuality();
-                                System.out.println("ConsumerController: Computed final quality via Kafka stop: " + 
-                                                 finalQuality + "% (grade: " + assessment.getQualityGrade() + ")");
+                                logger.info("ConsumerController: Computed final quality via Kafka stop: {}% (grade: {})", 
+                                           finalQuality, assessment.getQualityGrade());
                                 
                                 // Update journey step with detailed quality info
                                 updateJourneyStep(4, "✅", "Delivered - " + assessment.getQualityGrade(),
@@ -344,18 +363,19 @@ public class ConsumerController implements SimulationListener {
                             }
                         } else if (SimulationManager.isInitialized()) {
                             finalQuality = SimulationManager.getInstance().getFinalQuality();
+                            logger.info("Using final quality from SimulationManager: {}%", finalQuality);
                         }
                     } catch (Exception e) {
-                        System.err.println("Could not compute final quality via Kafka: " + e.getMessage());
+                        logger.warn("Could not compute final quality via Kafka: {}", e.getMessage());
                     }
                     
-                    // Display final quality
+                    // Display final quality and update status
                     displayFinalQuality(batchId, finalQuality);
                     
                     // Get and display average temperature from TemperatureService
                     displayAverageTemperature(batchId);
                     
-                    // Update all journey steps to complete
+                    // Update all journey steps to complete with explicit "Delivered" status
                     updateJourneyFromProgress(batchId, 100.0, "Delivered");
                     
                     // Reset tracking
@@ -363,25 +383,32 @@ public class ConsumerController implements SimulationListener {
                     lastProgress = 0.0;
                     simulationStartTimeMs = 0;
                     
-                    System.out.println("✅ ConsumerController: Stopped tracking simulation via Kafka: " + batchId);
+                    logger.info("✅ ConsumerController: Stopped tracking simulation via Kafka: {} (final quality: {}%)", 
+                               batchId, String.format("%.1f", finalQuality));
                 }
             } catch (Exception e) {
-                System.err.println("❌ Error handling simulation control event: " + e.getMessage());
-                e.printStackTrace();
+                logger.error("❌ Error handling simulation control event: {}", e.getMessage(), e);
             }
         });
     }
     
     /**
      * Initialize the journey display with default values.
+     * Sets initial state to "Waiting" which will be updated when simulation events arrive.
+     * 
+     * <p>Note: This method sets status to "Awaiting Shipment" to clearly indicate
+     * the Consumer is waiting for simulation events. The status will be explicitly
+     * updated to "In Transit" or "Delivered" when events are received.</p>
      */
     private void initializeJourneyDisplay() {
         Platform.runLater(() -> {
             if (finalQualityLabel != null) finalQualityLabel.setText("--");
             if (temperatureLabel != null) temperatureLabel.setText("--");
-            if (statusLabel != null) statusLabel.setText("Waiting");
+            // Use explicit "Awaiting Shipment" status instead of generic "Waiting"
+            // This makes it clear the UI is waiting for simulation events
+            if (statusLabel != null) statusLabel.setText("Awaiting Shipment");
             
-            // Reset journey steps
+            // Reset journey steps to initial pending state
             updateJourneyStep(1, "⏳", "Awaiting shipment...", "Start a simulation to see journey updates");
             updateJourneyStep(2, "⏳", "In Transit", "--");
             updateJourneyStep(3, "⏳", "Approaching Destination", "--");
