@@ -31,8 +31,8 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class QRProducerConsumerIntegrationTest {
     
-    /** Pre-compiled pattern for batch ID format verification (BATCH_{timestamp}_{random}_{suffix}) */
-    private static final Pattern BATCH_ID_FORMAT_PATTERN = Pattern.compile("BATCH_\\d+_\\d+_FORMAT_TEST");
+    /** Pre-compiled pattern for batch ID format verification (BATCH_{timestamp}_{uuid}_{suffix}) */
+    private static final Pattern BATCH_ID_FORMAT_PATTERN = Pattern.compile("BATCH_\\d+_[a-f0-9-]+_FORMAT_TEST");
     
     /**
      * Generate a unique test identifier to avoid file collisions in concurrent test execution.
@@ -51,10 +51,10 @@ class QRProducerConsumerIntegrationTest {
     @Test
     void testBatchIdFormatConsistency() throws Exception {
         // Generate batch ID in the same format the backend uses
-        // Add test identifier to avoid conflicts with other tests
+        // Use UUID for guaranteed uniqueness and reproducibility
+        String uniqueSuffix = uniqueId();
         long timestamp = System.currentTimeMillis();
-        int random = (int) (Math.random() * 9000) + 1000; // 4-digit random to avoid conflicts
-        String batchId = String.format("BATCH_%d_%d_FORMAT_TEST", timestamp, random);
+        String batchId = String.format("BATCH_%d_%s_FORMAT_TEST", timestamp, uniqueSuffix);
         
         // Generate and decode QR
         Path qrPath = QRGenerator.generateBatchQR(batchId, "farmer", "STANDARD");

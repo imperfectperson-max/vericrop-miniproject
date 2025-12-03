@@ -673,11 +673,19 @@ async def get_batch_by_id(batch_id: str):
         
     Raises:
         HTTPException 404 if batch not found
+    
+    Note:
+        Current implementation uses O(n) linear search which is acceptable for
+        development/demo use with small datasets. For production with large
+        datasets, consider using a dictionary indexed by lowercase batch_id
+        for O(1) lookups, or migrating to a proper database with indexing.
     """
     # Perform case-insensitive search for the batch ID
+    # O(n) complexity - acceptable for demo/development use case
+    batch_id_lower = batch_id.lower()
     for batch in batches_db:
         stored_batch_id = batch.get('batch_id', '')
-        if stored_batch_id.lower() == batch_id.lower():
+        if stored_batch_id.lower() == batch_id_lower:
             logger.info(f"✅ Batch found: {batch_id}")
             return batch
     
