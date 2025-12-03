@@ -1832,26 +1832,119 @@ public class ProducerController implements SimulationListener {
             // Get farmer info (use current or default)
             String farmer = farmerField.getText();
             String farmerId = (farmer != null && !farmer.isEmpty()) ? farmer : "unknown";
+            
+            // Get quality information for this batch
+            String quality = getQualityForBatch(selectedBatchId);
 
-            // Generate QR code using QRGenerator utility
-            var qrPath = org.vericrop.gui.util.QRGenerator.generateProductQR(selectedBatchId, farmerId);
+            // Generate QR code using the new versioned batch QR generator with quality
+            var qrPath = org.vericrop.gui.util.QRGenerator.generateBatchQR(selectedBatchId, farmerId, quality);
 
             qrStatusLabel.setText("✅ QR code generated: " + qrPath.getFileName());
             qrStatusLabel.setStyle("-fx-text-fill: #10B981;");
 
             // Broadcast QR generation event via AlertService
             var alertService = MainApp.getInstance().getApplicationContext().getAlertService();
+            String qualityInfo = quality != null ? " (Quality: " + quality + ")" : "";
             alertService.info("QR Code Generated",
-                    "QR code for batch " + selectedBatchId + " saved to " + qrPath.toAbsolutePath(),
+                    "QR code for batch " + selectedBatchId + qualityInfo + " saved to " + qrPath.toAbsolutePath(),
                     "producer");
 
-            System.out.println("✅ QR Code generated: " + qrPath.toAbsolutePath());
+            System.out.println("✅ QR Code generated: " + qrPath.toAbsolutePath() + " with quality: " + quality);
 
         } catch (Exception e) {
             qrStatusLabel.setText("❌ Error: " + e.getMessage());
             qrStatusLabel.setStyle("-fx-text-fill: #DC2626;");
             e.printStackTrace();
         }
+    }
+    
+    /**
+     * Get quality classification for a batch from stored metrics or batch info.
+     * 
+     * @param batchId The batch ID to look up
+     * @return Quality classification (PRIME, STANDARD, SUB-STANDARD) or null if not found
+     */
+    private String getQualityForBatch(String batchId) {
+        // First try to get from batchMetricsMap
+        Map<String, Double> metrics = batchMetricsMap.get(batchId);
+        if (metrics != null) {
+            Double primeRate = metrics.get("prime_rate");
+            Double qualityScore = metrics.get("quality_score");
+            
+            // Classify based on quality score (0-1 scale)
+            if (qualityScore != null) {
+                if (qualityScore >= 0.8) {
+                    return "PRIME";
+                } else if (qualityScore >= 0.6) {
+                    return "STANDARD";
+                } else {
+                    return "SUB-STANDARD";
+                }
+            }
+            
+            // Alternative: classify based on prime rate
+            if (primeRate != null) {
+                if (primeRate >= 0.8) {
+                    return "PRIME";
+                } else if (primeRate >= 0.6) {
+                    return "STANDARD";
+                } else {
+                    return "SUB-STANDARD";
+                }
+            }
+        }
+        
+        // Try to get from batchInfoMap
+        for (Map.Entry<String, Map<String, Object>> entry : batchInfoMap.entrySet()) {
+            Map<String, Object> batchInfo = entry.getValue();
+            String storedBatchId = safeGetString(batchInfo, "batch_id");
+            if (batchId.equals(storedBatchId)) {
+                // Try to extract quality from stored batch info
+                Object qualityScoreObj = batchInfo.get("quality_score");
+                if (qualityScoreObj instanceof Number) {
+                    double score = ((Number) qualityScoreObj).doubleValue();
+                    // Handle both 0-1 and 0-100 scales
+                    if (score > 1.0) {
+                        score = score / 100.0;
+                    }
+                    if (score >= 0.8) {
+                        return "PRIME";
+                    } else if (score >= 0.6) {
+                        return "STANDARD";
+                    } else {
+                        return "SUB-STANDARD";
+                    }
+                }
+                
+                // Check for label field (e.g., FRESH, LOW_QUALITY, ROTTEN)
+                String label = safeGetString(batchInfo, "label");
+                if ("FRESH".equalsIgnoreCase(label)) {
+                    return "PRIME";
+                } else if ("LOW_QUALITY".equalsIgnoreCase(label)) {
+                    return "STANDARD";
+                } else if ("ROTTEN".equalsIgnoreCase(label)) {
+                    return "SUB-STANDARD";
+                }
+            }
+        }
+        
+        // Fallback: check current prediction if available
+        if (currentPrediction != null) {
+            Object qualityScoreObj = currentPrediction.get("quality_score");
+            if (qualityScoreObj instanceof Number) {
+                double score = ((Number) qualityScoreObj).doubleValue();
+                if (score >= 0.8) {
+                    return "PRIME";
+                } else if (score >= 0.6) {
+                    return "STANDARD";
+                } else {
+                    return "SUB-STANDARD";
+                }
+            }
+        }
+        
+        System.out.println("⚠ Could not determine quality for batch: " + batchId);
+        return null;
     }
 
 
