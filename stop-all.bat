@@ -30,6 +30,8 @@ if errorlevel 1 (
     if not errorlevel 1 (
         set "DOCKER_COMPOSE=docker compose"
     )
+) else (
+    set "DOCKER_COMPOSE=docker-compose"
 )
 
 REM Parse arguments

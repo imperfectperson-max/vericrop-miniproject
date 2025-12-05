@@ -140,6 +140,8 @@ if errorlevel 1 (
         exit /b 1
     )
     set "DOCKER_COMPOSE=docker compose"
+) else (
+    set "DOCKER_COMPOSE=docker-compose"
 )
 echo [92m✓ Docker Compose is installed[0m
 echo.

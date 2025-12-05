@@ -171,7 +171,7 @@ check_java() {
     fi
     
     if [[ "$JAVA_MAJOR" != "unknown" && "$JAVA_MAJOR" -lt 11 ]]; then
-        echo -e "${YELLOW}⚠ Java version $JAVA_MAJOR detected. JDK 11+ required (JDK 17 recommended).${NC}"
+        echo -e "${YELLOW}⚠ Java version $JAVA_MAJOR detected. This version is unsupported. JDK 11+ is required (JDK 17 recommended).${NC}"
     else
         echo -e "${GREEN}✓ Java $JAVA_MAJOR detected${NC}"
     fi
