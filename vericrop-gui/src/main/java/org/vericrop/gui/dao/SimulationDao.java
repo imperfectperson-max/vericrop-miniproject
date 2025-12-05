@@ -356,6 +356,60 @@ public class SimulationDao {
     }
     
     /**
+     * Find all simulations.
+     * Used for maintenance operations (backup before delete).
+     * 
+     * @return List of all simulations
+     */
+    public List<Simulation> findAll() {
+        String sql = "SELECT s.*, " +
+                     "owner.username as owner_username, " +
+                     "supplier.username as supplier_username, " +
+                     "consumer.username as consumer_username " +
+                     "FROM simulations s " +
+                     "LEFT JOIN users owner ON s.owner_user_id = owner.id " +
+                     "LEFT JOIN users supplier ON s.supplier_user_id = supplier.id " +
+                     "LEFT JOIN users consumer ON s.consumer_user_id = consumer.id " +
+                     "ORDER BY s.created_at DESC";
+        
+        List<Simulation> simulations = new ArrayList<>();
+        
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+            
+            while (rs.next()) {
+                simulations.add(mapResultSetToSimulation(rs));
+            }
+        } catch (SQLException e) {
+            logger.error("Error finding all simulations: {}", e.getMessage());
+        }
+        return simulations;
+    }
+    
+    /**
+     * Delete all simulations.
+     * Used for maintenance operations.
+     * Note: Related simulation_batches should be deleted first due to FK constraints.
+     * 
+     * @return Number of simulations deleted
+     */
+    public int deleteAll() {
+        String sql = "DELETE FROM simulations";
+        
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            int deleted = stmt.executeUpdate();
+            logger.info("Deleted {} simulations", deleted);
+            return deleted;
+        } catch (SQLException e) {
+            logger.error("Error deleting all simulations: {}", e.getMessage());
+        }
+        return 0;
+    }
+    
+    /**
      * Map a ResultSet row to a Simulation object.
      */
     private Simulation mapResultSetToSimulation(ResultSet rs) throws SQLException {
