@@ -1123,6 +1123,78 @@ Write-Host "Python: $(python --version)"
 
 ### Running the Complete Stack
 
+**One-Click Start Scripts** (Recommended)
+
+For convenience, we provide start/stop scripts that handle all services in one command:
+
+**Unix/Linux/Mac:**
+```bash
+# Start all services with one command
+./start-all.sh
+
+# Start only infrastructure (PostgreSQL, Kafka, ML Service)
+./start-all.sh infra
+
+# Start simulation environment
+./start-all.sh simulation
+
+# Build Java + Docker images
+./start-all.sh all-build
+
+# Run the JavaFX GUI
+./start-all.sh run
+
+# Stop all services
+./stop-all.sh
+
+# Stop all and remove data volumes
+./stop-all.sh -v
+```
+
+**Windows:**
+```cmd
+REM Start all services with one command
+start-all.bat
+
+REM Start only infrastructure (PostgreSQL, Kafka, ML Service)
+start-all.bat infra
+
+REM Start simulation environment
+start-all.bat simulation
+
+REM Build Java + Docker images
+start-all.bat all-build
+
+REM Run the JavaFX GUI
+start-all.bat run
+
+REM Stop all services
+stop-all.bat
+
+REM Stop all and remove data volumes
+stop-all.bat -v
+```
+
+**Available Modes:**
+
+| Mode | Description |
+|------|-------------|
+| `full` | Start all services (default): Kafka, PostgreSQL, ML Service, Airflow |
+| `infra` | Start infrastructure only: PostgreSQL, Kafka, Zookeeper, ML Service |
+| `kafka` | Start Kafka stack only |
+| `simulation` | Start simulation environment |
+| `prod` | Start production environment |
+| `build` | Build Java artifacts with Gradle |
+| `docker-build` | Build Docker images |
+| `all-build` | Build everything (Java + Docker) |
+| `run` | Run the JavaFX GUI application |
+
+For help: `./start-all.sh --help` or `start-all.bat --help`
+
+---
+
+### Manual Setup
+
 Follow these step-by-step instructions to get VeriCrop running:
 
 #### Step 1: Clone the Repository
