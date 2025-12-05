@@ -1,0 +1,397 @@
+#!/bin/bash
+
+#
+# VeriCrop Start-All Script (Unix/Linux/Mac)
+#
+# This script helps you start all VeriCrop services with a single command.
+# It supports multiple modes: full stack, infrastructure only, build, and run.
+#
+# Usage:
+#   ./start-all.sh [mode] [options]
+#
+# Modes:
+#   full           - Start all services (default): Kafka, PostgreSQL, ML Service, Airflow
+#   infra          - Start infrastructure only: PostgreSQL, Kafka, Zookeeper
+#   kafka          - Start Kafka stack only (using docker-compose-kafka.yml)
+#   simulation     - Start simulation environment (using docker-compose-simulation.yml)
+#   prod           - Start production environment (using docker-compose.prod.yml)
+#   build          - Build Java artifacts with Gradle
+#   docker-build   - Build Docker images (vericrop-gui, ml-service)
+#   run            - Run the JavaFX GUI application
+#   all-build      - Build everything (Java + Docker images)
+#
+# Options:
+#   -d, --detach     Run services in detached mode (background)
+#   -b, --build      Rebuild Docker images before starting
+#   -h, --help       Show this help message
+#   --no-cache       Build Docker images without cache
+#
+
+set -e
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+# Script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+# Show help immediately if requested
+if [[ "$1" == "-h" || "$1" == "--help" || "$1" == "help" ]]; then
+    echo "VeriCrop Start-All Script (Unix/Linux/Mac)"
+    echo ""
+    echo "This script helps you start all VeriCrop services with a single command."
+    echo ""
+    echo "Usage:"
+    echo "  ./start-all.sh [mode] [options]"
+    echo ""
+    echo "Modes:"
+    echo "  full           - Start all services (default): Kafka, PostgreSQL, ML Service, Airflow"
+    echo "  infra          - Start infrastructure only: PostgreSQL, Kafka, Zookeeper"
+    echo "  kafka          - Start Kafka stack only (using docker-compose-kafka.yml)"
+    echo "  simulation     - Start simulation environment (using docker-compose-simulation.yml)"
+    echo "  prod           - Start production environment (using docker-compose.prod.yml)"
+    echo "  build          - Build Java artifacts with Gradle"
+    echo "  docker-build   - Build Docker images (vericrop-gui, ml-service)"
+    echo "  run            - Run the JavaFX GUI application"
+    echo "  all-build      - Build everything (Java + Docker images)"
+    echo ""
+    echo "Options:"
+    echo "  -d, --detach     Run services in detached mode (background)"
+    echo "  -b, --build      Rebuild Docker images before starting"
+    echo "  -h, --help       Show this help message"
+    echo "  --no-cache       Build Docker images without cache"
+    echo ""
+    exit 0
+fi
+
+# Default options
+MODE="${1:-full}"
+DETACH="-d"
+BUILD_FLAG=""
+NO_CACHE=""
+
+# Parse arguments
+shift || true
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -d|--detach)
+            DETACH="-d"
+            shift
+            ;;
+        -b|--build)
+            BUILD_FLAG="--build"
+            shift
+            ;;
+        --no-cache)
+            NO_CACHE="--no-cache"
+            shift
+            ;;
+        -h|--help)
+            exec "$0" help
+            ;;
+        *)
+            echo -e "${RED}Unknown option: $1${NC}"
+            exit 1
+            ;;
+    esac
+done
+
+# Print banner
+print_banner() {
+    echo ""
+    echo -e "${CYAN}╔═══════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${CYAN}║                                                           ║${NC}"
+    echo -e "${CYAN}║${GREEN}           🌱 VeriCrop Start-All Script 🌱                ${CYAN}║${NC}"
+    echo -e "${CYAN}║                                                           ║${NC}"
+    echo -e "${CYAN}║${NC}   AI-Powered Agricultural Supply Chain Management        ${CYAN}║${NC}"
+    echo -e "${CYAN}║${NC}   with Quality Control and Blockchain Transparency       ${CYAN}║${NC}"
+    echo -e "${CYAN}║                                                           ║${NC}"
+    echo -e "${CYAN}╚═══════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+}
+
+# Check prerequisites
+check_prerequisites() {
+    echo -e "${BLUE}Checking prerequisites...${NC}"
+    
+    # Check Docker
+    if ! command -v docker &> /dev/null; then
+        echo -e "${RED}❌ Docker is not installed. Please install Docker first.${NC}"
+        exit 1
+    fi
+    echo -e "${GREEN}✓ Docker is installed${NC}"
+    
+    # Check Docker Compose
+    if ! command -v docker-compose &> /dev/null; then
+        if ! docker compose version &> /dev/null; then
+            echo -e "${RED}❌ Docker Compose is not installed. Please install Docker Compose.${NC}"
+            exit 1
+        fi
+        DOCKER_COMPOSE="docker compose"
+    else
+        DOCKER_COMPOSE="docker-compose"
+    fi
+    echo -e "${GREEN}✓ Docker Compose is installed${NC}"
+    
+    # Check if Docker is running
+    if ! docker info &> /dev/null; then
+        echo -e "${RED}❌ Docker daemon is not running. Please start Docker.${NC}"
+        exit 1
+    fi
+    echo -e "${GREEN}✓ Docker daemon is running${NC}"
+    
+    echo ""
+}
+
+# Check Java for Gradle commands
+check_java() {
+    if ! command -v java &> /dev/null; then
+        echo -e "${RED}❌ Java is not installed. Please install JDK 17 or later.${NC}"
+        exit 1
+    fi
+    
+    JAVA_VERSION=$(java -version 2>&1 | head -n 1 | cut -d'"' -f2 | cut -d'.' -f1)
+    if [[ "$JAVA_VERSION" -lt 11 ]]; then
+        echo -e "${YELLOW}⚠ Java version $JAVA_VERSION detected. JDK 17 is recommended.${NC}"
+    else
+        echo -e "${GREEN}✓ Java $JAVA_VERSION detected${NC}"
+    fi
+}
+
+# Start full stack
+start_full() {
+    echo -e "${BLUE}Starting full VeriCrop stack...${NC}"
+    echo ""
+    
+    $DOCKER_COMPOSE up $DETACH $BUILD_FLAG
+    
+    echo ""
+    echo -e "${GREEN}✓ Full stack started successfully!${NC}"
+    print_service_urls
+}
+
+# Start infrastructure only
+start_infra() {
+    echo -e "${BLUE}Starting infrastructure services (PostgreSQL, Kafka, Zookeeper)...${NC}"
+    echo ""
+    
+    $DOCKER_COMPOSE up $DETACH postgres kafka zookeeper ml-service
+    
+    echo ""
+    echo -e "${GREEN}✓ Infrastructure services started!${NC}"
+    echo ""
+    echo -e "Services running:"
+    echo -e "  • PostgreSQL:  ${CYAN}localhost:5432${NC}"
+    echo -e "  • Kafka:       ${CYAN}localhost:9092${NC}"
+    echo -e "  • Zookeeper:   ${CYAN}localhost:2181${NC}"
+    echo -e "  • ML Service:  ${CYAN}http://localhost:8000${NC}"
+}
+
+# Start Kafka stack
+start_kafka() {
+    echo -e "${BLUE}Starting Kafka stack (docker-compose-kafka.yml)...${NC}"
+    echo ""
+    
+    $DOCKER_COMPOSE -f docker-compose-kafka.yml up $DETACH $BUILD_FLAG
+    
+    echo ""
+    echo -e "${GREEN}✓ Kafka stack started!${NC}"
+    echo ""
+    echo -e "Services running:"
+    echo -e "  • Kafka:       ${CYAN}localhost:9092${NC}"
+    echo -e "  • Zookeeper:   ${CYAN}localhost:2181${NC}"
+    echo -e "  • Kafka UI:    ${CYAN}http://localhost:8090${NC}"
+}
+
+# Start simulation environment
+start_simulation() {
+    echo -e "${BLUE}Starting simulation environment (docker-compose-simulation.yml)...${NC}"
+    echo ""
+    
+    $DOCKER_COMPOSE -f docker-compose-simulation.yml up $DETACH $BUILD_FLAG
+    
+    echo ""
+    echo -e "${GREEN}✓ Simulation environment started!${NC}"
+    echo ""
+    echo -e "Services running:"
+    echo -e "  • Kafka:         ${CYAN}localhost:9092${NC}"
+    echo -e "  • Kafka UI:      ${CYAN}http://localhost:8090${NC}"
+    echo -e "  • PostgreSQL:    ${CYAN}localhost:5432${NC}"
+    echo -e "  • ML Service:    ${CYAN}http://localhost:8000${NC}"
+    echo -e "  • Airflow:       ${CYAN}http://localhost:8080${NC} (admin/admin)"
+}
+
+# Start production environment
+start_prod() {
+    echo -e "${BLUE}Starting production environment (docker-compose.prod.yml)...${NC}"
+    echo ""
+    
+    if [ ! -f ".env" ]; then
+        echo -e "${YELLOW}⚠ Warning: .env file not found. Copying from .env.production.example${NC}"
+        if [ -f ".env.production.example" ]; then
+            cp .env.production.example .env
+            echo -e "${YELLOW}  Please review and update .env with production credentials.${NC}"
+        fi
+    fi
+    
+    $DOCKER_COMPOSE -f docker-compose.prod.yml up $DETACH $BUILD_FLAG
+    
+    echo ""
+    echo -e "${GREEN}✓ Production environment started!${NC}"
+    print_service_urls
+}
+
+# Build Java artifacts
+build_java() {
+    echo -e "${BLUE}Building Java artifacts with Gradle...${NC}"
+    echo ""
+    
+    check_java
+    
+    if [ -f "./gradlew" ]; then
+        chmod +x ./gradlew
+        ./gradlew clean build --no-daemon
+    else
+        echo -e "${RED}❌ Gradle wrapper not found. Please run from project root.${NC}"
+        exit 1
+    fi
+    
+    echo ""
+    echo -e "${GREEN}✓ Java build completed successfully!${NC}"
+}
+
+# Build Docker images
+build_docker() {
+    echo -e "${BLUE}Building Docker images...${NC}"
+    echo ""
+    
+    # Build vericrop-gui
+    echo -e "${YELLOW}Building vericrop-gui Docker image...${NC}"
+    docker build $NO_CACHE -t vericrop-gui:latest -f vericrop-gui/Dockerfile .
+    echo -e "${GREEN}✓ vericrop-gui image built${NC}"
+    
+    # Build ml-service
+    echo -e "${YELLOW}Building ml-service Docker image...${NC}"
+    docker build $NO_CACHE -t vericrop-ml-service:latest -f docker/ml-service/Dockerfile docker/ml-service
+    echo -e "${GREEN}✓ vericrop-ml-service image built${NC}"
+    
+    echo ""
+    echo -e "${GREEN}✓ All Docker images built successfully!${NC}"
+    echo ""
+    echo "Available images:"
+    docker images | grep -E "vericrop-gui|vericrop-ml-service" || echo "No images found"
+}
+
+# Build everything
+build_all() {
+    echo -e "${BLUE}Building everything (Java + Docker)...${NC}"
+    echo ""
+    
+    build_java
+    echo ""
+    build_docker
+    
+    echo ""
+    echo -e "${GREEN}✓ All builds completed successfully!${NC}"
+}
+
+# Run the JavaFX GUI
+run_gui() {
+    echo -e "${BLUE}Running VeriCrop JavaFX GUI...${NC}"
+    echo ""
+    
+    check_java
+    
+    if [ -f "./gradlew" ]; then
+        chmod +x ./gradlew
+        ./gradlew :vericrop-gui:run
+    else
+        echo -e "${RED}❌ Gradle wrapper not found. Please run from project root.${NC}"
+        exit 1
+    fi
+}
+
+# Print service URLs
+print_service_urls() {
+    echo ""
+    echo -e "${CYAN}═══════════════════════════════════════════════════════════${NC}"
+    echo -e "${CYAN}                     Service URLs                           ${NC}"
+    echo -e "${CYAN}═══════════════════════════════════════════════════════════${NC}"
+    echo ""
+    echo -e "  • ML Service:     ${GREEN}http://localhost:8000${NC}"
+    echo -e "  • ML Health:      ${GREEN}http://localhost:8000/health${NC}"
+    echo -e "  • Kafka UI:       ${GREEN}http://localhost:8081${NC}"
+    echo -e "  • Airflow UI:     ${GREEN}http://localhost:8080${NC} (admin/admin)"
+    echo -e "  • PostgreSQL:     ${GREEN}localhost:5432${NC} (vericrop/vericrop123)"
+    echo -e "  • Kafka:          ${GREEN}localhost:9092${NC}"
+    echo ""
+    echo -e "${CYAN}═══════════════════════════════════════════════════════════${NC}"
+    echo ""
+    echo -e "To run the JavaFX GUI:  ${YELLOW}./gradlew :vericrop-gui:run${NC}"
+    echo -e "To stop all services:   ${YELLOW}./stop-all.sh${NC}"
+    echo ""
+}
+
+# Main execution
+main() {
+    print_banner
+    check_prerequisites
+    
+    case $MODE in
+        full)
+            start_full
+            ;;
+        infra|infrastructure)
+            start_infra
+            ;;
+        kafka)
+            start_kafka
+            ;;
+        simulation|sim)
+            start_simulation
+            ;;
+        prod|production)
+            start_prod
+            ;;
+        build)
+            build_java
+            ;;
+        docker-build|docker)
+            build_docker
+            ;;
+        all-build|build-all)
+            build_all
+            ;;
+        run)
+            run_gui
+            ;;
+        help|-h|--help)
+            echo "Run './start-all.sh --help' for usage information"
+            exit 0
+            ;;
+        *)
+            echo -e "${RED}Unknown mode: $MODE${NC}"
+            echo ""
+            echo "Available modes:"
+            echo "  full           - Start all services (default)"
+            echo "  infra          - Start infrastructure only"
+            echo "  kafka          - Start Kafka stack"
+            echo "  simulation     - Start simulation environment"
+            echo "  prod           - Start production environment"
+            echo "  build          - Build Java artifacts"
+            echo "  docker-build   - Build Docker images"
+            echo "  all-build      - Build everything"
+            echo "  run            - Run the JavaFX GUI"
+            echo ""
+            exit 1
+            ;;
+    esac
+}
+
+main "$@"
