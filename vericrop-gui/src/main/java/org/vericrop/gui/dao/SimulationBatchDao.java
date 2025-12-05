@@ -362,6 +362,148 @@ public class SimulationBatchDao {
     }
     
     /**
+     * Delete all batches from all simulations.
+     * Used for maintenance operations.
+     * 
+     * @return Number of batches deleted
+     */
+    public int deleteAll() {
+        String sql = "DELETE FROM simulation_batches";
+        
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            int deleted = stmt.executeUpdate();
+            logger.info("Deleted {} simulation batches", deleted);
+            return deleted;
+        } catch (SQLException e) {
+            logger.error("Error deleting all batches: {}", e.getMessage());
+        }
+        return 0;
+    }
+    
+    /**
+     * Find all batches across all simulations.
+     * Used for maintenance operations (backup before delete).
+     * 
+     * @return List of all simulation batches
+     */
+    public List<SimulationBatch> findAll() {
+        String sql = "SELECT * FROM simulation_batches ORDER BY created_at DESC";
+        
+        List<SimulationBatch> batches = new java.util.ArrayList<>();
+        
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+            
+            while (rs.next()) {
+                batches.add(mapResultSetToBatch(rs));
+            }
+        } catch (SQLException e) {
+            logger.error("Error finding all batches: {}", e.getMessage());
+        }
+        return batches;
+    }
+    
+    /**
+     * Create a batch with transactional status update.
+     * Uses a single transaction to ensure batch is created and status is set atomically.
+     * 
+     * @param simulationId Simulation UUID
+     * @param batchIndex Sequential batch index
+     * @param quantity Batch quantity
+     * @param metadata Optional metadata
+     * @param initialStatus Initial status after creation
+     * @param location Initial location
+     * @return Created batch with final status, or null if failed
+     */
+    public SimulationBatch createBatchWithTransaction(UUID simulationId, int batchIndex, int quantity, 
+                                                       JsonNode metadata, String initialStatus, String location) {
+        String insertSql = "INSERT INTO simulation_batches (simulation_id, batch_index, quantity, status, " +
+                          "current_location, progress, metadata) " +
+                          "VALUES (?, ?, ?, ?, ?, ?, ?) " +
+                          "RETURNING id, created_at, updated_at";
+        
+        Connection conn = null;
+        try {
+            conn = dataSource.getConnection();
+            conn.setAutoCommit(false);
+            
+            try (PreparedStatement stmt = conn.prepareStatement(insertSql)) {
+                stmt.setObject(1, simulationId);
+                stmt.setInt(2, batchIndex);
+                stmt.setInt(3, quantity);
+                stmt.setString(4, initialStatus);
+                stmt.setString(5, location);
+                stmt.setDouble(6, 0.0);
+                
+                if (metadata != null) {
+                    PGobject jsonObject = new PGobject();
+                    jsonObject.setType("jsonb");
+                    jsonObject.setValue(OBJECT_MAPPER.writeValueAsString(metadata));
+                    stmt.setObject(7, jsonObject);
+                } else {
+                    stmt.setNull(7, Types.OTHER);
+                }
+                
+                try (ResultSet rs = stmt.executeQuery()) {
+                    if (rs.next()) {
+                        SimulationBatch batch = new SimulationBatch(simulationId, batchIndex, quantity);
+                        batch.setId(UUID.fromString(rs.getString("id")));
+                        batch.setStatus(initialStatus);
+                        batch.setCurrentLocation(location);
+                        batch.setProgress(0.0);
+                        batch.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
+                        batch.setUpdatedAt(rs.getTimestamp("updated_at").toLocalDateTime());
+                        batch.setMetadata(metadata);
+                        
+                        // Commit the transaction
+                        conn.commit();
+                        
+                        logger.info("Batch {} created successfully with status '{}' for simulation {}", 
+                                   batch.getId(), initialStatus, simulationId);
+                        return batch;
+                    }
+                }
+            }
+            
+            // Rollback if we didn't return
+            conn.rollback();
+            
+        } catch (SQLException e) {
+            logger.error("Failed to create batch with transaction: {} (SQLState: {})", 
+                        e.getMessage(), e.getSQLState());
+            if (conn != null) {
+                try {
+                    conn.rollback();
+                } catch (SQLException rollbackEx) {
+                    logger.error("Failed to rollback transaction: {}", rollbackEx.getMessage());
+                }
+            }
+        } catch (Exception e) {
+            logger.error("Error serializing batch metadata: {}", e.getMessage());
+            if (conn != null) {
+                try {
+                    conn.rollback();
+                } catch (SQLException rollbackEx) {
+                    logger.error("Failed to rollback transaction: {}", rollbackEx.getMessage());
+                }
+            }
+        } finally {
+            if (conn != null) {
+                try {
+                    conn.setAutoCommit(true);
+                    conn.close();
+                } catch (SQLException e) {
+                    logger.warn("Error closing connection: {}", e.getMessage());
+                }
+            }
+        }
+        return null;
+    }
+    
+    /**
      * Map a ResultSet row to a SimulationBatch object.
      */
     private SimulationBatch mapResultSetToBatch(ResultSet rs) throws SQLException {

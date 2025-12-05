@@ -100,6 +100,8 @@ public class SimulationPersistenceService {
     
     /**
      * Create a batch within a simulation.
+     * Uses transactional handling to ensure the batch is fully created with correct status.
+     * The status will be set to IN_TRANSIT only after successful transaction commit.
      * 
      * @param simulationId Simulation UUID
      * @param quantity Batch quantity
@@ -107,15 +109,23 @@ public class SimulationPersistenceService {
      * @return Created SimulationBatch or null if failed
      */
     public SimulationBatch createBatch(UUID simulationId, int quantity, JsonNode metadata) {
+        long startTime = System.currentTimeMillis();
+        logger.info("Creating batch for simulation {} with quantity {}", simulationId, quantity);
+        
         // Get next batch index
         int batchIndex = batchDao.countBySimulationId(simulationId);
         
-        SimulationBatch batch = batchDao.createBatch(simulationId, batchIndex, quantity, metadata);
+        // Use transactional batch creation to avoid stuck "in_transit" status
+        SimulationBatch batch = batchDao.createBatchWithTransaction(
+            simulationId, batchIndex, quantity, metadata, 
+            SimulationBatch.STATUS_IN_TRANSIT, LOCATION_STARTING);
+        
         if (batch != null) {
-            // Update status to in_transit
-            batchDao.updateBatchProgress(batch.getId(), SimulationBatch.STATUS_IN_TRANSIT, 
-                                        null, null, LOCATION_STARTING, 0.0);
-            batch.setStatus(SimulationBatch.STATUS_IN_TRANSIT);
+            long elapsed = System.currentTimeMillis() - startTime;
+            logger.info("✅ Batch {} created successfully for simulation {} in {}ms (status: {})", 
+                       batch.getId(), simulationId, elapsed, batch.getStatus());
+        } else {
+            logger.error("❌ Failed to create batch for simulation {} - transaction rolled back", simulationId);
         }
         
         return batch;
@@ -123,6 +133,7 @@ public class SimulationPersistenceService {
     
     /**
      * Update batch progress during simulation.
+     * Transitions batch status based on progress and logs the transition.
      * 
      * @param batchId Batch UUID
      * @param temperature Current temperature
@@ -132,8 +143,16 @@ public class SimulationPersistenceService {
      */
     public void updateBatchProgress(UUID batchId, Double temperature, Double humidity, 
                                     String location, Double progress) {
-        String status = progress >= 100.0 ? SimulationBatch.STATUS_DELIVERED : SimulationBatch.STATUS_IN_TRANSIT;
-        batchDao.updateBatchProgress(batchId, status, temperature, humidity, location, progress);
+        String oldStatus = batchDao.findById(batchId).map(b -> b.getStatus()).orElse("unknown");
+        String newStatus = progress != null && progress >= 100.0 ? 
+            SimulationBatch.STATUS_DELIVERED : SimulationBatch.STATUS_IN_TRANSIT;
+        
+        boolean updated = batchDao.updateBatchProgress(batchId, newStatus, temperature, humidity, location, progress);
+        
+        if (updated && !oldStatus.equals(newStatus)) {
+            logger.info("Batch {} status transitioned: {} -> {} (progress: {}%)", 
+                       batchId, oldStatus, newStatus, progress);
+        }
     }
     
     /**

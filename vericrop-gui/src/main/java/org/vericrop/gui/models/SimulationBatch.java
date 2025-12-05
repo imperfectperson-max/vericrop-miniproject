@@ -25,8 +25,11 @@ public class SimulationBatch {
     
     // Status constants
     public static final String STATUS_CREATED = "created";
+    public static final String STATUS_SAVING = "saving";
     public static final String STATUS_IN_TRANSIT = "in_transit";
     public static final String STATUS_DELIVERED = "delivered";
+    public static final String STATUS_SAVED = "saved";
+    public static final String STATUS_SAVE_FAILED = "save_failed";
     public static final String STATUS_FAILED = "failed";
     
     // Default constructor
