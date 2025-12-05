@@ -34,6 +34,7 @@ REM Default values
 set "MODE=full"
 set "BUILD_FLAG="
 set "NO_CACHE="
+set "DOCKER_COMPOSE=docker-compose"
 
 REM Parse first argument as mode
 if not "%~1"=="" (
@@ -130,7 +131,7 @@ if errorlevel 1 (
 )
 echo [92m✓ Docker daemon is running[0m
 
-REM Check Docker Compose
+REM Check Docker Compose and set DOCKER_COMPOSE variable
 docker-compose --version >nul 2>&1
 if errorlevel 1 (
     docker compose version >nul 2>&1
@@ -138,6 +139,7 @@ if errorlevel 1 (
         echo [91mX Docker Compose is not installed.[0m
         exit /b 1
     )
+    set "DOCKER_COMPOSE=docker compose"
 )
 echo [92m✓ Docker Compose is installed[0m
 echo.
@@ -146,7 +148,7 @@ goto :eof
 :check_java
 where java >nul 2>&1
 if errorlevel 1 (
-    echo [91mX Java is not installed. Please install JDK 17 or later.[0m
+    echo [91mX Java is not installed. Please install JDK 11 or later (JDK 17 recommended).[0m
     exit /b 1
 )
 echo [92m✓ Java is installed[0m
@@ -155,7 +157,7 @@ goto :eof
 :start_full
 echo [94mStarting full VeriCrop stack...[0m
 echo.
-docker-compose up -d %BUILD_FLAG%
+%DOCKER_COMPOSE% up -d %BUILD_FLAG%
 echo.
 echo [92m✓ Full stack started successfully![0m
 call :print_service_urls
@@ -164,7 +166,7 @@ goto :eof
 :start_infra
 echo [94mStarting infrastructure services (PostgreSQL, Kafka, Zookeeper)...[0m
 echo.
-docker-compose up -d postgres kafka zookeeper ml-service
+%DOCKER_COMPOSE% up -d postgres kafka zookeeper ml-service
 echo.
 echo [92m✓ Infrastructure services started![0m
 echo.
@@ -178,7 +180,7 @@ goto :eof
 :start_kafka
 echo [94mStarting Kafka stack (docker-compose-kafka.yml)...[0m
 echo.
-docker-compose -f docker-compose-kafka.yml up -d %BUILD_FLAG%
+%DOCKER_COMPOSE% -f docker-compose-kafka.yml up -d %BUILD_FLAG%
 echo.
 echo [92m✓ Kafka stack started![0m
 echo.
@@ -191,7 +193,7 @@ goto :eof
 :start_simulation
 echo [94mStarting simulation environment (docker-compose-simulation.yml)...[0m
 echo.
-docker-compose -f docker-compose-simulation.yml up -d %BUILD_FLAG%
+%DOCKER_COMPOSE% -f docker-compose-simulation.yml up -d %BUILD_FLAG%
 echo.
 echo [92m✓ Simulation environment started![0m
 echo.
@@ -213,7 +215,7 @@ if not exist ".env" (
         echo [93m  .env file created. Please review and update with production credentials.[0m
     )
 )
-docker-compose -f docker-compose.prod.yml up -d %BUILD_FLAG%
+%DOCKER_COMPOSE% -f docker-compose.prod.yml up -d %BUILD_FLAG%
 echo.
 echo [92m✓ Production environment started![0m
 call :print_service_urls

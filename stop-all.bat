@@ -21,6 +21,16 @@ cd /d "%~dp0"
 REM Default values
 set "REMOVE_VOLUMES="
 set "STOP_ALL=false"
+set "DOCKER_COMPOSE=docker-compose"
+
+REM Check Docker Compose and set DOCKER_COMPOSE variable
+docker-compose --version >nul 2>&1
+if errorlevel 1 (
+    docker compose version >nul 2>&1
+    if not errorlevel 1 (
+        set "DOCKER_COMPOSE=docker compose"
+    )
+)
 
 REM Parse arguments
 :parse_args
@@ -58,28 +68,28 @@ if "%STOP_ALL%"=="true" (
     REM Main docker-compose
     if exist "docker-compose.yml" (
         echo   -^> Stopping main services...
-        docker-compose down %REMOVE_VOLUMES% 2>nul
+        %DOCKER_COMPOSE% down %REMOVE_VOLUMES% 2>nul
     )
     
     REM Kafka compose
     if exist "docker-compose-kafka.yml" (
         echo   -^> Stopping Kafka services...
-        docker-compose -f docker-compose-kafka.yml down %REMOVE_VOLUMES% 2>nul
+        %DOCKER_COMPOSE% -f docker-compose-kafka.yml down %REMOVE_VOLUMES% 2>nul
     )
     
     REM Simulation compose
     if exist "docker-compose-simulation.yml" (
         echo   -^> Stopping simulation services...
-        docker-compose -f docker-compose-simulation.yml down %REMOVE_VOLUMES% 2>nul
+        %DOCKER_COMPOSE% -f docker-compose-simulation.yml down %REMOVE_VOLUMES% 2>nul
     )
     
     REM Production compose
     if exist "docker-compose.prod.yml" (
         echo   -^> Stopping production services...
-        docker-compose -f docker-compose.prod.yml down %REMOVE_VOLUMES% 2>nul
+        %DOCKER_COMPOSE% -f docker-compose.prod.yml down %REMOVE_VOLUMES% 2>nul
     )
 ) else (
-    docker-compose down %REMOVE_VOLUMES%
+    %DOCKER_COMPOSE% down %REMOVE_VOLUMES%
 )
 
 echo.

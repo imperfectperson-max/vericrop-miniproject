@@ -152,15 +152,28 @@ check_prerequisites() {
 # Check Java for Gradle commands
 check_java() {
     if ! command -v java &> /dev/null; then
-        echo -e "${RED}❌ Java is not installed. Please install JDK 17 or later.${NC}"
+        echo -e "${RED}❌ Java is not installed. Please install JDK 11 or later (JDK 17 recommended).${NC}"
         exit 1
     fi
     
-    JAVA_VERSION=$(java -version 2>&1 | head -n 1 | cut -d'"' -f2 | cut -d'.' -f1)
-    if [[ "$JAVA_VERSION" -lt 11 ]]; then
-        echo -e "${YELLOW}⚠ Java version $JAVA_VERSION detected. JDK 17 is recommended.${NC}"
+    # Parse Java version - handles both old (1.8.0) and new (11.0.1, 17) formats
+    JAVA_VERSION_OUTPUT=$(java -version 2>&1 | head -n 1)
+    if [[ "$JAVA_VERSION_OUTPUT" =~ \"([0-9]+)\.([0-9]+) ]]; then
+        JAVA_MAJOR="${BASH_REMATCH[1]}"
+        # For old format "1.8.0", the major version is the second number
+        if [[ "$JAVA_MAJOR" == "1" ]]; then
+            JAVA_MAJOR="${BASH_REMATCH[2]}"
+        fi
+    elif [[ "$JAVA_VERSION_OUTPUT" =~ \"([0-9]+) ]]; then
+        JAVA_MAJOR="${BASH_REMATCH[1]}"
     else
-        echo -e "${GREEN}✓ Java $JAVA_VERSION detected${NC}"
+        JAVA_MAJOR="unknown"
+    fi
+    
+    if [[ "$JAVA_MAJOR" != "unknown" && "$JAVA_MAJOR" -lt 11 ]]; then
+        echo -e "${YELLOW}⚠ Java version $JAVA_MAJOR detected. JDK 11+ required (JDK 17 recommended).${NC}"
+    else
+        echo -e "${GREEN}✓ Java $JAVA_MAJOR detected${NC}"
     fi
 }
 
