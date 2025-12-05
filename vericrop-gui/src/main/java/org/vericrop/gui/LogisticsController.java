@@ -49,6 +49,7 @@ import java.time.LocalTime;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.io.File;
+import java.util.stream.Collectors;
 import org.vericrop.gui.persistence.ShipmentPersistenceService;
 import org.vericrop.gui.persistence.PersistedShipment;
 import org.vericrop.gui.persistence.PersistedSimulation;
@@ -1817,7 +1818,7 @@ public class LogisticsController implements SimulationListener {
             List<PersistedSimulation> completedSims = simulations.stream()
                     .filter(PersistedSimulation::isCompleted)
                     .filter(s -> s.getEndTime() > s.getStartTime())
-                    .collect(java.util.stream.Collectors.toList());
+                    .collect(Collectors.toList());
             
             if (!completedSims.isEmpty()) {
                 sb.append("━━━ DELIVERY DURATION ━━━\n");
@@ -1882,9 +1883,9 @@ public class LogisticsController implements SimulationListener {
             sb.append("━━━ SCENARIOS EXECUTED ━━━\n");
             Map<String, Long> scenarioCounts = simulations.stream()
                     .filter(s -> s.getScenarioId() != null)
-                    .collect(java.util.stream.Collectors.groupingBy(
+                    .collect(Collectors.groupingBy(
                             PersistedSimulation::getScenarioId,
-                            java.util.stream.Collectors.counting()));
+                            Collectors.counting()));
             
             if (!scenarioCounts.isEmpty()) {
                 scenarioCounts.forEach((scenario, count) -> {
@@ -1997,11 +1998,7 @@ public class LogisticsController implements SimulationListener {
     }
 
     private String calculateAvgTemperature() {
-        double avg = shipments.stream()
-                .mapToDouble(Shipment::getTemperature)
-                .average()
-                .orElse(0.0);
-        return String.format("%.1f", avg);
+        return String.format("%.1f", calculateAvgTemperatureValue());
     }
 
     private void showAlert(Alert.AlertType type, String title, String message) {
