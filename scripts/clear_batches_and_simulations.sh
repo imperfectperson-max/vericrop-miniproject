@@ -93,8 +93,14 @@ get_counts() {
     
     response=$(curl -s "$API_URL/api/maintenance/counts")
     
-    simulations=$(echo "$response" | grep -o '"simulations":[0-9]*' | cut -d':' -f2)
-    batches=$(echo "$response" | grep -o '"batches":[0-9]*' | cut -d':' -f2)
+    # Try to use jq if available, fall back to grep/cut
+    if command -v jq &> /dev/null; then
+        simulations=$(echo "$response" | jq -r '.simulations // "N/A"')
+        batches=$(echo "$response" | jq -r '.batches // "N/A"')
+    else
+        simulations=$(echo "$response" | grep -o '"simulations":[0-9]*' | cut -d':' -f2)
+        batches=$(echo "$response" | grep -o '"batches":[0-9]*' | cut -d':' -f2)
+    fi
     
     echo ""
     echo "  Simulations: $simulations"
@@ -139,17 +145,30 @@ delete_all() {
     echo "$response" | python3 -m json.tool 2>/dev/null || echo "$response"
     echo ""
     
-    # Check if successful
-    if echo "$response" | grep -q '"success":true'; then
-        print_success "Delete operation completed successfully!"
-        
-        backup_path=$(echo "$response" | grep -o '"backup_path":"[^"]*"' | cut -d'"' -f4)
-        if [ -n "$backup_path" ]; then
-            print_info "Backup created at: $backup_path"
+    # Check if successful using jq if available, fall back to grep
+    if command -v jq &> /dev/null; then
+        success=$(echo "$response" | jq -r '.success // false')
+        if [ "$success" = "true" ]; then
+            print_success "Delete operation completed successfully!"
+            backup_path=$(echo "$response" | jq -r '.backup_path // ""')
+            if [ -n "$backup_path" ]; then
+                print_info "Backup created at: $backup_path"
+            fi
+        else
+            print_error "Delete operation failed. See response above for details."
+            exit 1
         fi
     else
-        print_error "Delete operation failed. See response above for details."
-        exit 1
+        if echo "$response" | grep -q '"success":true'; then
+            print_success "Delete operation completed successfully!"
+            backup_path=$(echo "$response" | grep -o '"backup_path":"[^"]*"' | cut -d'"' -f4)
+            if [ -n "$backup_path" ]; then
+                print_info "Backup created at: $backup_path"
+            fi
+        else
+            print_error "Delete operation failed. See response above for details."
+            exit 1
+        fi
     fi
 }
 

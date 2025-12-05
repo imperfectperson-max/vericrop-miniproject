@@ -180,8 +180,8 @@ class MaintenanceControllerTest {
     
     @Test
     void testListBackups_Success() {
-        // Arrange
-        List<String> backups = List.of("20241205_120000", "20241204_150000", "20241203_100000");
+        // Arrange - use descriptive backup names
+        List<String> backups = List.of("backup_1", "backup_2", "backup_3");
         when(maintenanceService.listBackups()).thenReturn(backups);
         
         // Act

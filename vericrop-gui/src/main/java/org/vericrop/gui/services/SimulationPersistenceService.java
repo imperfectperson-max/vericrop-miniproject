@@ -143,15 +143,13 @@ public class SimulationPersistenceService {
      */
     public void updateBatchProgress(UUID batchId, Double temperature, Double humidity, 
                                     String location, Double progress) {
-        String oldStatus = batchDao.findById(batchId).map(b -> b.getStatus()).orElse("unknown");
         String newStatus = progress != null && progress >= 100.0 ? 
             SimulationBatch.STATUS_DELIVERED : SimulationBatch.STATUS_IN_TRANSIT;
         
         boolean updated = batchDao.updateBatchProgress(batchId, newStatus, temperature, humidity, location, progress);
         
-        if (updated && !oldStatus.equals(newStatus)) {
-            logger.info("Batch {} status transitioned: {} -> {} (progress: {}%)", 
-                       batchId, oldStatus, newStatus, progress);
+        if (updated && SimulationBatch.STATUS_DELIVERED.equals(newStatus)) {
+            logger.info("Batch {} completed delivery (progress: {}%)", batchId, progress);
         }
     }
     

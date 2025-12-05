@@ -409,6 +409,9 @@ public class SimulationBatchDao {
     /**
      * Create a batch with transactional status update.
      * Uses a single transaction to ensure batch is created and status is set atomically.
+     * <p>
+     * Note: Manual connection management is used here instead of try-with-resources
+     * because we need explicit control over transaction commit/rollback semantics.
      * 
      * @param simulationId Simulation UUID
      * @param batchIndex Sequential batch index
@@ -425,6 +428,7 @@ public class SimulationBatchDao {
                           "VALUES (?, ?, ?, ?, ?, ?, ?) " +
                           "RETURNING id, created_at, updated_at";
         
+        // Manual connection management for explicit transaction control
         Connection conn = null;
         try {
             conn = dataSource.getConnection();
