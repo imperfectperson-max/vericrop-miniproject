@@ -1540,26 +1540,456 @@ public class LogisticsController implements SimulationListener {
     private void handleGenerateReport() {
         final String reportType = reportTypeCombo.getValue() != null ?
                 reportTypeCombo.getValue() : "General Report";
-        final String dateRange;
-        if (startDatePicker.getValue() != null && endDatePicker.getValue() != null) {
-            dateRange = "Date Range: " + startDatePicker.getValue() + " to " + endDatePicker.getValue() + "\n";
-        } else {
-            dateRange = "";
+        
+        // Get date range or use default (last 30 days)
+        LocalDate startDate = startDatePicker.getValue();
+        LocalDate endDate = endDatePicker.getValue();
+        if (startDate == null || endDate == null) {
+            endDate = LocalDate.now();
+            startDate = endDate.minusDays(30);
         }
+        
+        final String dateRange = "Date Range: " + startDate + " to " + endDate + "\n";
 
+        // Generate report based on type
+        final String reportContent = generateReportContent(reportType, startDate, endDate, dateRange);
+        
         Platform.runLater(() -> {
-            reportArea.setText("=== " + reportType + " ===\n\n" +
-                    dateRange +
-                    "• Total Shipments: " + shipments.size() + "\n" +
-                    "• Active Simulations: " + activeShipments.size() + "\n" +
-                    "• In Transit: " + countByStatus("IN_TRANSIT") + "\n" +
-                    "• At Warehouse: " + countByStatus("AT_WAREHOUSE") + "\n" +
-                    "• Delivered: " + countByStatus("DELIVERED") + "\n" +
-                    "• Avg Temperature: " + calculateAvgTemperature() + "°C\n" +
-                    "• Compliance: 100%\n" +
-                    "• Generated: " + java.time.LocalDateTime.now().format(
-                    java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+            reportArea.setText(reportContent);
         });
+    }
+    
+    /**
+     * Generate report content based on report type.
+     * Pulls data from persistence service and computes relevant statistics.
+     * 
+     * @param reportType The type of report to generate
+     * @param startDate Start date for the report period
+     * @param endDate End date for the report period
+     * @param dateRange Formatted date range string
+     * @return Formatted report content
+     */
+    private String generateReportContent(String reportType, LocalDate startDate, LocalDate endDate, String dateRange) {
+        StringBuilder sb = new StringBuilder();
+        String timestamp = java.time.LocalDateTime.now().format(
+                java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        
+        // Retrieve persisted data
+        List<PersistedSimulation> simulations = new java.util.ArrayList<>();
+        List<PersistedShipment> persistedShipments = new java.util.ArrayList<>();
+        
+        if (persistenceService != null) {
+            try {
+                simulations = persistenceService.getSimulationsByDateRange(startDate, endDate);
+                persistedShipments = persistenceService.getShipmentsByDateRange(startDate, endDate);
+            } catch (Exception e) {
+                logger.warn("Failed to retrieve persisted data: {}", e.getMessage());
+            }
+        }
+        
+        switch (reportType) {
+            case "Shipment Summary":
+                sb.append(generateShipmentSummaryPreview(dateRange, timestamp, simulations, persistedShipments));
+                break;
+            case "Temperature Log":
+                sb.append(generateTemperatureLogPreview(dateRange, timestamp, simulations, persistedShipments));
+                break;
+            case "Quality Compliance":
+                sb.append(generateQualityCompliancePreview(dateRange, timestamp, simulations));
+                break;
+            case "Delivery Performance":
+                sb.append(generateDeliveryPerformancePreview(dateRange, timestamp, simulations));
+                break;
+            case "Simulation Log":
+                sb.append(generateSimulationLogPreview(dateRange, timestamp, simulations));
+                break;
+            default:
+                sb.append(generateGeneralReportPreview(dateRange, timestamp, simulations, persistedShipments));
+        }
+        
+        return sb.toString();
+    }
+    
+    /**
+     * Generate Shipment Summary preview with detailed shipment information.
+     */
+    private String generateShipmentSummaryPreview(String dateRange, String timestamp,
+            List<PersistedSimulation> simulations, List<PersistedShipment> persistedShipments) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("=== SHIPMENT SUMMARY ===\n\n");
+        sb.append(dateRange);
+        sb.append("Generated: ").append(timestamp).append("\n\n");
+        
+        // Current active shipments from UI
+        sb.append("━━━ ACTIVE SHIPMENTS ━━━\n");
+        sb.append("• Total Active: ").append(shipments.size()).append("\n");
+        sb.append("• In Transit: ").append(countByStatus("IN_TRANSIT")).append("\n");
+        sb.append("• At Warehouse: ").append(countByStatus("AT_WAREHOUSE")).append("\n");
+        sb.append("• Delivered: ").append(countByStatus("DELIVERED")).append("\n\n");
+        
+        // Persisted shipments statistics
+        if (!persistedShipments.isEmpty()) {
+            sb.append("━━━ HISTORICAL SHIPMENTS ━━━\n");
+            sb.append("• Total Persisted: ").append(persistedShipments.size()).append("\n");
+            
+            double avgTemp = persistedShipments.stream()
+                    .mapToDouble(PersistedShipment::getTemperature)
+                    .average().orElse(0.0);
+            double avgHumidity = persistedShipments.stream()
+                    .mapToDouble(PersistedShipment::getHumidity)
+                    .average().orElse(0.0);
+            
+            sb.append("• Average Temperature: ").append(String.format("%.1f°C", avgTemp)).append("\n");
+            sb.append("• Average Humidity: ").append(String.format("%.1f%%", avgHumidity)).append("\n\n");
+            
+            // Recent shipments list (last 5)
+            sb.append("━━━ RECENT SHIPMENTS ━━━\n");
+            persistedShipments.stream().limit(5).forEach(s -> {
+                sb.append("• ").append(s.getBatchId())
+                  .append(" | ").append(s.getStatus())
+                  .append(" | ").append(String.format("%.1f°C", s.getTemperature()))
+                  .append("\n");
+            });
+        } else {
+            sb.append("━━━ NO HISTORICAL DATA ━━━\n");
+            sb.append("• No persisted shipments found for this period.\n");
+            sb.append("• Run simulations to generate shipment data.\n");
+        }
+        
+        return sb.toString();
+    }
+    
+    /**
+     * Generate Temperature Log preview with temperature tracking data.
+     */
+    private String generateTemperatureLogPreview(String dateRange, String timestamp,
+            List<PersistedSimulation> simulations, List<PersistedShipment> persistedShipments) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("=== TEMPERATURE LOG ===\n\n");
+        sb.append(dateRange);
+        sb.append("Generated: ").append(timestamp).append("\n\n");
+        
+        // Current temperature from active shipments
+        sb.append("━━━ CURRENT TEMPERATURES ━━━\n");
+        if (!shipments.isEmpty()) {
+            double avgTemp = calculateAvgTemperatureValue();
+            double minTemp = shipments.stream().mapToDouble(Shipment::getTemperature).min().orElse(0.0);
+            double maxTemp = shipments.stream().mapToDouble(Shipment::getTemperature).max().orElse(0.0);
+            
+            sb.append("• Average: ").append(String.format("%.1f°C", avgTemp)).append("\n");
+            sb.append("• Minimum: ").append(String.format("%.1f°C", minTemp)).append("\n");
+            sb.append("• Maximum: ").append(String.format("%.1f°C", maxTemp)).append("\n\n");
+        } else {
+            sb.append("• No active shipments to monitor.\n\n");
+        }
+        
+        // Temperature data from simulations
+        sb.append("━━━ SIMULATION TEMPERATURE DATA ━━━\n");
+        if (!simulations.isEmpty()) {
+            double overallAvgTemp = simulations.stream()
+                    .mapToDouble(PersistedSimulation::getAvgTemperature)
+                    .average().orElse(0.0);
+            double overallMinTemp = simulations.stream()
+                    .mapToDouble(PersistedSimulation::getMinTemperature)
+                    .min().orElse(0.0);
+            double overallMaxTemp = simulations.stream()
+                    .mapToDouble(PersistedSimulation::getMaxTemperature)
+                    .max().orElse(0.0);
+            
+            long violationsCount = simulations.stream()
+                    .mapToInt(PersistedSimulation::getViolationsCount)
+                    .sum();
+            
+            sb.append("• Simulations Analyzed: ").append(simulations.size()).append("\n");
+            sb.append("• Overall Avg Temp: ").append(String.format("%.1f°C", overallAvgTemp)).append("\n");
+            sb.append("• Overall Min Temp: ").append(String.format("%.1f°C", overallMinTemp)).append("\n");
+            sb.append("• Overall Max Temp: ").append(String.format("%.1f°C", overallMaxTemp)).append("\n");
+            sb.append("• Total Temp Violations: ").append(violationsCount).append("\n\n");
+            
+            // Temperature compliance (2-8°C is optimal)
+            sb.append("━━━ TEMPERATURE COMPLIANCE ━━━\n");
+            long compliant = simulations.stream()
+                    .filter(s -> s.getAvgTemperature() >= 2.0 && s.getAvgTemperature() <= 8.0)
+                    .count();
+            double complianceRate = simulations.isEmpty() ? 0 : (compliant * 100.0 / simulations.size());
+            
+            sb.append("• Compliant Shipments: ").append(compliant).append("/").append(simulations.size()).append("\n");
+            sb.append("• Compliance Rate: ").append(String.format("%.1f%%", complianceRate)).append("\n");
+        } else {
+            sb.append("• No simulation temperature data available.\n");
+            sb.append("• Run simulations to collect temperature data.\n");
+        }
+        
+        return sb.toString();
+    }
+    
+    /**
+     * Generate Quality Compliance preview with quality metrics.
+     */
+    private String generateQualityCompliancePreview(String dateRange, String timestamp,
+            List<PersistedSimulation> simulations) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("=== QUALITY COMPLIANCE ===\n\n");
+        sb.append(dateRange);
+        sb.append("Generated: ").append(timestamp).append("\n\n");
+        
+        if (!simulations.isEmpty()) {
+            // Compliance statistics
+            long compliant = simulations.stream()
+                    .filter(s -> "COMPLIANT".equals(s.getComplianceStatus()))
+                    .count();
+            long nonCompliant = simulations.size() - compliant;
+            double complianceRate = (compliant * 100.0 / simulations.size());
+            
+            sb.append("━━━ COMPLIANCE SUMMARY ━━━\n");
+            sb.append("• Total Simulations: ").append(simulations.size()).append("\n");
+            sb.append("• Compliant: ").append(compliant).append(" (").append(String.format("%.1f%%", complianceRate)).append(")\n");
+            sb.append("• Non-Compliant: ").append(nonCompliant).append("\n\n");
+            
+            // Quality statistics
+            sb.append("━━━ QUALITY METRICS ━━━\n");
+            double avgInitialQuality = simulations.stream()
+                    .mapToDouble(PersistedSimulation::getInitialQuality)
+                    .average().orElse(0.0);
+            double avgFinalQuality = simulations.stream()
+                    .mapToDouble(PersistedSimulation::getFinalQuality)
+                    .average().orElse(0.0);
+            double qualityDegradation = avgInitialQuality - avgFinalQuality;
+            
+            sb.append("• Avg Initial Quality: ").append(String.format("%.1f%%", avgInitialQuality)).append("\n");
+            sb.append("• Avg Final Quality: ").append(String.format("%.1f%%", avgFinalQuality)).append("\n");
+            sb.append("• Avg Quality Degradation: ").append(String.format("%.1f%%", qualityDegradation)).append("\n\n");
+            
+            // Violations breakdown
+            sb.append("━━━ VIOLATIONS ANALYSIS ━━━\n");
+            int totalViolations = simulations.stream()
+                    .mapToInt(PersistedSimulation::getViolationsCount)
+                    .sum();
+            double avgViolationsPerSim = simulations.isEmpty() ? 0 : (double) totalViolations / simulations.size();
+            
+            sb.append("• Total Violations: ").append(totalViolations).append("\n");
+            sb.append("• Avg Violations/Simulation: ").append(String.format("%.1f", avgViolationsPerSim)).append("\n");
+            
+            // Quality grade distribution
+            long highQuality = simulations.stream().filter(s -> s.getFinalQuality() >= 80).count();
+            long mediumQuality = simulations.stream().filter(s -> s.getFinalQuality() >= 60 && s.getFinalQuality() < 80).count();
+            long lowQuality = simulations.stream().filter(s -> s.getFinalQuality() < 60).count();
+            
+            sb.append("\n━━━ QUALITY GRADES ━━━\n");
+            sb.append("• High (≥80%): ").append(highQuality).append("\n");
+            sb.append("• Medium (60-79%): ").append(mediumQuality).append("\n");
+            sb.append("• Low (<60%): ").append(lowQuality).append("\n");
+        } else {
+            sb.append("━━━ NO DATA AVAILABLE ━━━\n");
+            sb.append("• No simulation data found for this period.\n");
+            sb.append("• Run simulations from ProducerController to generate quality data.\n");
+        }
+        
+        return sb.toString();
+    }
+    
+    /**
+     * Generate Delivery Performance preview with delivery metrics.
+     */
+    private String generateDeliveryPerformancePreview(String dateRange, String timestamp,
+            List<PersistedSimulation> simulations) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("=== DELIVERY PERFORMANCE ===\n\n");
+        sb.append(dateRange);
+        sb.append("Generated: ").append(timestamp).append("\n\n");
+        
+        // Active simulations
+        sb.append("━━━ ACTIVE DELIVERIES ━━━\n");
+        sb.append("• Currently Tracking: ").append(activeShipments.size()).append("\n\n");
+        
+        if (!simulations.isEmpty()) {
+            // Completion statistics
+            long completed = simulations.stream().filter(PersistedSimulation::isCompleted).count();
+            long inProgress = simulations.size() - completed;
+            double completionRate = simulations.isEmpty() ? 0 : (completed * 100.0 / simulations.size());
+            
+            sb.append("━━━ COMPLETION METRICS ━━━\n");
+            sb.append("• Total Simulations: ").append(simulations.size()).append("\n");
+            sb.append("• Completed: ").append(completed).append(" (").append(String.format("%.1f%%", completionRate)).append(")\n");
+            sb.append("• In Progress/Stopped: ").append(inProgress).append("\n\n");
+            
+            // Duration statistics (completed only)
+            List<PersistedSimulation> completedSims = simulations.stream()
+                    .filter(PersistedSimulation::isCompleted)
+                    .filter(s -> s.getEndTime() > s.getStartTime())
+                    .collect(java.util.stream.Collectors.toList());
+            
+            if (!completedSims.isEmpty()) {
+                sb.append("━━━ DELIVERY DURATION ━━━\n");
+                
+                double avgDurationMs = completedSims.stream()
+                        .mapToDouble(s -> s.getEndTime() - s.getStartTime())
+                        .average().orElse(0.0);
+                long minDurationMs = completedSims.stream()
+                        .mapToLong(s -> s.getEndTime() - s.getStartTime())
+                        .min().orElse(0);
+                long maxDurationMs = completedSims.stream()
+                        .mapToLong(s -> s.getEndTime() - s.getStartTime())
+                        .max().orElse(0);
+                
+                sb.append("• Average Duration: ").append(formatDuration((long) avgDurationMs)).append("\n");
+                sb.append("• Fastest Delivery: ").append(formatDuration(minDurationMs)).append("\n");
+                sb.append("• Slowest Delivery: ").append(formatDuration(maxDurationMs)).append("\n\n");
+            }
+            
+            // Quality preservation
+            sb.append("━━━ QUALITY PRESERVATION ━━━\n");
+            double avgFinalQuality = simulations.stream()
+                    .filter(PersistedSimulation::isCompleted)
+                    .mapToDouble(PersistedSimulation::getFinalQuality)
+                    .average().orElse(0.0);
+            
+            sb.append("• Avg Final Quality: ").append(String.format("%.1f%%", avgFinalQuality)).append("\n");
+            
+            // Waypoints (route complexity)
+            int totalWaypoints = simulations.stream()
+                    .mapToInt(PersistedSimulation::getWaypointsCount)
+                    .sum();
+            sb.append("• Total Waypoints Traversed: ").append(totalWaypoints).append("\n");
+        } else {
+            sb.append("━━━ NO DATA AVAILABLE ━━━\n");
+            sb.append("• No delivery data found for this period.\n");
+            sb.append("• Start simulations to track delivery performance.\n");
+        }
+        
+        return sb.toString();
+    }
+    
+    /**
+     * Generate Simulation Log preview with simulation details.
+     */
+    private String generateSimulationLogPreview(String dateRange, String timestamp,
+            List<PersistedSimulation> simulations) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("=== SIMULATION LOG ===\n\n");
+        sb.append(dateRange);
+        sb.append("Generated: ").append(timestamp).append("\n\n");
+        
+        if (!simulations.isEmpty()) {
+            sb.append("━━━ SUMMARY ━━━\n");
+            sb.append("• Total Simulations: ").append(simulations.size()).append("\n");
+            
+            long completed = simulations.stream().filter(PersistedSimulation::isCompleted).count();
+            sb.append("• Completed: ").append(completed).append("\n");
+            sb.append("• Stopped/In Progress: ").append(simulations.size() - completed).append("\n\n");
+            
+            // Scenario breakdown
+            sb.append("━━━ SCENARIOS EXECUTED ━━━\n");
+            Map<String, Long> scenarioCounts = simulations.stream()
+                    .filter(s -> s.getScenarioId() != null)
+                    .collect(java.util.stream.Collectors.groupingBy(
+                            PersistedSimulation::getScenarioId,
+                            java.util.stream.Collectors.counting()));
+            
+            if (!scenarioCounts.isEmpty()) {
+                scenarioCounts.forEach((scenario, count) -> {
+                    sb.append("• ").append(scenario).append(": ").append(count).append(" runs\n");
+                });
+            } else {
+                sb.append("• No scenario data available\n");
+            }
+            sb.append("\n");
+            
+            // Recent simulations (last 5)
+            sb.append("━━━ RECENT SIMULATIONS ━━━\n");
+            simulations.stream()
+                    .sorted((a, b) -> Long.compare(b.getStartTime(), a.getStartTime()))
+                    .limit(5)
+                    .forEach(sim -> {
+                        String status = sim.isCompleted() ? "✓" : "○";
+                        sb.append(status).append(" ").append(sim.getBatchId())
+                          .append(" | Quality: ").append(String.format("%.1f%%", sim.getFinalQuality()))
+                          .append(" | ").append(sim.getComplianceStatus() != null ? sim.getComplianceStatus() : "N/A")
+                          .append("\n");
+                    });
+            
+            // Alert summary
+            int totalAlerts = simulations.stream()
+                    .mapToInt(PersistedSimulation::getAlertCount)
+                    .sum();
+            if (totalAlerts > 0) {
+                sb.append("\n━━━ ALERTS GENERATED ━━━\n");
+                sb.append("• Total Alerts: ").append(totalAlerts).append("\n");
+            }
+        } else {
+            sb.append("━━━ NO SIMULATIONS FOUND ━━━\n");
+            sb.append("• No simulation logs available for this period.\n");
+            sb.append("• Start a simulation from ProducerController to generate logs.\n");
+        }
+        
+        return sb.toString();
+    }
+    
+    /**
+     * Generate a general overview report.
+     */
+    private String generateGeneralReportPreview(String dateRange, String timestamp,
+            List<PersistedSimulation> simulations, List<PersistedShipment> persistedShipments) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("=== GENERAL REPORT ===\n\n");
+        sb.append(dateRange);
+        sb.append("Generated: ").append(timestamp).append("\n\n");
+        
+        sb.append("━━━ CURRENT STATUS ━━━\n");
+        sb.append("• Active Shipments: ").append(shipments.size()).append("\n");
+        sb.append("• Active Simulations: ").append(activeShipments.size()).append("\n");
+        sb.append("• In Transit: ").append(countByStatus("IN_TRANSIT")).append("\n");
+        sb.append("• At Warehouse: ").append(countByStatus("AT_WAREHOUSE")).append("\n");
+        sb.append("• Delivered: ").append(countByStatus("DELIVERED")).append("\n");
+        sb.append("• Avg Temperature: ").append(calculateAvgTemperature()).append("°C\n\n");
+        
+        sb.append("━━━ HISTORICAL DATA ━━━\n");
+        sb.append("• Persisted Shipments: ").append(persistedShipments.size()).append("\n");
+        sb.append("• Persisted Simulations: ").append(simulations.size()).append("\n");
+        
+        if (!simulations.isEmpty()) {
+            long compliant = simulations.stream()
+                    .filter(s -> "COMPLIANT".equals(s.getComplianceStatus()))
+                    .count();
+            double complianceRate = (compliant * 100.0 / simulations.size());
+            sb.append("• Compliance Rate: ").append(String.format("%.1f%%", complianceRate)).append("\n");
+            
+            double avgQuality = simulations.stream()
+                    .mapToDouble(PersistedSimulation::getFinalQuality)
+                    .average().orElse(0.0);
+            sb.append("• Avg Final Quality: ").append(String.format("%.1f%%", avgQuality)).append("\n");
+        }
+        
+        return sb.toString();
+    }
+    
+    /**
+     * Calculate average temperature as double value.
+     */
+    private double calculateAvgTemperatureValue() {
+        return shipments.stream()
+                .mapToDouble(Shipment::getTemperature)
+                .average()
+                .orElse(0.0);
+    }
+    
+    /**
+     * Format duration in milliseconds to human-readable string.
+     */
+    private String formatDuration(long durationMs) {
+        if (durationMs <= 0) return "N/A";
+        
+        long seconds = durationMs / 1000;
+        long minutes = seconds / 60;
+        long hours = minutes / 60;
+        
+        if (hours > 0) {
+            return String.format("%dh %dm", hours, minutes % 60);
+        } else if (minutes > 0) {
+            return String.format("%dm %ds", minutes, seconds % 60);
+        } else {
+            return String.format("%ds", seconds);
+        }
     }
 
     private long countByStatus(String status) {
