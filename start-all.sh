@@ -488,12 +488,13 @@ run_gui() {
     
     # Instance 2
     echo "[2/3] Starting Instance 2 (Distributor)..."
+    local GRADLE_RUN_CMD_INSTANCE2="./gradlew :vericrop-gui:run -Dapp.instance=2 || ./gradlew run -Dapp.instance=2 || ./gradlew :app:run -Dapp.instance=2 || ./gradlew bootRun -Dapp.instance=2"
     if command -v gnome-terminal &> /dev/null; then
-        gnome-terminal -- bash -c "./gradlew :vericrop-gui:run -Dapp.instance=2 || ./gradlew run || ./gradlew :app:run || ./gradlew bootRun; exec bash" &
+        gnome-terminal -- bash -c "$GRADLE_RUN_CMD_INSTANCE2; exec bash" &
     elif command -v xterm &> /dev/null; then
-        xterm -title "VeriCrop GUI - Instance 2 (Distributor)" -e bash -c "./gradlew :vericrop-gui:run -Dapp.instance=2 || ./gradlew run || ./gradlew :app:run || ./gradlew bootRun; exec bash" &
+        xterm -title "VeriCrop GUI - Instance 2 (Distributor)" -e bash -c "$GRADLE_RUN_CMD_INSTANCE2; exec bash" &
     elif command -v konsole &> /dev/null; then
-        konsole --title "VeriCrop GUI - Instance 2 (Distributor)" -e bash -c "./gradlew :vericrop-gui:run -Dapp.instance=2 || ./gradlew run || ./gradlew :app:run || ./gradlew bootRun; exec bash" &
+        konsole --title "VeriCrop GUI - Instance 2 (Distributor)" -e bash -c "$GRADLE_RUN_CMD_INSTANCE2; exec bash" &
     else
         nohup ./gradlew :vericrop-gui:run -Dapp.instance=2 > /tmp/vericrop-gui-instance2.log 2>&1 &
     fi
@@ -501,12 +502,13 @@ run_gui() {
     
     # Instance 3
     echo "[3/3] Starting Instance 3 (Retailer)..."
+    local GRADLE_RUN_CMD_INSTANCE3="./gradlew :vericrop-gui:run -Dapp.instance=3 || ./gradlew run -Dapp.instance=3 || ./gradlew :app:run -Dapp.instance=3 || ./gradlew bootRun -Dapp.instance=3"
     if command -v gnome-terminal &> /dev/null; then
-        gnome-terminal -- bash -c "./gradlew :vericrop-gui:run -Dapp.instance=3 || ./gradlew run || ./gradlew :app:run || ./gradlew bootRun; exec bash" &
+        gnome-terminal -- bash -c "$GRADLE_RUN_CMD_INSTANCE3; exec bash" &
     elif command -v xterm &> /dev/null; then
-        xterm -title "VeriCrop GUI - Instance 3 (Retailer)" -e bash -c "./gradlew :vericrop-gui:run -Dapp.instance=3 || ./gradlew run || ./gradlew :app:run || ./gradlew bootRun; exec bash" &
+        xterm -title "VeriCrop GUI - Instance 3 (Retailer)" -e bash -c "$GRADLE_RUN_CMD_INSTANCE3; exec bash" &
     elif command -v konsole &> /dev/null; then
-        konsole --title "VeriCrop GUI - Instance 3 (Retailer)" -e bash -c "./gradlew :vericrop-gui:run -Dapp.instance=3 || ./gradlew run || ./gradlew :app:run || ./gradlew bootRun; exec bash" &
+        konsole --title "VeriCrop GUI - Instance 3 (Retailer)" -e bash -c "$GRADLE_RUN_CMD_INSTANCE3; exec bash" &
     else
         nohup ./gradlew :vericrop-gui:run -Dapp.instance=3 > /tmp/vericrop-gui-instance3.log 2>&1 &
     fi
