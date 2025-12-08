@@ -198,32 +198,46 @@ if not exist "gradlew.bat" (
 
 echo Starting GUI instances...
 echo.
-
-REM First, let's see what Gradle tasks are available
-echo Checking available Gradle tasks...
-gradlew.bat tasks --console=plain | findstr "run" | head -5
-echo.
-
-REM Try different run commands based on project structure
-echo Trying to start instances...
+echo Please wait - Gradle will download dependencies on first run.
+echo Each instance takes 10-30 seconds to start (faster on subsequent runs).
 echo.
 
 REM Instance 1
-echo [1/3] Starting Instance 1 (Farmer)...
-start "VeriCrop GUI - Instance 1 (Farmer)" cmd /k "title VeriCrop GUI - Instance 1 (Farmer) && echo Starting GUI... && gradlew.bat :vericrop-gui:run || gradlew.bat run || gradlew.bat :app:run || gradlew.bat bootRun"
+echo [1/3] Launching Instance 1 (Farmer) window...
+echo      Status: Initializing Gradle and starting JavaFX application...
+start "VeriCrop GUI - Instance 1 (Farmer)" cmd /k "title VeriCrop GUI - Instance 1 (Farmer) && echo ============================================================ && echo   VeriCrop GUI - Instance 1 (Farmer) && echo ============================================================ && echo. && echo Loading application, please wait... && echo. && echo [INFO] Gradle is building and starting the JavaFX application... && echo [INFO] This may take 10-30 seconds on first run. && echo. && gradlew.bat :vericrop-gui:run"
+echo      Instance 1 window opened. Waiting 5 seconds before starting next instance...
 timeout /t 5 /nobreak >nul
+echo.
 
 REM Instance 2
-echo [2/3] Starting Instance 2 (Distributor)...
-start "VeriCrop GUI - Instance 2 (Distributor)" cmd /k "title VeriCrop GUI - Instance 2 (Distributor) && echo Starting GUI... && gradlew.bat :vericrop-gui:run -Dapp.instance=2 || gradlew.bat run || gradlew.bat :app:run || gradlew.bat bootRun"
+echo [2/3] Launching Instance 2 (Distributor) window...
+echo      Status: Initializing Gradle and starting JavaFX application...
+start "VeriCrop GUI - Instance 2 (Distributor)" cmd /k "title VeriCrop GUI - Instance 2 (Distributor) && echo ============================================================ && echo   VeriCrop GUI - Instance 2 (Distributor) && echo ============================================================ && echo. && echo Loading application, please wait... && echo. && echo [INFO] Gradle is building and starting the JavaFX application... && echo [INFO] This may take 10-30 seconds on first run. && echo. && gradlew.bat :vericrop-gui:run -Dapp.instance=2"
+echo      Instance 2 window opened. Waiting 5 seconds before starting next instance...
 timeout /t 5 /nobreak >nul
+echo.
 
 REM Instance 3
-echo [3/3] Starting Instance 3 (Retailer)...
-start "VeriCrop GUI - Instance 3 (Retailer)" cmd /k "title VeriCrop GUI - Instance 3 (Retailer) && echo Starting GUI... && gradlew.bat :vericrop-gui:run -Dapp.instance=3 || gradlew.bat run || gradlew.bat :app:run || gradlew.bat bootRun"
+echo [3/3] Launching Instance 3 (Retailer) window...
+echo      Status: Initializing Gradle and starting JavaFX application...
+start "VeriCrop GUI - Instance 3 (Retailer)" cmd /k "title VeriCrop GUI - Instance 3 (Retailer) && echo ============================================================ && echo   VeriCrop GUI - Instance 3 (Retailer) && echo ============================================================ && echo. && echo Loading application, please wait... && echo. && echo [INFO] Gradle is building and starting the JavaFX application... && echo [INFO] This may take 10-30 seconds on first run. && echo. && gradlew.bat :vericrop-gui:run -Dapp.instance=3"
 
 echo.
-echo ✓ GUI instances launched. Check the opened windows.
+echo ===============================================================
+echo ✓ All 3 GUI instance windows have been launched!
+echo ===============================================================
+echo.
+echo IMPORTANT: Each window is now loading the application.
+echo You should see 3 separate command windows with titles:
+echo   1. "VeriCrop GUI - Instance 1 (Farmer)"
+echo   2. "VeriCrop GUI - Instance 2 (Distributor)"
+echo   3. "VeriCrop GUI - Instance 3 (Retailer)"
+echo.
+echo The JavaFX GUI windows will appear once Gradle completes the build.
+echo This typically takes:
+echo   - First run:  20-60 seconds (downloading dependencies)
+echo   - Later runs: 10-20 seconds (using cached dependencies)
 echo.
 
 if "%VERICROP_LOAD_DEMO%"=="true" (
@@ -235,13 +249,13 @@ if "%VERICROP_LOAD_DEMO%"=="true" (
     echo.
 )
 
-echo If GUIs don't start, try building first:
-echo   start-all.bat build
+echo If a GUI doesn't appear after 60 seconds:
+echo   1. Check the command window for error messages
+echo   2. Ensure Java JDK 11+ is installed: java -version
+echo   3. Try building first: start-all.bat build
+echo   4. Check Gradle wrapper exists: dir gradlew.bat
 echo.
-echo Troubleshooting:
-echo   1. Make sure Java JDK 11+ is installed
-echo   2. Check Gradle wrapper exists (gradlew.bat)
-echo   3. Try: gradlew.bat tasks (to see available tasks)
+echo ===============================================================
 echo.
 goto :eof
 
