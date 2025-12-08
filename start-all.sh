@@ -324,8 +324,6 @@ build_all() {
     echo -e "${GREEN}✓ All builds completed successfully!${NC}"
 }
 
-
-
 # Initialize Airflow
 init_airflow() {
     echo -e "${BLUE}Initializing Airflow...${NC}"
@@ -368,7 +366,7 @@ fix_airflow() {
     echo ""
     
     echo "1. Ensuring postgres-airflow is ready..."
-    sleep 10
+    sleep 10  # Wait for PostgreSQL to be fully ready
     echo ""
     
     echo "2. Checking database connection..."
@@ -396,6 +394,7 @@ show_logs() {
     echo -e "${BLUE}Showing service logs...${NC}"
     echo ""
     
+    # Show last 50 lines of logs (matches start-all.bat behavior)
     $DOCKER_COMPOSE logs --tail=50
     
     echo ""
