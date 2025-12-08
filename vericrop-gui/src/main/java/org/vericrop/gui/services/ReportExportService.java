@@ -28,13 +28,24 @@ public class ReportExportService {
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private static final DateTimeFormatter DATETIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     
+    // Scenario ID constants for the 3 ProducerController simulation examples
+    private static final String SCENARIO_EXAMPLE_1 = "example_1";
+    private static final String SCENARIO_EXAMPLE_2 = "example_2";
+    private static final String SCENARIO_EXAMPLE_3 = "example_3";
+    
+    // Batch ID keywords for identifying simulation types
+    private static final String BATCH_KEYWORD_APPLES = "APPLES";
+    private static final String BATCH_KEYWORD_CARROTS = "CARROTS";
+    private static final String BATCH_KEYWORD_VEGGIES = "VEGGIES";
+    private static final String BATCH_KEYWORD_VEGETABLES = "VEGETABLES";
+    
     // CSV Header constants for maintainability
     private static final String CSV_HEADER_SHIPMENT_SUMMARY = 
             "Batch ID,Status,Location,Temperature (°C),Humidity (%),Vehicle,ETA,Created At,Updated At,Origin,Destination,Quality Score";
     private static final String CSV_HEADER_TEMPERATURE_LOG = 
             "Batch ID,Timestamp,Temperature (°C),Humidity (%),Status,Location,Source";
     private static final String CSV_HEADER_QUALITY_COMPLIANCE = 
-            "Batch ID,Scenario,Status,Completed,Final Quality (%),Initial Quality (%),Violations,Compliance Status,Avg Temp (°C),Min Temp (°C),Max Temp (°C),Start Time,End Time";
+            "Simulation Type,Batch ID,Scenario,Status,Completed,Final Quality (%),Initial Quality (%),Violations,Compliance Status,Avg Temp (°C),Min Temp (°C),Max Temp (°C),Start Time,End Time";
     private static final String CSV_HEADER_DELIVERY_PERFORMANCE = 
             "Batch ID,Type,Status,Duration (min),Final Quality (%),Avg Temperature (°C),Waypoints,Start Time,End Time";
     private static final String CSV_HEADER_SIMULATION_LOG = 
@@ -578,16 +589,16 @@ public class ReportExportService {
         
         // Categorize simulations by type (the 3 examples from ProducerController)
         List<PersistedSimulation> applesSimulations = simulations.stream()
-                .filter(s -> s.getBatchId().contains("APPLES") || 
-                        (s.getScenarioId() != null && s.getScenarioId().contains("example_1")))
+                .filter(s -> s.getBatchId().contains(BATCH_KEYWORD_APPLES) || 
+                        (s.getScenarioId() != null && s.getScenarioId().contains(SCENARIO_EXAMPLE_1)))
                 .collect(Collectors.toList());
         List<PersistedSimulation> carrotsSimulations = simulations.stream()
-                .filter(s -> s.getBatchId().contains("CARROTS") || 
-                        (s.getScenarioId() != null && s.getScenarioId().contains("example_2")))
+                .filter(s -> s.getBatchId().contains(BATCH_KEYWORD_CARROTS) || 
+                        (s.getScenarioId() != null && s.getScenarioId().contains(SCENARIO_EXAMPLE_2)))
                 .collect(Collectors.toList());
         List<PersistedSimulation> veggiesSimulations = simulations.stream()
-                .filter(s -> s.getBatchId().contains("VEGGIES") || s.getBatchId().contains("VEGETABLES") ||
-                        (s.getScenarioId() != null && s.getScenarioId().contains("example_3")))
+                .filter(s -> s.getBatchId().contains(BATCH_KEYWORD_VEGGIES) || s.getBatchId().contains(BATCH_KEYWORD_VEGETABLES) ||
+                        (s.getScenarioId() != null && s.getScenarioId().contains(SCENARIO_EXAMPLE_3)))
                 .collect(Collectors.toList());
         
         long compliant = simulations.stream()
@@ -639,9 +650,9 @@ public class ReportExportService {
             
             // Identify simulation type
             String type = "";
-            if (simulation.getBatchId().contains("APPLES")) type = " [Example 1: Apples]";
-            else if (simulation.getBatchId().contains("CARROTS")) type = " [Example 2: Carrots]";
-            else if (simulation.getBatchId().contains("VEGGIES") || simulation.getBatchId().contains("VEGETABLES")) 
+            if (simulation.getBatchId().contains(BATCH_KEYWORD_APPLES)) type = " [Example 1: Apples]";
+            else if (simulation.getBatchId().contains(BATCH_KEYWORD_CARROTS)) type = " [Example 2: Carrots]";
+            else if (simulation.getBatchId().contains(BATCH_KEYWORD_VEGGIES) || simulation.getBatchId().contains(BATCH_KEYWORD_VEGETABLES)) 
                 type = " [Example 3: Vegetables]";
             
             sb.append(String.format("[%s] Batch: %s%s\n", compliance, simulation.getBatchId(), type));
@@ -694,20 +705,20 @@ public class ReportExportService {
     private String generateQualityComplianceCsv(List<PersistedSimulation> simulations, 
                                                  LocalDate startDate, LocalDate endDate) {
         StringBuilder sb = new StringBuilder();
-        // Add Simulation Type column to CSV header
-        sb.append("Simulation Type,").append(CSV_HEADER_QUALITY_COMPLIANCE).append("\n");
+        // CSV header already includes "Simulation Type" column
+        sb.append(CSV_HEADER_QUALITY_COMPLIANCE).append("\n");
         
         for (PersistedSimulation simulation : simulations) {
             // Determine simulation type (the 3 examples from ProducerController)
             String simType = "Other";
-            if (simulation.getBatchId().contains("APPLES") || 
-                (simulation.getScenarioId() != null && simulation.getScenarioId().contains("example_1"))) {
+            if (simulation.getBatchId().contains(BATCH_KEYWORD_APPLES) || 
+                (simulation.getScenarioId() != null && simulation.getScenarioId().contains(SCENARIO_EXAMPLE_1))) {
                 simType = "Example 1: Farm to Consumer (Apples)";
-            } else if (simulation.getBatchId().contains("CARROTS") || 
-                       (simulation.getScenarioId() != null && simulation.getScenarioId().contains("example_2"))) {
+            } else if (simulation.getBatchId().contains(BATCH_KEYWORD_CARROTS) || 
+                       (simulation.getScenarioId() != null && simulation.getScenarioId().contains(SCENARIO_EXAMPLE_2))) {
                 simType = "Example 2: Local Producer (Carrots)";
-            } else if (simulation.getBatchId().contains("VEGGIES") || simulation.getBatchId().contains("VEGETABLES") ||
-                       (simulation.getScenarioId() != null && simulation.getScenarioId().contains("example_3"))) {
+            } else if (simulation.getBatchId().contains(BATCH_KEYWORD_VEGGIES) || simulation.getBatchId().contains(BATCH_KEYWORD_VEGETABLES) ||
+                       (simulation.getScenarioId() != null && simulation.getScenarioId().contains(SCENARIO_EXAMPLE_3))) {
                 simType = "Example 3: Cross-Region (Vegetables)";
             }
             
@@ -944,16 +955,16 @@ public class ReportExportService {
                                                   LocalDate startDate, LocalDate endDate) {
         // Categorize simulations by type (the 3 examples from ProducerController)
         long applesCount = simulations.stream()
-                .filter(s -> s.getBatchId().contains("APPLES") || 
-                        (s.getScenarioId() != null && s.getScenarioId().contains("example_1")))
+                .filter(s -> s.getBatchId().contains(BATCH_KEYWORD_APPLES) || 
+                        (s.getScenarioId() != null && s.getScenarioId().contains(SCENARIO_EXAMPLE_1)))
                 .count();
         long carrotsCount = simulations.stream()
-                .filter(s -> s.getBatchId().contains("CARROTS") || 
-                        (s.getScenarioId() != null && s.getScenarioId().contains("example_2")))
+                .filter(s -> s.getBatchId().contains(BATCH_KEYWORD_CARROTS) || 
+                        (s.getScenarioId() != null && s.getScenarioId().contains(SCENARIO_EXAMPLE_2)))
                 .count();
         long veggiesCount = simulations.stream()
-                .filter(s -> s.getBatchId().contains("VEGGIES") || s.getBatchId().contains("VEGETABLES") ||
-                        (s.getScenarioId() != null && s.getScenarioId().contains("example_3")))
+                .filter(s -> s.getBatchId().contains(BATCH_KEYWORD_VEGGIES) || s.getBatchId().contains(BATCH_KEYWORD_VEGETABLES) ||
+                        (s.getScenarioId() != null && s.getScenarioId().contains(SCENARIO_EXAMPLE_3)))
                 .count();
         
         long compliant = simulations.stream()
@@ -1020,16 +1031,16 @@ public class ReportExportService {
         
         // Categorize simulations
         List<PersistedSimulation> applesSimulations = simulations.stream()
-                .filter(s -> s.getBatchId().contains("APPLES") || 
-                        (s.getScenarioId() != null && s.getScenarioId().contains("example_1")))
+                .filter(s -> s.getBatchId().contains(BATCH_KEYWORD_APPLES) || 
+                        (s.getScenarioId() != null && s.getScenarioId().contains(SCENARIO_EXAMPLE_1)))
                 .collect(Collectors.toList());
         List<PersistedSimulation> carrotsSimulations = simulations.stream()
-                .filter(s -> s.getBatchId().contains("CARROTS") || 
-                        (s.getScenarioId() != null && s.getScenarioId().contains("example_2")))
+                .filter(s -> s.getBatchId().contains(BATCH_KEYWORD_CARROTS) || 
+                        (s.getScenarioId() != null && s.getScenarioId().contains(SCENARIO_EXAMPLE_2)))
                 .collect(Collectors.toList());
         List<PersistedSimulation> veggiesSimulations = simulations.stream()
-                .filter(s -> s.getBatchId().contains("VEGGIES") || s.getBatchId().contains("VEGETABLES") ||
-                        (s.getScenarioId() != null && s.getScenarioId().contains("example_3")))
+                .filter(s -> s.getBatchId().contains(BATCH_KEYWORD_VEGGIES) || s.getBatchId().contains(BATCH_KEYWORD_VEGETABLES) ||
+                        (s.getScenarioId() != null && s.getScenarioId().contains(SCENARIO_EXAMPLE_3)))
                 .collect(Collectors.toList());
         
         // Statistics by type
@@ -1070,13 +1081,13 @@ public class ReportExportService {
         for (PersistedSimulation simulation : simulations) {
             String simType = "Other";
             String badgeClass = "";
-            if (simulation.getBatchId().contains("APPLES")) {
+            if (simulation.getBatchId().contains(BATCH_KEYWORD_APPLES)) {
                 simType = "Example 1: Apples";
                 badgeClass = "badge-apples";
-            } else if (simulation.getBatchId().contains("CARROTS")) {
+            } else if (simulation.getBatchId().contains(BATCH_KEYWORD_CARROTS)) {
                 simType = "Example 2: Carrots";
                 badgeClass = "badge-carrots";
-            } else if (simulation.getBatchId().contains("VEGGIES") || simulation.getBatchId().contains("VEGETABLES")) {
+            } else if (simulation.getBatchId().contains(BATCH_KEYWORD_VEGGIES) || simulation.getBatchId().contains(BATCH_KEYWORD_VEGETABLES)) {
                 simType = "Example 3: Vegetables";
                 badgeClass = "badge-veggies";
             }

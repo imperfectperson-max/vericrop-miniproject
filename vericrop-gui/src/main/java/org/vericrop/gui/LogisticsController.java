@@ -1788,17 +1788,26 @@ public class LogisticsController implements SimulationListener {
         
         if (!simulations.isEmpty()) {
             // Categorize simulations by type (the 3 examples from ProducerController)
+            // Using same keywords as ReportExportService for consistency
+            final String SCENARIO_EXAMPLE_1 = "example_1";
+            final String SCENARIO_EXAMPLE_2 = "example_2";
+            final String SCENARIO_EXAMPLE_3 = "example_3";
+            final String BATCH_KEYWORD_APPLES = "APPLES";
+            final String BATCH_KEYWORD_CARROTS = "CARROTS";
+            final String BATCH_KEYWORD_VEGGIES = "VEGGIES";
+            final String BATCH_KEYWORD_VEGETABLES = "VEGETABLES";
+            
             List<PersistedSimulation> applesSimulations = simulations.stream()
-                    .filter(s -> s.getBatchId().contains("APPLES") || 
-                            (s.getScenarioId() != null && s.getScenarioId().contains("example_1")))
+                    .filter(s -> s.getBatchId().contains(BATCH_KEYWORD_APPLES) || 
+                            (s.getScenarioId() != null && s.getScenarioId().contains(SCENARIO_EXAMPLE_1)))
                     .collect(Collectors.toList());
             List<PersistedSimulation> carrotsSimulations = simulations.stream()
-                    .filter(s -> s.getBatchId().contains("CARROTS") || 
-                            (s.getScenarioId() != null && s.getScenarioId().contains("example_2")))
+                    .filter(s -> s.getBatchId().contains(BATCH_KEYWORD_CARROTS) || 
+                            (s.getScenarioId() != null && s.getScenarioId().contains(SCENARIO_EXAMPLE_2)))
                     .collect(Collectors.toList());
             List<PersistedSimulation> veggiesSimulations = simulations.stream()
-                    .filter(s -> s.getBatchId().contains("VEGGIES") || s.getBatchId().contains("VEGETABLES") ||
-                            (s.getScenarioId() != null && s.getScenarioId().contains("example_3")))
+                    .filter(s -> s.getBatchId().contains(BATCH_KEYWORD_VEGGIES) || s.getBatchId().contains(BATCH_KEYWORD_VEGETABLES) ||
+                            (s.getScenarioId() != null && s.getScenarioId().contains(SCENARIO_EXAMPLE_3)))
                     .collect(Collectors.toList());
             
             // Overall compliance statistics
