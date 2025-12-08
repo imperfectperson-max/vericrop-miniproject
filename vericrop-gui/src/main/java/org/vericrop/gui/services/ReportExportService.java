@@ -48,7 +48,10 @@ public class ReportExportService {
      */
     public enum ExportFormat {
         TXT,
-        CSV
+        CSV,
+        JSON,
+        HTML,
+        PDF
     }
     
     /**
@@ -102,8 +105,22 @@ public class ReportExportService {
         String typeName = reportType.name().toLowerCase().replace("_", "-");
         String start = startDate.format(DATE_FORMATTER);
         String end = endDate.format(DATE_FORMATTER);
-        String extension = format.name().toLowerCase();
+        String extension = getFileExtension(format);
         return String.format("%s_%s_to_%s.%s", typeName, start, end, extension);
+    }
+    
+    /**
+     * Get file extension for export format
+     */
+    private String getFileExtension(ExportFormat format) {
+        switch (format) {
+            case TXT: return "txt";
+            case CSV: return "csv";
+            case JSON: return "json";
+            case HTML: return "html";
+            case PDF: return "pdf";
+            default: return "txt";
+        }
     }
     
     /**
@@ -135,6 +152,12 @@ public class ReportExportService {
                 throw new IllegalArgumentException("Unknown report type: " + reportType);
         }
         
+        // For PDF, we need to convert HTML to PDF
+        if (format == ExportFormat.PDF) {
+            String htmlContent = content;
+            content = convertHtmlToPdf(htmlContent);
+        }
+        
         Files.writeString(filePath, content);
         logger.info("Exported report: {} ({} format)", filePath, format);
         
@@ -142,15 +165,32 @@ public class ReportExportService {
     }
     
     /**
+     * Convert HTML content to PDF (simple implementation)
+     * Note: This is a placeholder. For production, use a library like iText or Flying Saucer
+     */
+    private String convertHtmlToPdf(String htmlContent) {
+        // For now, return HTML wrapped with PDF note
+        // In production, integrate with a PDF library
+        return "<!-- PDF conversion requires additional library -->\n" + htmlContent;
+    }
+    
+    /**
      * Generate Shipment Summary Report
      */
     private String generateShipmentSummaryReport(LocalDate startDate, LocalDate endDate, ExportFormat format) {
         List<PersistedShipment> shipments = persistenceService.getShipmentsByDateRange(startDate, endDate);
+        List<PersistedSimulation> simulations = persistenceService.getSimulationsByDateRange(startDate, endDate);
         
-        if (format == ExportFormat.CSV) {
-            return generateShipmentSummaryCsv(shipments, startDate, endDate);
-        } else {
-            return generateShipmentSummaryTxt(shipments, startDate, endDate);
+        switch (format) {
+            case CSV:
+                return generateShipmentSummaryCsv(shipments, startDate, endDate);
+            case JSON:
+                return generateShipmentSummaryJson(shipments, simulations, startDate, endDate);
+            case HTML:
+            case PDF:
+                return generateShipmentSummaryHtml(shipments, simulations, startDate, endDate);
+            default:
+                return generateShipmentSummaryTxt(shipments, startDate, endDate);
         }
     }
     
@@ -171,6 +211,20 @@ public class ReportExportService {
         
         for (PersistedShipment shipment : shipments) {
             sb.append("Batch ID:     ").append(shipment.getBatchId()).append("\n");
+            
+            // Add scenario-specific insights based on batch prefix
+            String batchId = shipment.getBatchId();
+            if (batchId.contains("APPLES")) {
+                sb.append("Type:         Farm to Consumer Direct (Summer Apples)\n");
+                sb.append("Route:        Warehouse stop included, optimal cold chain\n");
+            } else if (batchId.contains("CARROTS")) {
+                sb.append("Type:         Local Producer Delivery (Organic Carrots)\n");
+                sb.append("Route:        Short direct route, no warehouse\n");
+            } else if (batchId.contains("VEGGIES") || batchId.contains("VEGETABLES")) {
+                sb.append("Type:         Cross-Region Long Haul (Mixed Vegetables)\n");
+                sb.append("Route:        Extended delivery with environmental events\n");
+            }
+            
             sb.append("Status:       ").append(shipment.getStatus()).append("\n");
             sb.append("Location:     ").append(shipment.getLocation()).append("\n");
             sb.append("Temperature:  ").append(String.format("%.1f°C", shipment.getTemperature())).append("\n");
@@ -192,10 +246,21 @@ public class ReportExportService {
             long inTransit = shipments.stream().filter(s -> "IN_TRANSIT".equalsIgnoreCase(s.getStatus())).count();
             long delivered = shipments.stream().filter(s -> "DELIVERED".equalsIgnoreCase(s.getStatus())).count();
             
+            // Count shipments by type
+            long apples = shipments.stream().filter(s -> s.getBatchId().contains("APPLES")).count();
+            long carrots = shipments.stream().filter(s -> s.getBatchId().contains("CARROTS")).count();
+            long veggies = shipments.stream().filter(s -> 
+                s.getBatchId().contains("VEGGIES") || s.getBatchId().contains("VEGETABLES")).count();
+            
             sb.append("Average Temperature: ").append(String.format("%.1f°C", avgTemp)).append("\n");
             sb.append("Average Humidity:    ").append(String.format("%.1f%%", avgHumidity)).append("\n");
             sb.append("In Transit:          ").append(inTransit).append("\n");
-            sb.append("Delivered:           ").append(delivered).append("\n");
+            sb.append("Delivered:           ").append(delivered).append("\n\n");
+            
+            sb.append("By Delivery Type:\n");
+            sb.append("  Farm to Consumer (Apples):    ").append(apples).append("\n");
+            sb.append("  Local Producer (Carrots):     ").append(carrots).append("\n");
+            sb.append("  Cross-Region (Vegetables):    ").append(veggies).append("\n");
         }
         
         return sb.toString();
@@ -225,16 +290,180 @@ public class ReportExportService {
     }
     
     /**
+     * Generate Shipment Summary in JSON format
+     */
+    private String generateShipmentSummaryJson(List<PersistedShipment> shipments, 
+                                                List<PersistedSimulation> simulations,
+                                                LocalDate startDate, LocalDate endDate) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\n");
+        sb.append("  \"reportType\": \"Shipment Summary\",\n");
+        sb.append("  \"dateRange\": {\n");
+        sb.append("    \"start\": \"").append(startDate.format(DATE_FORMATTER)).append("\",\n");
+        sb.append("    \"end\": \"").append(endDate.format(DATE_FORMATTER)).append("\"\n");
+        sb.append("  },\n");
+        sb.append("  \"generated\": \"").append(Instant.now().toString()).append("\",\n");
+        sb.append("  \"totalShipments\": ").append(shipments.size()).append(",\n");
+        sb.append("  \"shipmentsByType\": {\n");
+        
+        long apples = shipments.stream().filter(s -> s.getBatchId().contains("APPLES")).count();
+        long carrots = shipments.stream().filter(s -> s.getBatchId().contains("CARROTS")).count();
+        long veggies = shipments.stream().filter(s -> 
+            s.getBatchId().contains("VEGGIES") || s.getBatchId().contains("VEGETABLES")).count();
+        
+        sb.append("    \"farmToConsumer\": ").append(apples).append(",\n");
+        sb.append("    \"localProducer\": ").append(carrots).append(",\n");
+        sb.append("    \"crossRegion\": ").append(veggies).append("\n");
+        sb.append("  },\n");
+        sb.append("  \"shipments\": [\n");
+        
+        for (int i = 0; i < shipments.size(); i++) {
+            PersistedShipment shipment = shipments.get(i);
+            sb.append("    {\n");
+            sb.append("      \"batchId\": \"").append(escapeJson(shipment.getBatchId())).append("\",\n");
+            
+            // Determine delivery type
+            String deliveryType = "Other";
+            if (shipment.getBatchId().contains("APPLES")) {
+                deliveryType = "Farm to Consumer Direct";
+            } else if (shipment.getBatchId().contains("CARROTS")) {
+                deliveryType = "Local Producer Delivery";
+            } else if (shipment.getBatchId().contains("VEGGIES") || shipment.getBatchId().contains("VEGETABLES")) {
+                deliveryType = "Cross-Region Long Haul";
+            }
+            
+            sb.append("      \"deliveryType\": \"").append(deliveryType).append("\",\n");
+            sb.append("      \"status\": \"").append(escapeJson(shipment.getStatus())).append("\",\n");
+            sb.append("      \"location\": \"").append(escapeJson(shipment.getLocation())).append("\",\n");
+            sb.append("      \"temperature\": ").append(String.format("%.1f", shipment.getTemperature())).append(",\n");
+            sb.append("      \"humidity\": ").append(String.format("%.1f", shipment.getHumidity())).append(",\n");
+            sb.append("      \"vehicle\": \"").append(escapeJson(shipment.getVehicle())).append("\",\n");
+            sb.append("      \"createdAt\": \"").append(formatTimestamp(shipment.getCreatedAt())).append("\",\n");
+            sb.append("      \"updatedAt\": \"").append(formatTimestamp(shipment.getUpdatedAt())).append("\"\n");
+            sb.append("    }");
+            if (i < shipments.size() - 1) sb.append(",");
+            sb.append("\n");
+        }
+        
+        sb.append("  ]\n");
+        sb.append("}\n");
+        
+        return sb.toString();
+    }
+    
+    /**
+     * Generate Shipment Summary in HTML format
+     */
+    private String generateShipmentSummaryHtml(List<PersistedShipment> shipments,
+                                                List<PersistedSimulation> simulations,
+                                                LocalDate startDate, LocalDate endDate) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("<!DOCTYPE html>\n<html>\n<head>\n");
+        sb.append("  <meta charset=\"UTF-8\">\n");
+        sb.append("  <title>Shipment Summary Report</title>\n");
+        sb.append("  <style>\n");
+        sb.append("    body { font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }\n");
+        sb.append("    .container { max-width: 1200px; margin: 0 auto; background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }\n");
+        sb.append("    h1 { color: #2563eb; border-bottom: 3px solid #2563eb; padding-bottom: 10px; }\n");
+        sb.append("    h2 { color: #1e40af; margin-top: 30px; }\n");
+        sb.append("    .header-info { background-color: #eff6ff; padding: 15px; border-radius: 5px; margin-bottom: 20px; }\n");
+        sb.append("    table { width: 100%; border-collapse: collapse; margin-top: 20px; }\n");
+        sb.append("    th { background-color: #2563eb; color: white; padding: 12px; text-align: left; }\n");
+        sb.append("    td { padding: 10px; border-bottom: 1px solid #e5e7eb; }\n");
+        sb.append("    tr:hover { background-color: #f9fafb; }\n");
+        sb.append("    .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }\n");
+        sb.append("    .badge-apples { background-color: #dcfce7; color: #166534; }\n");
+        sb.append("    .badge-carrots { background-color: #fef3c7; color: #92400e; }\n");
+        sb.append("    .badge-veggies { background-color: #e0e7ff; color: #3730a3; }\n");
+        sb.append("    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 20px; }\n");
+        sb.append("    .stat-card { background-color: #f9fafb; padding: 15px; border-radius: 5px; border-left: 4px solid #2563eb; }\n");
+        sb.append("    .stat-value { font-size: 24px; font-weight: bold; color: #1e40af; }\n");
+        sb.append("    .stat-label { font-size: 14px; color: #6b7280; }\n");
+        sb.append("  </style>\n");
+        sb.append("</head>\n<body>\n");
+        sb.append("  <div class=\"container\">\n");
+        sb.append("    <h1>📦 Shipment Summary Report</h1>\n");
+        sb.append("    <div class=\"header-info\">\n");
+        sb.append("      <strong>Date Range:</strong> ").append(startDate.format(DATE_FORMATTER))
+          .append(" to ").append(endDate.format(DATE_FORMATTER)).append("<br>\n");
+        sb.append("      <strong>Generated:</strong> ").append(Instant.now().atZone(ZoneId.systemDefault())
+          .format(DATETIME_FORMATTER)).append("<br>\n");
+        sb.append("      <strong>Total Shipments:</strong> ").append(shipments.size()).append("\n");
+        sb.append("    </div>\n");
+        
+        // Statistics
+        long apples = shipments.stream().filter(s -> s.getBatchId().contains("APPLES")).count();
+        long carrots = shipments.stream().filter(s -> s.getBatchId().contains("CARROTS")).count();
+        long veggies = shipments.stream().filter(s -> 
+            s.getBatchId().contains("VEGGIES") || s.getBatchId().contains("VEGETABLES")).count();
+        long inTransit = shipments.stream().filter(s -> "IN_TRANSIT".equalsIgnoreCase(s.getStatus())).count();
+        long delivered = shipments.stream().filter(s -> "DELIVERED".equalsIgnoreCase(s.getStatus())).count();
+        
+        sb.append("    <h2>📊 Statistics</h2>\n");
+        sb.append("    <div class=\"stats\">\n");
+        sb.append("      <div class=\"stat-card\"><div class=\"stat-value\">").append(apples).append("</div><div class=\"stat-label\">Farm to Consumer (Apples)</div></div>\n");
+        sb.append("      <div class=\"stat-card\"><div class=\"stat-value\">").append(carrots).append("</div><div class=\"stat-label\">Local Producer (Carrots)</div></div>\n");
+        sb.append("      <div class=\"stat-card\"><div class=\"stat-value\">").append(veggies).append("</div><div class=\"stat-label\">Cross-Region (Vegetables)</div></div>\n");
+        sb.append("      <div class=\"stat-card\"><div class=\"stat-value\">").append(inTransit).append("</div><div class=\"stat-label\">In Transit</div></div>\n");
+        sb.append("      <div class=\"stat-card\"><div class=\"stat-value\">").append(delivered).append("</div><div class=\"stat-label\">Delivered</div></div>\n");
+        sb.append("    </div>\n");
+        
+        // Shipment table
+        sb.append("    <h2>📋 Shipment Details</h2>\n");
+        sb.append("    <table>\n");
+        sb.append("      <tr><th>Batch ID</th><th>Type</th><th>Status</th><th>Location</th><th>Temperature</th><th>Humidity</th><th>Vehicle</th></tr>\n");
+        
+        for (PersistedShipment shipment : shipments) {
+            sb.append("      <tr>\n");
+            sb.append("        <td>").append(escapeHtml(shipment.getBatchId())).append("</td>\n");
+            
+            // Determine type with badge
+            String badgeClass = "";
+            String typeName = "Other";
+            if (shipment.getBatchId().contains("APPLES")) {
+                badgeClass = "badge-apples";
+                typeName = "Farm to Consumer";
+            } else if (shipment.getBatchId().contains("CARROTS")) {
+                badgeClass = "badge-carrots";
+                typeName = "Local Producer";
+            } else if (shipment.getBatchId().contains("VEGGIES") || shipment.getBatchId().contains("VEGETABLES")) {
+                badgeClass = "badge-veggies";
+                typeName = "Cross-Region";
+            }
+            
+            sb.append("        <td><span class=\"badge ").append(badgeClass).append("\">").append(typeName).append("</span></td>\n");
+            sb.append("        <td>").append(escapeHtml(shipment.getStatus())).append("</td>\n");
+            sb.append("        <td>").append(escapeHtml(shipment.getLocation())).append("</td>\n");
+            sb.append("        <td>").append(String.format("%.1f°C", shipment.getTemperature())).append("</td>\n");
+            sb.append("        <td>").append(String.format("%.1f%%", shipment.getHumidity())).append("</td>\n");
+            sb.append("        <td>").append(escapeHtml(shipment.getVehicle())).append("</td>\n");
+            sb.append("      </tr>\n");
+        }
+        
+        sb.append("    </table>\n");
+        sb.append("  </div>\n");
+        sb.append("</body>\n</html>\n");
+        
+        return sb.toString();
+    }
+    
+    /**
      * Generate Temperature Log Report
      */
     private String generateTemperatureLogReport(LocalDate startDate, LocalDate endDate, ExportFormat format) {
         List<PersistedShipment> shipments = persistenceService.getShipmentsByDateRange(startDate, endDate);
         List<PersistedSimulation> simulations = persistenceService.getSimulationsByDateRange(startDate, endDate);
         
-        if (format == ExportFormat.CSV) {
-            return generateTemperatureLogCsv(shipments, simulations, startDate, endDate);
-        } else {
-            return generateTemperatureLogTxt(shipments, simulations, startDate, endDate);
+        switch (format) {
+            case CSV:
+                return generateTemperatureLogCsv(shipments, simulations, startDate, endDate);
+            case JSON:
+                return generateTemperatureLogJson(shipments, simulations, startDate, endDate);
+            case HTML:
+            case PDF:
+                return generateTemperatureLogHtml(shipments, simulations, startDate, endDate);
+            default:
+                return generateTemperatureLogTxt(shipments, simulations, startDate, endDate);
         }
     }
     
@@ -317,10 +546,16 @@ public class ReportExportService {
     private String generateQualityComplianceReport(LocalDate startDate, LocalDate endDate, ExportFormat format) {
         List<PersistedSimulation> simulations = persistenceService.getSimulationsByDateRange(startDate, endDate);
         
-        if (format == ExportFormat.CSV) {
-            return generateQualityComplianceCsv(simulations, startDate, endDate);
-        } else {
-            return generateQualityComplianceTxt(simulations, startDate, endDate);
+        switch (format) {
+            case CSV:
+                return generateQualityComplianceCsv(simulations, startDate, endDate);
+            case JSON:
+                return generateQualityComplianceJson(simulations, startDate, endDate);
+            case HTML:
+            case PDF:
+                return generateQualityComplianceHtml(simulations, startDate, endDate);
+            default:
+                return generateQualityComplianceTxt(simulations, startDate, endDate);
         }
     }
     
@@ -399,10 +634,16 @@ public class ReportExportService {
         List<PersistedSimulation> simulations = persistenceService.getSimulationsByDateRange(startDate, endDate);
         List<PersistedShipment> shipments = persistenceService.getShipmentsByDateRange(startDate, endDate);
         
-        if (format == ExportFormat.CSV) {
-            return generateDeliveryPerformanceCsv(simulations, shipments, startDate, endDate);
-        } else {
-            return generateDeliveryPerformanceTxt(simulations, shipments, startDate, endDate);
+        switch (format) {
+            case CSV:
+                return generateDeliveryPerformanceCsv(simulations, shipments, startDate, endDate);
+            case JSON:
+                return generateDeliveryPerformanceJson(simulations, shipments, startDate, endDate);
+            case HTML:
+            case PDF:
+                return generateDeliveryPerformanceHtml(simulations, shipments, startDate, endDate);
+            default:
+                return generateDeliveryPerformanceTxt(simulations, shipments, startDate, endDate);
         }
     }
     
@@ -484,10 +725,16 @@ public class ReportExportService {
     private String generateSimulationLogReport(LocalDate startDate, LocalDate endDate, ExportFormat format) {
         List<PersistedSimulation> simulations = persistenceService.getSimulationsByDateRange(startDate, endDate);
         
-        if (format == ExportFormat.CSV) {
-            return generateSimulationLogCsv(simulations, startDate, endDate);
-        } else {
-            return generateSimulationLogTxt(simulations, startDate, endDate);
+        switch (format) {
+            case CSV:
+                return generateSimulationLogCsv(simulations, startDate, endDate);
+            case JSON:
+                return generateSimulationLogJson(simulations, startDate, endDate);
+            case HTML:
+            case PDF:
+                return generateSimulationLogHtml(simulations, startDate, endDate);
+            default:
+                return generateSimulationLogTxt(simulations, startDate, endDate);
         }
     }
     
@@ -562,6 +809,88 @@ public class ReportExportService {
         return sb.toString();
     }
     
+    // Stub implementations for JSON/HTML formats for remaining report types
+    // These follow the same pattern as Shipment Summary but are simplified for brevity
+    
+    private String generateTemperatureLogJson(List<PersistedShipment> shipments, 
+                                               List<PersistedSimulation> simulations,
+                                               LocalDate startDate, LocalDate endDate) {
+        // Simple JSON implementation - can be expanded
+        return "{ \"reportType\": \"Temperature Log\", \"dateRange\": { \"start\": \"" + 
+               startDate.format(DATE_FORMATTER) + "\", \"end\": \"" + endDate.format(DATE_FORMATTER) + 
+               "\" }, \"shipments\": " + shipments.size() + ", \"simulations\": " + simulations.size() + " }";
+    }
+    
+    private String generateTemperatureLogHtml(List<PersistedShipment> shipments, 
+                                               List<PersistedSimulation> simulations,
+                                               LocalDate startDate, LocalDate endDate) {
+        // Reuse TXT format wrapped in basic HTML
+        String txtContent = generateTemperatureLogTxt(shipments, simulations, startDate, endDate);
+        return wrapInBasicHtml("Temperature Log Report", txtContent);
+    }
+    
+    private String generateQualityComplianceJson(List<PersistedSimulation> simulations, 
+                                                  LocalDate startDate, LocalDate endDate) {
+        return "{ \"reportType\": \"Quality Compliance\", \"dateRange\": { \"start\": \"" + 
+               startDate.format(DATE_FORMATTER) + "\", \"end\": \"" + endDate.format(DATE_FORMATTER) + 
+               "\" }, \"simulations\": " + simulations.size() + " }";
+    }
+    
+    private String generateQualityComplianceHtml(List<PersistedSimulation> simulations, 
+                                                  LocalDate startDate, LocalDate endDate) {
+        String txtContent = generateQualityComplianceTxt(simulations, startDate, endDate);
+        return wrapInBasicHtml("Quality Compliance Report", txtContent);
+    }
+    
+    private String generateDeliveryPerformanceJson(List<PersistedSimulation> simulations,
+                                                    List<PersistedShipment> shipments,
+                                                    LocalDate startDate, LocalDate endDate) {
+        return "{ \"reportType\": \"Delivery Performance\", \"dateRange\": { \"start\": \"" + 
+               startDate.format(DATE_FORMATTER) + "\", \"end\": \"" + endDate.format(DATE_FORMATTER) + 
+               "\" }, \"simulations\": " + simulations.size() + ", \"shipments\": " + shipments.size() + " }";
+    }
+    
+    private String generateDeliveryPerformanceHtml(List<PersistedSimulation> simulations,
+                                                    List<PersistedShipment> shipments,
+                                                    LocalDate startDate, LocalDate endDate) {
+        String txtContent = generateDeliveryPerformanceTxt(simulations, shipments, startDate, endDate);
+        return wrapInBasicHtml("Delivery Performance Report", txtContent);
+    }
+    
+    private String generateSimulationLogJson(List<PersistedSimulation> simulations, 
+                                              LocalDate startDate, LocalDate endDate) {
+        return "{ \"reportType\": \"Simulation Log\", \"dateRange\": { \"start\": \"" + 
+               startDate.format(DATE_FORMATTER) + "\", \"end\": \"" + endDate.format(DATE_FORMATTER) + 
+               "\" }, \"simulations\": " + simulations.size() + " }";
+    }
+    
+    private String generateSimulationLogHtml(List<PersistedSimulation> simulations, 
+                                              LocalDate startDate, LocalDate endDate) {
+        String txtContent = generateSimulationLogTxt(simulations, startDate, endDate);
+        return wrapInBasicHtml("Simulation Log Report", txtContent);
+    }
+    
+    /**
+     * Wrap text content in basic HTML template
+     */
+    private String wrapInBasicHtml(String title, String textContent) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("<!DOCTYPE html>\n<html>\n<head>\n");
+        sb.append("  <meta charset=\"UTF-8\">\n");
+        sb.append("  <title>").append(escapeHtml(title)).append("</title>\n");
+        sb.append("  <style>\n");
+        sb.append("    body { font-family: 'Courier New', monospace; margin: 20px; background-color: #f5f5f5; }\n");
+        sb.append("    .container { max-width: 1200px; margin: 0 auto; background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }\n");
+        sb.append("    pre { white-space: pre-wrap; word-wrap: break-word; }\n");
+        sb.append("  </style>\n");
+        sb.append("</head>\n<body>\n");
+        sb.append("  <div class=\"container\">\n");
+        sb.append("    <pre>").append(escapeHtml(textContent)).append("</pre>\n");
+        sb.append("  </div>\n");
+        sb.append("</body>\n</html>\n");
+        return sb.toString();
+    }
+    
     // ==================== UTILITY METHODS ====================
     
     /**
@@ -588,6 +917,34 @@ public class ReportExportService {
             return "\"" + value.replace("\"", "\"\"") + "\"";
         }
         return value;
+    }
+    
+    /**
+     * Escape a value for JSON format
+     */
+    private String escapeJson(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.replace("\\", "\\\\")
+                   .replace("\"", "\\\"")
+                   .replace("\n", "\\n")
+                   .replace("\r", "\\r")
+                   .replace("\t", "\\t");
+    }
+    
+    /**
+     * Escape a value for HTML format
+     */
+    private String escapeHtml(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.replace("&", "&amp;")
+                   .replace("<", "&lt;")
+                   .replace(">", "&gt;")
+                   .replace("\"", "&quot;")
+                   .replace("'", "&#39;");
     }
     
     /**

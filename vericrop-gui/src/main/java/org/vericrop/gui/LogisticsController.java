@@ -1196,12 +1196,13 @@ public class LogisticsController implements SimulationListener {
     }
     
     /**
-     * Setup export format dropdown with TXT and CSV options.
+     * Setup export format dropdown with multiple format options.
+     * Supports TXT, CSV, JSON, HTML, and PDF formats.
      * Defaults to TXT format.
      */
     private void setupExportFormatCombo() {
         if (exportFormatCombo != null) {
-            exportFormatCombo.getItems().addAll("TXT", "CSV");
+            exportFormatCombo.getItems().addAll("TXT", "CSV", "JSON", "HTML", "PDF");
             exportFormatCombo.setValue("TXT"); // Default to TXT
         }
     }
