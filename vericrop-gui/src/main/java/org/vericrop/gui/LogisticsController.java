@@ -1774,6 +1774,10 @@ public class LogisticsController implements SimulationListener {
     
     /**
      * Generate Quality Compliance preview with quality metrics.
+     * Enhanced to properly interpret the 3 simulation examples:
+     * - Example 1: Farm to Consumer Direct (Summer Apples)
+     * - Example 2: Local Producer Delivery (Organic Carrots)
+     * - Example 3: Cross-Region Long Haul (Mixed Vegetables)
      */
     private String generateQualityCompliancePreview(String dateRange, String timestamp,
             List<PersistedSimulation> simulations) {
@@ -1794,6 +1798,79 @@ public class LogisticsController implements SimulationListener {
             sb.append("• Total Simulations: ").append(simulations.size()).append("\n");
             sb.append("• Compliant: ").append(compliant).append(" (").append(String.format("%.1f%%", complianceRate)).append(")\n");
             sb.append("• Non-Compliant: ").append(nonCompliant).append("\n\n");
+            
+            // Breakdown by the 3 simulation types (Examples 1, 2, 3)
+            long example1Count = simulations.stream()
+                    .filter(s -> s.getBatchId().contains("APPLES") || 
+                            (s.getScenarioId() != null && s.getScenarioId().contains("example_1")))
+                    .count();
+            long example2Count = simulations.stream()
+                    .filter(s -> s.getBatchId().contains("CARROTS") || 
+                            (s.getScenarioId() != null && s.getScenarioId().contains("example_2")))
+                    .count();
+            long example3Count = simulations.stream()
+                    .filter(s -> s.getBatchId().contains("VEGGIES") || s.getBatchId().contains("VEGETABLES") ||
+                            (s.getScenarioId() != null && s.getScenarioId().contains("example_3")))
+                    .count();
+            
+            if (example1Count + example2Count + example3Count > 0) {
+                sb.append("━━━ BY SIMULATION TYPE ━━━\n");
+                if (example1Count > 0) {
+                    long ex1Compliant = simulations.stream()
+                            .filter(s -> s.getBatchId().contains("APPLES") || 
+                                    (s.getScenarioId() != null && s.getScenarioId().contains("example_1")))
+                            .filter(s -> "COMPLIANT".equals(s.getComplianceStatus()))
+                            .count();
+                    double ex1ComplianceRate = (ex1Compliant * 100.0 / example1Count);
+                    double ex1AvgQuality = simulations.stream()
+                            .filter(s -> s.getBatchId().contains("APPLES") || 
+                                    (s.getScenarioId() != null && s.getScenarioId().contains("example_1")))
+                            .mapToDouble(PersistedSimulation::getFinalQuality)
+                            .average().orElse(0.0);
+                    
+                    sb.append("• Example 1 - Farm to Consumer (Apples): ").append(example1Count).append(" runs\n");
+                    sb.append("  └─ Compliance: ").append(String.format("%.1f%%", ex1ComplianceRate))
+                      .append(" | Avg Quality: ").append(String.format("%.1f%%", ex1AvgQuality)).append("\n");
+                    sb.append("  └─ Characteristics: Warehouse stops, 30min duration, optimal cold chain\n");
+                }
+                if (example2Count > 0) {
+                    long ex2Compliant = simulations.stream()
+                            .filter(s -> s.getBatchId().contains("CARROTS") || 
+                                    (s.getScenarioId() != null && s.getScenarioId().contains("example_2")))
+                            .filter(s -> "COMPLIANT".equals(s.getComplianceStatus()))
+                            .count();
+                    double ex2ComplianceRate = (ex2Compliant * 100.0 / example2Count);
+                    double ex2AvgQuality = simulations.stream()
+                            .filter(s -> s.getBatchId().contains("CARROTS") || 
+                                    (s.getScenarioId() != null && s.getScenarioId().contains("example_2")))
+                            .mapToDouble(PersistedSimulation::getFinalQuality)
+                            .average().orElse(0.0);
+                    
+                    sb.append("• Example 2 - Local Producer (Carrots): ").append(example2Count).append(" runs\n");
+                    sb.append("  └─ Compliance: ").append(String.format("%.1f%%", ex2ComplianceRate))
+                      .append(" | Avg Quality: ").append(String.format("%.1f%%", ex2AvgQuality)).append("\n");
+                    sb.append("  └─ Characteristics: Short 15min route, no warehouse, strict temp control\n");
+                }
+                if (example3Count > 0) {
+                    long ex3Compliant = simulations.stream()
+                            .filter(s -> s.getBatchId().contains("VEGGIES") || s.getBatchId().contains("VEGETABLES") ||
+                                    (s.getScenarioId() != null && s.getScenarioId().contains("example_3")))
+                            .filter(s -> "COMPLIANT".equals(s.getComplianceStatus()))
+                            .count();
+                    double ex3ComplianceRate = (ex3Compliant * 100.0 / example3Count);
+                    double ex3AvgQuality = simulations.stream()
+                            .filter(s -> s.getBatchId().contains("VEGGIES") || s.getBatchId().contains("VEGETABLES") ||
+                                    (s.getScenarioId() != null && s.getScenarioId().contains("example_3")))
+                            .mapToDouble(PersistedSimulation::getFinalQuality)
+                            .average().orElse(0.0);
+                    
+                    sb.append("• Example 3 - Cross-Region (Vegetables): ").append(example3Count).append(" runs\n");
+                    sb.append("  └─ Compliance: ").append(String.format("%.1f%%", ex3ComplianceRate))
+                      .append(" | Avg Quality: ").append(String.format("%.1f%%", ex3AvgQuality)).append("\n");
+                    sb.append("  └─ Characteristics: Extended 45min delivery, temperature spike events\n");
+                }
+                sb.append("\n");
+            }
             
             // Quality statistics
             sb.append("━━━ QUALITY METRICS ━━━\n");
@@ -1832,6 +1909,10 @@ public class LogisticsController implements SimulationListener {
             sb.append("━━━ NO DATA AVAILABLE ━━━\n");
             sb.append("• No simulation data found for this period.\n");
             sb.append("• Run simulations from ProducerController to generate quality data.\n");
+            sb.append("• Available examples:\n");
+            sb.append("  - Example 1: Farm to Consumer (Summer Apples, 30min)\n");
+            sb.append("  - Example 2: Local Producer (Organic Carrots, 15min)\n");
+            sb.append("  - Example 3: Cross-Region (Mixed Vegetables, 45min)\n");
         }
         
         return sb.toString();

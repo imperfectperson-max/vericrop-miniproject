@@ -331,4 +331,97 @@ class ReportExportServiceTest {
         assertTrue(content.contains("DELIVERY PERFORMANCE REPORT"));
         assertTrue(content.contains("PERFORMANCE METRICS"));
     }
+    
+    // ==================== FIX VALIDATION TESTS ====================
+    
+    /**
+     * Test that PDF format exports use .html extension for browser compatibility.
+     * This fixes the issue where PDF files couldn't be opened.
+     */
+    @Test
+    void testPdfExportUsesHtmlExtension() throws IOException {
+        LocalDate start = LocalDate.now().minusDays(1);
+        LocalDate end = LocalDate.now().plusDays(1);
+        
+        File exportedFile = exportService.exportReport(
+                ReportExportService.ReportType.QUALITY_COMPLIANCE, start, end,
+                ReportExportService.ExportFormat.PDF);
+        
+        assertTrue(exportedFile.exists());
+        // PDF exports should use .html extension for browser compatibility
+        assertTrue(exportedFile.getName().endsWith(".html"), 
+                "PDF export should use .html extension for browser compatibility");
+        
+        // Verify it's valid HTML content
+        String content = Files.readString(exportedFile.toPath());
+        assertTrue(content.contains("<!DOCTYPE html>"));
+        assertTrue(content.contains("</html>"));
+    }
+    
+    /**
+     * Test that Quality Compliance report includes simulation type breakdown.
+     * This fixes the issue where the 3 simulation examples weren't properly interpreted.
+     */
+    @Test
+    void testQualityComplianceIncludesSimulationTypes() throws IOException {
+        // Add simulation data with the 3 types
+        PersistedSimulation apples = new PersistedSimulation("BATCH_APPLES_001", "FARMER_A", "example_1");
+        apples.setStatus("COMPLETED");
+        apples.setCompleted(true);
+        apples.setFinalQuality(95.0);
+        apples.setInitialQuality(100.0);
+        apples.setAvgTemperature(4.5);
+        apples.setMinTemperature(3.5);
+        apples.setMaxTemperature(5.5);
+        apples.setComplianceStatus("COMPLIANT");
+        apples.setEndTime(System.currentTimeMillis());
+        persistenceService.saveSimulation(apples);
+        
+        PersistedSimulation carrots = new PersistedSimulation("BATCH_CARROTS_001", "FARMER_B", "example_2");
+        carrots.setStatus("COMPLETED");
+        carrots.setCompleted(true);
+        carrots.setFinalQuality(90.0);
+        carrots.setInitialQuality(100.0);
+        carrots.setAvgTemperature(4.0);
+        carrots.setMinTemperature(3.0);
+        carrots.setMaxTemperature(5.0);
+        carrots.setComplianceStatus("COMPLIANT");
+        carrots.setEndTime(System.currentTimeMillis());
+        persistenceService.saveSimulation(carrots);
+        
+        PersistedSimulation veggies = new PersistedSimulation("BATCH_VEGGIES_001", "FARMER_C", "example_3");
+        veggies.setStatus("COMPLETED");
+        veggies.setCompleted(true);
+        veggies.setFinalQuality(85.0);
+        veggies.setInitialQuality(100.0);
+        veggies.setAvgTemperature(6.0);
+        veggies.setMinTemperature(4.0);
+        veggies.setMaxTemperature(8.0);
+        veggies.setComplianceStatus("COMPLIANT");
+        veggies.setEndTime(System.currentTimeMillis());
+        persistenceService.saveSimulation(veggies);
+        
+        LocalDate start = LocalDate.now().minusDays(1);
+        LocalDate end = LocalDate.now().plusDays(1);
+        
+        File exportedFile = exportService.exportReport(
+                ReportExportService.ReportType.QUALITY_COMPLIANCE, start, end,
+                ReportExportService.ExportFormat.TXT);
+        
+        assertTrue(exportedFile.exists());
+        String content = Files.readString(exportedFile.toPath());
+        
+        // Should include breakdown by simulation type
+        assertTrue(content.contains("COMPLIANCE BY SIMULATION TYPE") || 
+                   content.contains("BY SIMULATION TYPE"), 
+                   "Quality Compliance report should include simulation type breakdown");
+        assertTrue(content.contains("Farm to Consumer") || content.contains("Apples"));
+        assertTrue(content.contains("Local Producer") || content.contains("Carrots"));
+        assertTrue(content.contains("Cross-Region") || content.contains("Vegetables"));
+        
+        // Verify all 3 examples are counted
+        assertTrue(content.contains("Example 1"));
+        assertTrue(content.contains("Example 2"));
+        assertTrue(content.contains("Example 3"));
+    }
 }

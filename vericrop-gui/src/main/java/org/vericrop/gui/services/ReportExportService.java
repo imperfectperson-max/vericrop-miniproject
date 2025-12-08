@@ -110,7 +110,9 @@ public class ReportExportService {
     }
     
     /**
-     * Get file extension for export format
+     * Get file extension for export format.
+     * Note: PDF exports use .html extension for browser compatibility
+     * since true PDF generation requires additional libraries.
      */
     private String getFileExtension(ExportFormat format) {
         switch (format) {
@@ -118,7 +120,7 @@ public class ReportExportService {
             case CSV: return "csv";
             case JSON: return "json";
             case HTML: return "html";
-            case PDF: return "pdf";
+            case PDF: return "html"; // PDF exports use HTML format for browser compatibility
             default: return "txt";
         }
     }
@@ -165,15 +167,14 @@ public class ReportExportService {
     }
     
     /**
-     * Convert HTML content to PDF.
-     * Note: Currently saves as HTML with .pdf extension. For true PDF generation,
-     * integrate a library like Apache PDFBox, iText, or Flying Saucer.
+     * Convert HTML content to PDF-compatible format.
+     * Note: Currently saves as HTML (PDF exports are saved as .html files for compatibility).
+     * For true PDF generation, integrate a library like Apache PDFBox, iText, or Flying Saucer.
      * This is a minimal implementation to support the PDF format option.
      */
     private String convertHtmlToPdf(String htmlContent) {
-        // Save as HTML with .pdf extension - users can open in browser and print to PDF
-        // Or integrate a proper PDF library for production use
-        logger.warn("PDF export currently generates HTML format. Consider integrating a PDF library for production.");
+        // Return HTML content unchanged - filename will use .html extension for PDF exports
+        logger.info("PDF export generates HTML format with .html extension for browser compatibility.");
         return htmlContent;
     }
     
@@ -587,6 +588,86 @@ public class ReportExportService {
         sb.append("Non-Compliant Runs: ").append(nonCompliant).append("\n");
         sb.append("Compliance Rate:    ").append(String.format("%.1f%%", complianceRate)).append("\n\n");
         
+        // Breakdown by the 3 simulation types (Examples 1, 2, 3)
+        long example1Count = simulations.stream()
+                .filter(s -> s.getBatchId().contains("APPLES") || 
+                        (s.getScenarioId() != null && s.getScenarioId().contains("example_1")))
+                .count();
+        long example2Count = simulations.stream()
+                .filter(s -> s.getBatchId().contains("CARROTS") || 
+                        (s.getScenarioId() != null && s.getScenarioId().contains("example_2")))
+                .count();
+        long example3Count = simulations.stream()
+                .filter(s -> s.getBatchId().contains("VEGGIES") || s.getBatchId().contains("VEGETABLES") ||
+                        (s.getScenarioId() != null && s.getScenarioId().contains("example_3")))
+                .count();
+        
+        if (example1Count + example2Count + example3Count > 0) {
+            sb.append("-------------------------------------------------\n");
+            sb.append("COMPLIANCE BY SIMULATION TYPE\n");
+            sb.append("-------------------------------------------------\n\n");
+            
+            if (example1Count > 0) {
+                long ex1Compliant = simulations.stream()
+                        .filter(s -> s.getBatchId().contains("APPLES") || 
+                                (s.getScenarioId() != null && s.getScenarioId().contains("example_1")))
+                        .filter(s -> "COMPLIANT".equals(s.getComplianceStatus()))
+                        .count();
+                double ex1ComplianceRate = (ex1Compliant * 100.0 / example1Count);
+                double ex1AvgQuality = simulations.stream()
+                        .filter(s -> s.getBatchId().contains("APPLES") || 
+                                (s.getScenarioId() != null && s.getScenarioId().contains("example_1")))
+                        .mapToDouble(PersistedSimulation::getFinalQuality)
+                        .average().orElse(0.0);
+                
+                sb.append("Example 1 - Farm to Consumer (Apples):\n");
+                sb.append("  Total Runs:       ").append(example1Count).append("\n");
+                sb.append("  Compliance Rate:  ").append(String.format("%.1f%%", ex1ComplianceRate)).append("\n");
+                sb.append("  Avg Quality:      ").append(String.format("%.1f%%", ex1AvgQuality)).append("\n");
+                sb.append("  Characteristics:  Warehouse stops, 30min, optimal cold chain\n\n");
+            }
+            
+            if (example2Count > 0) {
+                long ex2Compliant = simulations.stream()
+                        .filter(s -> s.getBatchId().contains("CARROTS") || 
+                                (s.getScenarioId() != null && s.getScenarioId().contains("example_2")))
+                        .filter(s -> "COMPLIANT".equals(s.getComplianceStatus()))
+                        .count();
+                double ex2ComplianceRate = (ex2Compliant * 100.0 / example2Count);
+                double ex2AvgQuality = simulations.stream()
+                        .filter(s -> s.getBatchId().contains("CARROTS") || 
+                                (s.getScenarioId() != null && s.getScenarioId().contains("example_2")))
+                        .mapToDouble(PersistedSimulation::getFinalQuality)
+                        .average().orElse(0.0);
+                
+                sb.append("Example 2 - Local Producer (Carrots):\n");
+                sb.append("  Total Runs:       ").append(example2Count).append("\n");
+                sb.append("  Compliance Rate:  ").append(String.format("%.1f%%", ex2ComplianceRate)).append("\n");
+                sb.append("  Avg Quality:      ").append(String.format("%.1f%%", ex2AvgQuality)).append("\n");
+                sb.append("  Characteristics:  Short 15min route, no warehouse, strict temp\n\n");
+            }
+            
+            if (example3Count > 0) {
+                long ex3Compliant = simulations.stream()
+                        .filter(s -> s.getBatchId().contains("VEGGIES") || s.getBatchId().contains("VEGETABLES") ||
+                                (s.getScenarioId() != null && s.getScenarioId().contains("example_3")))
+                        .filter(s -> "COMPLIANT".equals(s.getComplianceStatus()))
+                        .count();
+                double ex3ComplianceRate = (ex3Compliant * 100.0 / example3Count);
+                double ex3AvgQuality = simulations.stream()
+                        .filter(s -> s.getBatchId().contains("VEGGIES") || s.getBatchId().contains("VEGETABLES") ||
+                                (s.getScenarioId() != null && s.getScenarioId().contains("example_3")))
+                        .mapToDouble(PersistedSimulation::getFinalQuality)
+                        .average().orElse(0.0);
+                
+                sb.append("Example 3 - Cross-Region (Vegetables):\n");
+                sb.append("  Total Runs:       ").append(example3Count).append("\n");
+                sb.append("  Compliance Rate:  ").append(String.format("%.1f%%", ex3ComplianceRate)).append("\n");
+                sb.append("  Avg Quality:      ").append(String.format("%.1f%%", ex3AvgQuality)).append("\n");
+                sb.append("  Characteristics:  Extended 45min, temp spike events\n\n");
+            }
+        }
+        
         sb.append("-------------------------------------------------\n");
         sb.append("DETAILED COMPLIANCE DATA\n");
         sb.append("-------------------------------------------------\n\n");
@@ -595,7 +676,14 @@ public class ReportExportService {
             String status = simulation.isCompleted() ? "✓ COMPLETED" : "○ IN PROGRESS";
             String compliance = "COMPLIANT".equals(simulation.getComplianceStatus()) ? "✓" : "✗";
             
-            sb.append(String.format("[%s] Batch: %s\n", compliance, simulation.getBatchId()));
+            // Add type identifier
+            String type = "";
+            if (simulation.getBatchId().contains("APPLES")) type = " [Ex1-Apples]";
+            else if (simulation.getBatchId().contains("CARROTS")) type = " [Ex2-Carrots]";
+            else if (simulation.getBatchId().contains("VEGGIES") || simulation.getBatchId().contains("VEGETABLES")) 
+                type = " [Ex3-Veggies]";
+            
+            sb.append(String.format("[%s] Batch: %s%s\n", compliance, simulation.getBatchId(), type));
             sb.append(String.format("    Status: %s | Quality: %.1f%% | Violations: %d\n",
                     status, simulation.getFinalQuality(), simulation.getViolationsCount()));
             sb.append(String.format("    Temp Range: %.1f°C - %.1f°C (avg: %.1f°C)\n",
@@ -849,15 +937,181 @@ public class ReportExportService {
         sb.append("    \"start\": \"").append(startDate.format(DATE_FORMATTER)).append("\",\n");
         sb.append("    \"end\": \"").append(endDate.format(DATE_FORMATTER)).append("\"\n");
         sb.append("  },\n");
-        sb.append("  \"simulationCount\": ").append(simulations.size()).append("\n");
+        sb.append("  \"simulationCount\": ").append(simulations.size()).append(",\n");
+        
+        long compliant = simulations.stream()
+            .filter(s -> "COMPLIANT".equals(s.getComplianceStatus()))
+            .count();
+        double complianceRate = simulations.isEmpty() ? 0 : (compliant * 100.0 / simulations.size());
+        
+        sb.append("  \"complianceRate\": ").append(String.format("%.1f", complianceRate)).append(",\n");
+        
+        // Add simulation type breakdown
+        long example1Count = simulations.stream()
+                .filter(s -> s.getBatchId().contains("APPLES") || 
+                        (s.getScenarioId() != null && s.getScenarioId().contains("example_1")))
+                .count();
+        long example2Count = simulations.stream()
+                .filter(s -> s.getBatchId().contains("CARROTS") || 
+                        (s.getScenarioId() != null && s.getScenarioId().contains("example_2")))
+                .count();
+        long example3Count = simulations.stream()
+                .filter(s -> s.getBatchId().contains("VEGGIES") || s.getBatchId().contains("VEGETABLES") ||
+                        (s.getScenarioId() != null && s.getScenarioId().contains("example_3")))
+                .count();
+        
+        sb.append("  \"bySimulationType\": {\n");
+        sb.append("    \"example1FarmToConsumer\": ").append(example1Count).append(",\n");
+        sb.append("    \"example2LocalProducer\": ").append(example2Count).append(",\n");
+        sb.append("    \"example3CrossRegion\": ").append(example3Count).append("\n");
+        sb.append("  }\n");
         sb.append("}\n");
         return sb.toString();
     }
     
     private String generateQualityComplianceHtml(List<PersistedSimulation> simulations, 
                                                   LocalDate startDate, LocalDate endDate) {
-        String txtContent = generateQualityComplianceTxt(simulations, startDate, endDate);
-        return wrapInBasicHtml("Quality Compliance Report", txtContent);
+        StringBuilder sb = new StringBuilder();
+        sb.append("<!DOCTYPE html>\n<html>\n<head>\n");
+        sb.append("  <meta charset=\"UTF-8\">\n");
+        sb.append("  <title>Quality Compliance Report</title>\n");
+        sb.append("  <style>\n");
+        sb.append("    body { font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }\n");
+        sb.append("    .container { max-width: 1200px; margin: 0 auto; background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }\n");
+        sb.append("    h1 { color: #2563eb; border-bottom: 3px solid #2563eb; padding-bottom: 10px; }\n");
+        sb.append("    h2 { color: #1e40af; margin-top: 30px; }\n");
+        sb.append("    .header-info { background-color: #eff6ff; padding: 15px; border-radius: 5px; margin-bottom: 20px; }\n");
+        sb.append("    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-top: 20px; }\n");
+        sb.append("    .stat-card { background-color: #f9fafb; padding: 15px; border-radius: 5px; border-left: 4px solid #2563eb; }\n");
+        sb.append("    .stat-value { font-size: 24px; font-weight: bold; color: #1e40af; }\n");
+        sb.append("    .stat-label { font-size: 14px; color: #6b7280; margin-top: 5px; }\n");
+        sb.append("    .stat-detail { font-size: 12px; color: #9ca3af; margin-top: 3px; }\n");
+        sb.append("    .compliant { color: #10b981; }\n");
+        sb.append("    .non-compliant { color: #ef4444; }\n");
+        sb.append("  </style>\n");
+        sb.append("</head>\n<body>\n");
+        sb.append("  <div class=\"container\">\n");
+        sb.append("    <h1>✓ Quality Compliance Report</h1>\n");
+        sb.append("    <div class=\"header-info\">\n");
+        sb.append("      <strong>Date Range:</strong> ").append(startDate.format(DATE_FORMATTER))
+          .append(" to ").append(endDate.format(DATE_FORMATTER)).append("<br>\n");
+        sb.append("      <strong>Generated:</strong> ").append(Instant.now().atZone(ZoneId.systemDefault())
+          .format(DATETIME_FORMATTER)).append("<br>\n");
+        sb.append("      <strong>Total Simulations:</strong> ").append(simulations.size()).append("\n");
+        sb.append("    </div>\n");
+        
+        if (!simulations.isEmpty()) {
+            long compliant = simulations.stream()
+                .filter(s -> "COMPLIANT".equals(s.getComplianceStatus()))
+                .count();
+            double complianceRate = (compliant * 100.0 / simulations.size());
+            
+            sb.append("    <h2>📊 Overall Compliance</h2>\n");
+            sb.append("    <div class=\"stats\">\n");
+            sb.append("      <div class=\"stat-card\">\n");
+            sb.append("        <div class=\"stat-value compliant\">").append(String.format("%.1f%%", complianceRate)).append("</div>\n");
+            sb.append("        <div class=\"stat-label\">Compliance Rate</div>\n");
+            sb.append("      </div>\n");
+            sb.append("      <div class=\"stat-card\">\n");
+            sb.append("        <div class=\"stat-value compliant\">").append(compliant).append("</div>\n");
+            sb.append("        <div class=\"stat-label\">Compliant Runs</div>\n");
+            sb.append("      </div>\n");
+            sb.append("      <div class=\"stat-card\">\n");
+            sb.append("        <div class=\"stat-value non-compliant\">").append(simulations.size() - compliant).append("</div>\n");
+            sb.append("        <div class=\"stat-label\">Non-Compliant Runs</div>\n");
+            sb.append("      </div>\n");
+            sb.append("    </div>\n");
+            
+            // Simulation type breakdown
+            long example1Count = simulations.stream()
+                    .filter(s -> s.getBatchId().contains("APPLES") || 
+                            (s.getScenarioId() != null && s.getScenarioId().contains("example_1")))
+                    .count();
+            long example2Count = simulations.stream()
+                    .filter(s -> s.getBatchId().contains("CARROTS") || 
+                            (s.getScenarioId() != null && s.getScenarioId().contains("example_2")))
+                    .count();
+            long example3Count = simulations.stream()
+                    .filter(s -> s.getBatchId().contains("VEGGIES") || s.getBatchId().contains("VEGETABLES") ||
+                            (s.getScenarioId() != null && s.getScenarioId().contains("example_3")))
+                    .count();
+            
+            if (example1Count + example2Count + example3Count > 0) {
+                sb.append("    <h2>📋 Compliance by Simulation Type</h2>\n");
+                sb.append("    <div class=\"stats\">\n");
+                
+                if (example1Count > 0) {
+                    long ex1Compliant = simulations.stream()
+                            .filter(s -> s.getBatchId().contains("APPLES") || 
+                                    (s.getScenarioId() != null && s.getScenarioId().contains("example_1")))
+                            .filter(s -> "COMPLIANT".equals(s.getComplianceStatus()))
+                            .count();
+                    double ex1ComplianceRate = (ex1Compliant * 100.0 / example1Count);
+                    double ex1AvgQuality = simulations.stream()
+                            .filter(s -> s.getBatchId().contains("APPLES") || 
+                                    (s.getScenarioId() != null && s.getScenarioId().contains("example_1")))
+                            .mapToDouble(PersistedSimulation::getFinalQuality)
+                            .average().orElse(0.0);
+                    
+                    sb.append("      <div class=\"stat-card\">\n");
+                    sb.append("        <div class=\"stat-value\">").append(String.format("%.1f%%", ex1ComplianceRate)).append("</div>\n");
+                    sb.append("        <div class=\"stat-label\">Example 1 - Farm to Consumer (Apples)</div>\n");
+                    sb.append("        <div class=\"stat-detail\">").append(example1Count).append(" runs | Avg Quality: ")
+                      .append(String.format("%.1f%%", ex1AvgQuality)).append("</div>\n");
+                    sb.append("      </div>\n");
+                }
+                
+                if (example2Count > 0) {
+                    long ex2Compliant = simulations.stream()
+                            .filter(s -> s.getBatchId().contains("CARROTS") || 
+                                    (s.getScenarioId() != null && s.getScenarioId().contains("example_2")))
+                            .filter(s -> "COMPLIANT".equals(s.getComplianceStatus()))
+                            .count();
+                    double ex2ComplianceRate = (ex2Compliant * 100.0 / example2Count);
+                    double ex2AvgQuality = simulations.stream()
+                            .filter(s -> s.getBatchId().contains("CARROTS") || 
+                                    (s.getScenarioId() != null && s.getScenarioId().contains("example_2")))
+                            .mapToDouble(PersistedSimulation::getFinalQuality)
+                            .average().orElse(0.0);
+                    
+                    sb.append("      <div class=\"stat-card\">\n");
+                    sb.append("        <div class=\"stat-value\">").append(String.format("%.1f%%", ex2ComplianceRate)).append("</div>\n");
+                    sb.append("        <div class=\"stat-label\">Example 2 - Local Producer (Carrots)</div>\n");
+                    sb.append("        <div class=\"stat-detail\">").append(example2Count).append(" runs | Avg Quality: ")
+                      .append(String.format("%.1f%%", ex2AvgQuality)).append("</div>\n");
+                    sb.append("      </div>\n");
+                }
+                
+                if (example3Count > 0) {
+                    long ex3Compliant = simulations.stream()
+                            .filter(s -> s.getBatchId().contains("VEGGIES") || s.getBatchId().contains("VEGETABLES") ||
+                                    (s.getScenarioId() != null && s.getScenarioId().contains("example_3")))
+                            .filter(s -> "COMPLIANT".equals(s.getComplianceStatus()))
+                            .count();
+                    double ex3ComplianceRate = (ex3Compliant * 100.0 / example3Count);
+                    double ex3AvgQuality = simulations.stream()
+                            .filter(s -> s.getBatchId().contains("VEGGIES") || s.getBatchId().contains("VEGETABLES") ||
+                                    (s.getScenarioId() != null && s.getScenarioId().contains("example_3")))
+                            .mapToDouble(PersistedSimulation::getFinalQuality)
+                            .average().orElse(0.0);
+                    
+                    sb.append("      <div class=\"stat-card\">\n");
+                    sb.append("        <div class=\"stat-value\">").append(String.format("%.1f%%", ex3ComplianceRate)).append("</div>\n");
+                    sb.append("        <div class=\"stat-label\">Example 3 - Cross-Region (Vegetables)</div>\n");
+                    sb.append("        <div class=\"stat-detail\">").append(example3Count).append(" runs | Avg Quality: ")
+                      .append(String.format("%.1f%%", ex3AvgQuality)).append("</div>\n");
+                    sb.append("      </div>\n");
+                }
+                
+                sb.append("    </div>\n");
+            }
+        } else {
+            sb.append("    <p>No simulation data available for the selected date range.</p>\n");
+        }
+        
+        sb.append("  </div>\n");
+        sb.append("</body>\n</html>\n");
+        return sb.toString();
     }
     
     private String generateDeliveryPerformanceJson(List<PersistedSimulation> simulations,
