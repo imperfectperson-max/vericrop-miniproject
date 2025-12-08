@@ -1908,7 +1908,12 @@ public class LogisticsController implements SimulationListener {
     
     /**
      * Helper method to filter simulations by type.
-     * Matches logic from ReportExportService.SimulationType enum.
+     * 
+     * Note: This duplicates logic from ReportExportService.SimulationType enum.
+     * The duplication is intentional to avoid creating a dependency between GUI controllers
+     * and the service layer's internal enum. This keeps the controllers decoupled from
+     * service implementation details. If this classification logic becomes more complex,
+     * consider extracting it to a shared utility class.
      */
     private List<PersistedSimulation> filterSimulationsByBatchType(
             List<PersistedSimulation> simulations, String example) {

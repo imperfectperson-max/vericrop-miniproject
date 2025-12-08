@@ -1091,7 +1091,7 @@ public class ReportExportService {
                     break;
                 case EXAMPLE_3_VEGETABLES:
                     badgeClass = "badge-veggies";
-                    typeName = "Example 3 - Veggies";
+                    typeName = "Example 3 - Vegetables"; // Consistent with enum display name
                     break;
                 default:
                     badgeClass = "";
