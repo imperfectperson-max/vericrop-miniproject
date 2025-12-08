@@ -962,19 +962,10 @@ public class ReportExportService {
         sb.append("    \"complianceRate\": ").append(String.format("%.1f", complianceRate)).append("\n");
         sb.append("  },\n");
         
-        // Breakdown by simulation type
-        long applesCount = simulations.stream()
-            .filter(s -> s.getBatchId().contains("APPLES") || 
-                    (s.getScenarioId() != null && s.getScenarioId().contains("example_1")))
-            .count();
-        long carrotsCount = simulations.stream()
-            .filter(s -> s.getBatchId().contains("CARROTS") || 
-                    (s.getScenarioId() != null && s.getScenarioId().contains("example_2")))
-            .count();
-        long veggiesCount = simulations.stream()
-            .filter(s -> s.getBatchId().contains("VEGGIES") || s.getBatchId().contains("VEGETABLES") ||
-                    (s.getScenarioId() != null && s.getScenarioId().contains("example_3")))
-            .count();
+        // Breakdown by simulation type using helper method
+        long applesCount = filterSimulationsByType(simulations, SimulationType.EXAMPLE_1_APPLES).size();
+        long carrotsCount = filterSimulationsByType(simulations, SimulationType.EXAMPLE_2_CARROTS).size();
+        long veggiesCount = filterSimulationsByType(simulations, SimulationType.EXAMPLE_3_VEGETABLES).size();
         
         sb.append("  \"bySimulationType\": {\n");
         sb.append("    \"example1Apples\": ").append(applesCount).append(",\n");
@@ -1281,6 +1272,11 @@ public class ReportExportService {
          * Determine simulation type from a PersistedSimulation.
          */
         public static SimulationType fromSimulation(PersistedSimulation simulation) {
+            // Defensive: handle null simulation or null batch ID
+            if (simulation == null || simulation.getBatchId() == null) {
+                return OTHER;
+            }
+            
             for (SimulationType type : values()) {
                 if (type == OTHER) continue; // Skip OTHER, it's the default fallback
                 
@@ -1290,7 +1286,7 @@ public class ReportExportService {
                     return type;
                 }
                 
-                // Check batch ID keywords
+                // Check batch ID keywords (batch ID is guaranteed non-null here)
                 if (type.batchIdKeywords != null) {
                     for (String keyword : type.batchIdKeywords) {
                         if (simulation.getBatchId().contains(keyword)) {
