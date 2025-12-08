@@ -59,17 +59,23 @@ run_test() {
 echo "Step 1: Checking Service Health"
 echo "--------------------------------"
 
+FAILED_SERVICES=0
+
 # Check ML Service
-check_service "ML Service" "${ML_SERVICE_URL}/health" # || exit 1
+check_service "ML Service" "${ML_SERVICE_URL}/health" || ((FAILED_SERVICES++))
 
 # Check VeriCrop API
-check_service "VeriCrop API" "${VERICROP_API_URL}/api/health" # || exit 1
+check_service "VeriCrop API" "${VERICROP_API_URL}/api/health" || ((FAILED_SERVICES++))
 
 # Check Kafka UI
-check_service "Kafka UI" "${KAFKA_UI_URL}" # || exit 1
+check_service "Kafka UI" "${KAFKA_UI_URL}" || ((FAILED_SERVICES++))
 
 # Check Airflow UI
-check_service "Airflow UI" "${AIRFLOW_UI_URL}/health" # || exit 1
+check_service "Airflow UI" "${AIRFLOW_UI_URL}/health" || ((FAILED_SERVICES++))
+
+if [ $FAILED_SERVICES -gt 0 ]; then
+    echo -e "${YELLOW}⚠ Warning: $FAILED_SERVICES service(s) failed health check. Continuing anyway...${NC}"
+fi
 
 echo ""
 echo "Step 2: Testing VeriCrop API Endpoints"

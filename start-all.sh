@@ -328,7 +328,6 @@ build_java() {
     
     if ! check_java; then
         # exit 1
-        echo "Continuing despite Java check failure..."
     fi
     
     if [ -f "./gradlew" ]; then

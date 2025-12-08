@@ -131,7 +131,7 @@ delete_all() {
     read -p "Are you sure you want to proceed? (yes/no): " -r
     if [[ ! $REPLY =~ ^[Yy]es$ ]]; then
         print_info "Operation cancelled."
-        # exit 0
+        return 0
     fi
     
     print_info "Executing delete operation..."
