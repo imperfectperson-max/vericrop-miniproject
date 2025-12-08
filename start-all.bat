@@ -62,23 +62,74 @@ call :check_prerequisites
 if errorlevel 1 exit /b 1
 
 REM Execute based on mode
-if /I "%MODE%"=="full" goto start_full
-if /I "%MODE%"=="infra" goto start_infra
-if /I "%MODE%"=="infrastructure" goto start_infra
-if /I "%MODE%"=="kafka" goto start_kafka
-if /I "%MODE%"=="simulation" goto start_simulation
-if /I "%MODE%"=="sim" goto start_simulation
-if /I "%MODE%"=="prod" goto start_prod
-if /I "%MODE%"=="production" goto start_prod
-if /I "%MODE%"=="build" goto build_java
-if /I "%MODE%"=="docker-build" goto build_docker
-if /I "%MODE%"=="docker" goto build_docker
-if /I "%MODE%"=="all-build" goto build_all
-if /I "%MODE%"=="build-all" goto build_all
-if /I "%MODE%"=="run" goto run_gui
-if /I "%MODE%"=="help" goto show_help
-if /I "%MODE%"=="-h" goto show_help
-if /I "%MODE%"=="--help" goto show_help
+if /I "%MODE%"=="full" (
+    call :start_full
+    goto end_script
+)
+if /I "%MODE%"=="infra" (
+    call :start_infra
+    goto end_script
+)
+if /I "%MODE%"=="infrastructure" (
+    call :start_infra
+    goto end_script
+)
+if /I "%MODE%"=="kafka" (
+    call :start_kafka
+    goto end_script
+)
+if /I "%MODE%"=="simulation" (
+    call :start_simulation
+    goto end_script
+)
+if /I "%MODE%"=="sim" (
+    call :start_simulation
+    goto end_script
+)
+if /I "%MODE%"=="prod" (
+    call :start_prod
+    goto end_script
+)
+if /I "%MODE%"=="production" (
+    call :start_prod
+    goto end_script
+)
+if /I "%MODE%"=="build" (
+    call :build_java
+    goto end_script
+)
+if /I "%MODE%"=="docker-build" (
+    call :build_docker
+    goto end_script
+)
+if /I "%MODE%"=="docker" (
+    call :build_docker
+    goto end_script
+)
+if /I "%MODE%"=="all-build" (
+    call :build_all
+    goto end_script
+)
+if /I "%MODE%"=="build-all" (
+    call :build_all
+    goto end_script
+)
+if /I "%MODE%"=="run" (
+    call :run_gui
+    goto end_script
+)
+if /I "%MODE%"=="help" (
+    call :show_help
+    goto end_script
+)
+if /I "%MODE%"=="-h" (
+    call :show_help
+    goto end_script
+)
+if /I "%MODE%"=="--help" (
+    call :show_help
+    goto end_script
+)
 
 echo Unknown mode: %MODE%
 echo.
@@ -94,6 +145,10 @@ echo   all-build      - Build everything
 echo   run            - Run the JavaFX GUI
 echo.
 exit /b 1
+
+:end_script
+REM Script completed successfully
+exit /b 0
 
 REM ============================================================================
 REM Functions
