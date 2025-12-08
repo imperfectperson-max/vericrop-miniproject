@@ -76,6 +76,21 @@ public class ReportExportService {
     }
     
     /**
+     * Helper class to hold grouped simulations by type
+     */
+    private static class SimulationGroups {
+        final List<PersistedSimulation> apples;
+        final List<PersistedSimulation> carrots;
+        final List<PersistedSimulation> veggies;
+        
+        SimulationGroups(List<PersistedSimulation> apples, List<PersistedSimulation> carrots, List<PersistedSimulation> veggies) {
+            this.apples = apples;
+            this.carrots = carrots;
+            this.veggies = veggies;
+        }
+    }
+    
+    /**
      * Constructor
      */
     public ReportExportService(ShipmentPersistenceService persistenceService) {
@@ -595,15 +610,7 @@ public class ReportExportService {
         sb.append("Total Violations:         ").append(totalViolations).append("\n\n");
         
         // Group simulations by type (the 3 simulation examples)
-        List<PersistedSimulation> applesSimulations = simulations.stream()
-            .filter(s -> s.getBatchId() != null && s.getBatchId().contains("APPLES"))
-            .collect(Collectors.toList());
-        List<PersistedSimulation> carrotsSimulations = simulations.stream()
-            .filter(s -> s.getBatchId() != null && s.getBatchId().contains("CARROTS"))
-            .collect(Collectors.toList());
-        List<PersistedSimulation> veggiesSimulations = simulations.stream()
-            .filter(s -> s.getBatchId() != null && (s.getBatchId().contains("VEGGIES") || s.getBatchId().contains("VEGETABLES")))
-            .collect(Collectors.toList());
+        SimulationGroups groups = groupSimulationsByType(simulations);
         
         sb.append("-------------------------------------------------\n");
         sb.append("ANALYSIS BY SIMULATION TYPE\n");
@@ -611,26 +618,26 @@ public class ReportExportService {
         sb.append("-------------------------------------------------\n\n");
         
         // Example 1: Farm to Consumer (Apples)
-        if (!applesSimulations.isEmpty()) {
+        if (!groups.apples.isEmpty()) {
             sb.append("*** EXAMPLE 1: Farm to Consumer Direct (Summer Apples) ***\n");
             sb.append("Characteristics: Warehouse stops, optimal cold chain, 30-min\n\n");
-            appendScenarioAnalysisTxt(sb, applesSimulations);
+            appendScenarioAnalysisTxt(sb, groups.apples);
             sb.append("\n");
         }
         
         // Example 2: Local Producer (Carrots)
-        if (!carrotsSimulations.isEmpty()) {
+        if (!groups.carrots.isEmpty()) {
             sb.append("*** EXAMPLE 2: Local Producer Delivery (Organic Carrots) ***\n");
             sb.append("Characteristics: Short direct route, no warehouse, 15-min\n\n");
-            appendScenarioAnalysisTxt(sb, carrotsSimulations);
+            appendScenarioAnalysisTxt(sb, groups.carrots);
             sb.append("\n");
         }
         
         // Example 3: Cross-Region (Vegetables)
-        if (!veggiesSimulations.isEmpty()) {
+        if (!groups.veggies.isEmpty()) {
             sb.append("*** EXAMPLE 3: Cross-Region Long Haul (Mixed Vegetables) ***\n");
             sb.append("Characteristics: Extended delivery, temp events, 45-min\n\n");
-            appendScenarioAnalysisTxt(sb, veggiesSimulations);
+            appendScenarioAnalysisTxt(sb, groups.veggies);
             sb.append("\n");
         }
         
@@ -1121,44 +1128,36 @@ public class ReportExportService {
         sb.append("    </div>\n");
         
         // Group simulations by type (the 3 simulation examples)
-        List<PersistedSimulation> applesSimulations = simulations.stream()
-            .filter(s -> s.getBatchId() != null && s.getBatchId().contains("APPLES"))
-            .collect(Collectors.toList());
-        List<PersistedSimulation> carrotsSimulations = simulations.stream()
-            .filter(s -> s.getBatchId() != null && s.getBatchId().contains("CARROTS"))
-            .collect(Collectors.toList());
-        List<PersistedSimulation> veggiesSimulations = simulations.stream()
-            .filter(s -> s.getBatchId() != null && (s.getBatchId().contains("VEGGIES") || s.getBatchId().contains("VEGETABLES")))
-            .collect(Collectors.toList());
+        SimulationGroups groups = groupSimulationsByType(simulations);
         
         // Add section for the 3 simulation types
         sb.append("    <h2>🍎🥕🥬 Analysis by Simulation Type (3 Examples from ProducerController)</h2>\n");
         sb.append("    <p>The following analysis breaks down compliance by the 3 simulation examples: Farm-to-Consumer (Apples), Local Producer (Carrots), and Cross-Region (Vegetables).</p>\n");
         
         // Example 1: Farm to Consumer (Apples)
-        if (!applesSimulations.isEmpty()) {
+        if (!groups.apples.isEmpty()) {
             sb.append("    <div class=\"scenario-section\">\n");
             sb.append("      <h3><span class=\"badge badge-apples\">Example 1</span> Farm to Consumer Direct (Summer Apples)</h3>\n");
             sb.append("      <p><strong>Characteristics:</strong> Warehouse stops included, optimal cold chain management, 30-minute duration</p>\n");
-            generateScenarioAnalysis(sb, applesSimulations);
+            generateScenarioAnalysis(sb, groups.apples);
             sb.append("    </div>\n");
         }
         
         // Example 2: Local Producer (Carrots)
-        if (!carrotsSimulations.isEmpty()) {
+        if (!groups.carrots.isEmpty()) {
             sb.append("    <div class=\"scenario-section\">\n");
             sb.append("      <h3><span class=\"badge badge-carrots\">Example 2</span> Local Producer Delivery (Organic Carrots)</h3>\n");
             sb.append("      <p><strong>Characteristics:</strong> Short direct route, no warehouse stops, strict temperature control, 15-minute duration</p>\n");
-            generateScenarioAnalysis(sb, carrotsSimulations);
+            generateScenarioAnalysis(sb, groups.carrots);
             sb.append("    </div>\n");
         }
         
         // Example 3: Cross-Region (Vegetables)
-        if (!veggiesSimulations.isEmpty()) {
+        if (!groups.veggies.isEmpty()) {
             sb.append("    <div class=\"scenario-section\">\n");
             sb.append("      <h3><span class=\"badge badge-veggies\">Example 3</span> Cross-Region Long Haul (Mixed Vegetables)</h3>\n");
             sb.append("      <p><strong>Characteristics:</strong> Extended delivery with temperature events, multiple environmental challenges, 45-minute duration</p>\n");
-            generateScenarioAnalysis(sb, veggiesSimulations);
+            generateScenarioAnalysis(sb, groups.veggies);
             sb.append("    </div>\n");
         }
         
@@ -1300,20 +1299,7 @@ public class ReportExportService {
             .average().orElse(0);
         
         // Calculate average duration
-        double avgDurationMinutes = 0;
-        if (!simulations.isEmpty()) {
-            long totalDuration = 0;
-            int validCount = 0;
-            for (PersistedSimulation s : simulations) {
-                if (s.isCompleted() && s.getEndTime() > s.getStartTime()) {
-                    totalDuration += (s.getEndTime() - s.getStartTime());
-                    validCount++;
-                }
-            }
-            if (validCount > 0) {
-                avgDurationMinutes = (totalDuration / validCount) / (1000.0 * 60.0);
-            }
-        }
+        double avgDurationMinutes = calculateAverageDuration(simulations);
         
         sb.append("    <h2>📊 Performance Metrics</h2>\n");
         sb.append("    <div class=\"stats\">\n");
@@ -1564,5 +1550,50 @@ public class ReportExportService {
      */
     public String getReportsDirectoryPath() {
         return reportsDirectory.toAbsolutePath().toString();
+    }
+    
+    /**
+     * Group simulations by type (the 3 simulation examples).
+     * Reduces code duplication when analyzing simulations by type.
+     */
+    private SimulationGroups groupSimulationsByType(List<PersistedSimulation> simulations) {
+        List<PersistedSimulation> apples = simulations.stream()
+            .filter(s -> s.getBatchId() != null && s.getBatchId().contains("APPLES"))
+            .collect(Collectors.toList());
+        List<PersistedSimulation> carrots = simulations.stream()
+            .filter(s -> s.getBatchId() != null && s.getBatchId().contains("CARROTS"))
+            .collect(Collectors.toList());
+        List<PersistedSimulation> veggies = simulations.stream()
+            .filter(s -> s.getBatchId() != null && 
+                (s.getBatchId().contains("VEGGIES") || s.getBatchId().contains("VEGETABLES")))
+            .collect(Collectors.toList());
+        
+        return new SimulationGroups(apples, carrots, veggies);
+    }
+    
+    /**
+     * Calculate average duration in minutes from completed simulations.
+     * Reduces code duplication when calculating delivery durations.
+     */
+    private double calculateAverageDuration(List<PersistedSimulation> simulations) {
+        if (simulations.isEmpty()) {
+            return 0;
+        }
+        
+        long totalDuration = 0;
+        int validCount = 0;
+        
+        for (PersistedSimulation s : simulations) {
+            if (s.isCompleted() && s.getEndTime() > s.getStartTime()) {
+                totalDuration += (s.getEndTime() - s.getStartTime());
+                validCount++;
+            }
+        }
+        
+        if (validCount == 0) {
+            return 0;
+        }
+        
+        return (totalDuration / validCount) / (1000.0 * 60.0);
     }
 }
