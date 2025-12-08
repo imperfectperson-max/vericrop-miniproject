@@ -1,389 +1,310 @@
 @echo off
-REM ============================================================================
-REM VeriCrop Start-All Script (Windows)
-REM
-REM This script helps you start all VeriCrop services with a single command.
-REM It supports multiple modes: full stack, infrastructure only, build, and run.
-REM
-REM Usage:
-REM   start-all.bat [mode] [options]
-REM
-REM Modes:
-REM   full           - Start all services (default): Kafka, PostgreSQL, ML Service, Airflow
-REM   infra          - Start infrastructure only: PostgreSQL, Kafka, Zookeeper
-REM   kafka          - Start Kafka stack only (using docker-compose-kafka.yml)
-REM   simulation     - Start simulation environment (using docker-compose-simulation.yml)
-REM   prod           - Start production environment (using docker-compose.prod.yml)
-REM   build          - Build Java artifacts with Gradle
-REM   docker-build   - Build Docker images (vericrop-gui, ml-service)
-REM   run            - Run the JavaFX GUI application
-REM   all-build      - Build everything (Java + Docker images)
-REM
-REM Options:
-REM   -b, --build      Rebuild Docker images before starting
-REM   -h, --help       Show this help message
-REM   --no-cache       Build Docker images without cache
-REM ============================================================================
-
 setlocal EnableDelayedExpansion
 
-REM Script directory
 cd /d "%~dp0"
 
-REM Default values
 set "MODE=full"
-set "BUILD_FLAG="
-set "NO_CACHE="
 set "DOCKER_COMPOSE=docker-compose"
+set "GUI_INSTANCES=3"
 
-REM Parse first argument as mode
-if not "%~1"=="" (
-    set "MODE=%~1"
-    shift
-)
-
-REM Parse options
-:parse_args
-if "%~1"=="" goto end_parse
-if /I "%~1"=="-b" set "BUILD_FLAG=--build" & shift & goto parse_args
-if /I "%~1"=="--build" set "BUILD_FLAG=--build" & shift & goto parse_args
-if /I "%~1"=="--no-cache" set "NO_CACHE=--no-cache" & shift & goto parse_args
-if /I "%~1"=="-h" goto show_help
-if /I "%~1"=="--help" goto show_help
-echo Unknown option: %~1
-exit /b 1
-:end_parse
-
-REM Print banner
-call :print_banner
+echo.
+echo ===============================================================
+echo        VeriCrop Start-All Script (Windows)
+echo ===============================================================
+echo.
 
 REM Check prerequisites
-call :check_prerequisites
-if errorlevel 1 exit /b 1
+echo Checking prerequisites...
 
-REM Execute based on mode
-if /I "%MODE%"=="full" (
-    call :start_full
-    goto end_script
-)
-if /I "%MODE%"=="infra" (
-    call :start_infra
-    goto end_script
-)
-if /I "%MODE%"=="infrastructure" (
-    call :start_infra
-    goto end_script
-)
-if /I "%MODE%"=="kafka" (
-    call :start_kafka
-    goto end_script
-)
-if /I "%MODE%"=="simulation" (
-    call :start_simulation
-    goto end_script
-)
-if /I "%MODE%"=="sim" (
-    call :start_simulation
-    goto end_script
-)
-if /I "%MODE%"=="prod" (
-    call :start_prod
-    goto end_script
-)
-if /I "%MODE%"=="production" (
-    call :start_prod
-    goto end_script
-)
-if /I "%MODE%"=="build" (
-    call :build_java
-    goto end_script
-)
-if /I "%MODE%"=="docker-build" (
-    call :build_docker
-    goto end_script
-)
-if /I "%MODE%"=="docker" (
-    call :build_docker
-    goto end_script
-)
-if /I "%MODE%"=="all-build" (
-    call :build_all
-    goto end_script
-)
-if /I "%MODE%"=="build-all" (
-    call :build_all
-    goto end_script
-)
-if /I "%MODE%"=="run" (
-    call :run_gui
-    goto end_script
-)
-if /I "%MODE%"=="help" (
-    call :show_help
-    goto end_script
-)
-if /I "%MODE%"=="-h" (
-    call :show_help
-    goto end_script
-)
-if /I "%MODE%"=="--help" (
-    call :show_help
-    goto end_script
-)
-
-echo Unknown mode: %MODE%
-echo.
-echo Available modes:
-echo   full           - Start all services (default)
-echo   infra          - Start infrastructure only
-echo   kafka          - Start Kafka stack
-echo   simulation     - Start simulation environment
-echo   prod           - Start production environment
-echo   build          - Build Java artifacts
-echo   docker-build   - Build Docker images
-echo   all-build      - Build everything
-echo   run            - Run the JavaFX GUI
-echo.
-exit /b 1
-
-:end_script
-REM Script completed successfully
-exit /b 0
-
-REM ============================================================================
-REM Functions
-REM ============================================================================
-
-:print_banner
-echo.
-echo ===============================================================
-echo.
-echo           [92m  VeriCrop Start-All Script (Windows)  [0m
-echo.
-echo    AI-Powered Agricultural Supply Chain Management
-echo    with Quality Control and Blockchain Transparency
-echo.
-echo ===============================================================
-echo.
-goto :eof
-
-:check_prerequisites
-echo [94mChecking prerequisites...[0m
-
-REM Check Docker
 where docker >nul 2>&1
 if errorlevel 1 (
-    echo [91mX Docker is not installed. Please install Docker Desktop.[0m
+    echo ERROR: Docker is not installed.
+    pause
     exit /b 1
 )
-echo [92m✓ Docker is installed[0m
+echo ✓ Docker is installed
 
-REM Check if Docker is running
 docker info >nul 2>&1
 if errorlevel 1 (
-    echo [91mX Docker daemon is not running. Please start Docker Desktop.[0m
+    echo ERROR: Docker daemon is not running.
+    pause
     exit /b 1
 )
-echo [92m✓ Docker daemon is running[0m
+echo ✓ Docker daemon is running
 
-REM Check Docker Compose and set DOCKER_COMPOSE variable
+REM Check docker-compose
 docker-compose --version >nul 2>&1
 if errorlevel 1 (
     docker compose version >nul 2>&1
     if errorlevel 1 (
-        echo [91mX Docker Compose is not installed.[0m
+        echo ERROR: Docker Compose is not installed.
+        pause
         exit /b 1
     )
     set "DOCKER_COMPOSE=docker compose"
-) else (
-    set "DOCKER_COMPOSE=docker-compose"
 )
-echo [92m✓ Docker Compose is installed[0m
+echo ✓ Docker Compose is available
 echo.
-goto :eof
 
-:check_java
-where java >nul 2>&1
-if errorlevel 1 (
-    echo [91mX Java is not installed. Please install JDK 11 or later (JDK 17 recommended).[0m
-    exit /b 1
-)
-echo [92m✓ Java is installed[0m
-goto :eof
-
-:start_full
-echo [94mStarting full VeriCrop stack...[0m
-echo.
-%DOCKER_COMPOSE% up -d %BUILD_FLAG%
-echo.
-echo [92m✓ Full stack started successfully![0m
-call :print_service_urls
-goto :eof
-
-:start_infra
-echo [94mStarting infrastructure services (PostgreSQL, Kafka, Zookeeper)...[0m
-echo.
-%DOCKER_COMPOSE% up -d postgres kafka zookeeper ml-service
-echo.
-echo [92m✓ Infrastructure services started![0m
-echo.
-echo Services running:
-echo   * PostgreSQL:  localhost:5432
-echo   * Kafka:       localhost:9092
-echo   * Zookeeper:   localhost:2181
-echo   * ML Service:  http://localhost:8000
-goto :eof
-
-:start_kafka
-echo [94mStarting Kafka stack (docker-compose-kafka.yml)...[0m
-echo.
-%DOCKER_COMPOSE% -f docker-compose-kafka.yml up -d %BUILD_FLAG%
-echo.
-echo [92m✓ Kafka stack started![0m
-echo.
-echo Services running:
-echo   * Kafka:       localhost:9092
-echo   * Zookeeper:   localhost:2181
-echo   * Kafka UI:    http://localhost:8090
-goto :eof
-
-:start_simulation
-echo [94mStarting simulation environment (docker-compose-simulation.yml)...[0m
-echo.
-%DOCKER_COMPOSE% -f docker-compose-simulation.yml up -d %BUILD_FLAG%
-echo.
-echo [92m✓ Simulation environment started![0m
-echo.
-echo Services running:
-echo   * Kafka:         localhost:9092
-echo   * Kafka UI:      http://localhost:8090
-echo   * PostgreSQL:    localhost:5432
-echo   * ML Service:    http://localhost:8000
-echo   * Airflow:       http://localhost:8080 (admin/admin)
-goto :eof
-
-:start_prod
-echo [94mStarting production environment (docker-compose.prod.yml)...[0m
-echo.
-if not exist ".env" (
-    echo [93m⚠ Warning: .env file not found. Please create from .env.production.example[0m
-    if exist ".env.production.example" (
-        copy .env.production.example .env
-        echo [93m  .env file created. Please review and update with production credentials.[0m
+REM Create Airflow marker if it doesn't exist (for first run)
+if not exist "airflow-initialized.txt" (
+    REM Check if Airflow is actually running
+    docker-compose ps | findstr "airflow-webserver" | findstr "Up" >nul
+    if not errorlevel 1 (
+        echo ✓ Airflow appears to be running. Creating marker file...
+        echo initialized > airflow-initialized.txt
     )
 )
-%DOCKER_COMPOSE% -f docker-compose.prod.yml up -d %BUILD_FLAG%
-echo.
-echo [92m✓ Production environment started![0m
-call :print_service_urls
-goto :eof
 
-:build_java
-echo [94mBuilding Java artifacts with Gradle...[0m
-echo.
-call :check_java
-if errorlevel 1 exit /b 1
+REM Command handling
+if "%~1"=="" goto :start_all
 
-if exist "gradlew.bat" (
-    call gradlew.bat clean build --no-daemon
-) else (
-    echo [91mX Gradle wrapper not found. Please run from project root.[0m
-    exit /b 1
-)
-echo.
-echo [92m✓ Java build completed successfully![0m
-goto :eof
+if /I "%~1"=="init-airflow" goto :init_airflow
+if /I "%~1"=="fix-airflow" goto :fix_airflow
+if /I "%~1"=="infra" goto :start_infra
+if /I "%~1"=="logs" goto :show_logs
+if /I "%~1"=="ps" goto :show_status
+if /I "%~1"=="stop" goto :stop_all
+if /I "%~1"=="run-gui" goto :run_gui
+if /I "%~1"=="gui" goto :run_gui
+if /I "%~1"=="build" goto :build_java
+if /I "%~1"=="help" goto :show_help
 
-:build_docker
-echo [94mBuilding Docker images...[0m
+:start_all
+echo Starting all VeriCrop services...
 echo.
 
-echo [93mBuilding vericrop-gui Docker image...[0m
-docker build %NO_CACHE% -t vericrop-gui:latest -f vericrop-gui/Dockerfile .
-echo [92m✓ vericrop-gui image built[0m
-
-echo [93mBuilding ml-service Docker image...[0m
-docker build %NO_CACHE% -t vericrop-ml-service:latest -f docker/ml-service/Dockerfile docker/ml-service
-echo [92m✓ vericrop-ml-service image built[0m
+%DOCKER_COMPOSE% up -d --remove-orphans
 
 echo.
-echo [92m✓ All Docker images built successfully![0m
-echo.
-echo Available images:
-docker images | findstr /I "vericrop-gui vericrop-ml-service"
-goto :eof
+call :show_service_status
 
-:build_all
-echo [94mBuilding everything (Java + Docker)...[0m
-echo.
-call :build_java
-if errorlevel 1 exit /b 1
-echo.
-call :build_docker
-if errorlevel 1 exit /b 1
-echo.
-echo [92m✓ All builds completed successfully![0m
-goto :eof
-
-:run_gui
-echo [94mRunning VeriCrop JavaFX GUI...[0m
-echo.
-call :check_java
-if errorlevel 1 exit /b 1
-
-if exist "gradlew.bat" (
-    call gradlew.bat :vericrop-gui:run
-) else (
-    echo [91mX Gradle wrapper not found. Please run from project root.[0m
-    exit /b 1
-)
-goto :eof
-
-:print_service_urls
 echo.
 echo ===============================================================
 echo                      Service URLs
 echo ===============================================================
 echo.
-echo   * ML Service:     http://localhost:8000
-echo   * ML Health:      http://localhost:8000/health
-echo   * Kafka UI:       http://localhost:8081
-echo   * Airflow UI:     http://localhost:8080 (admin/admin)
-echo   * PostgreSQL:     localhost:5432 (vericrop/vericrop123)
-echo   * Kafka:          localhost:9092
+echo   ✓ PostgreSQL:     localhost:5432 (vericrop/vericrop123)
+echo   ✓ Kafka:          localhost:9092
+echo   ✓ Kafka UI:       http://localhost:8081
+echo   ✓ ML Service:     http://localhost:8000
+echo   ✓ Redis:          localhost:6379
+echo.
+REM Check if Airflow is initialized
+if exist "airflow-initialized.txt" (
+    echo   ✓ Airflow UI:     http://localhost:8080 (admin/admin)
+) else (
+    echo   ⚠ Airflow UI:     http://localhost:8080 (needs initialization)
+    echo     Run: start-all.bat init-airflow
+)
+echo.
+echo To run 3 GUI instances: start-all.bat run-gui
 echo.
 echo ===============================================================
+goto :end_script
+
+:run_gui
+echo Starting %GUI_INSTANCES% instances of VeriCrop JavaFX GUI...
 echo.
-echo To run the JavaFX GUI:  gradlew.bat :vericrop-gui:run
-echo To stop all services:   stop-all.bat
+echo Each instance will run in a separate window:
+echo   - Instance 1: Farmer role (default)
+echo   - Instance 2: Distributor role
+echo   - Instance 3: Retailer role
 echo.
+
+REM Check if Java and Gradle are available
+call :check_java
+if errorlevel 1 goto :end_script
+
+if not exist "gradlew.bat" (
+    echo ERROR: gradlew.bat not found in current directory.
+    echo Please run from project root directory.
+    pause
+    goto :end_script
+)
+
+echo Starting GUI instances...
+echo.
+
+REM First, let's see what Gradle tasks are available
+echo Checking available Gradle tasks...
+gradlew.bat tasks --console=plain | findstr "run" | head -5
+echo.
+
+REM Try different run commands based on project structure
+echo Trying to start instances...
+echo.
+
+REM Instance 1
+echo [1/3] Starting Instance 1 (Farmer)...
+start "VeriCrop GUI - Instance 1 (Farmer)" cmd /k "title VeriCrop GUI - Instance 1 (Farmer) && echo Starting GUI... && gradlew.bat :vericrop-gui:run || gradlew.bat run || gradlew.bat :app:run || gradlew.bat bootRun"
+timeout /t 5 /nobreak >nul
+
+REM Instance 2
+echo [2/3] Starting Instance 2 (Distributor)...
+start "VeriCrop GUI - Instance 2 (Distributor)" cmd /k "title VeriCrop GUI - Instance 2 (Distributor) && echo Starting GUI... && gradlew.bat :vericrop-gui:run -Dapp.instance=2 || gradlew.bat run || gradlew.bat :app:run || gradlew.bat bootRun"
+timeout /t 5 /nobreak >nul
+
+REM Instance 3
+echo [3/3] Starting Instance 3 (Retailer)...
+start "VeriCrop GUI - Instance 3 (Retailer)" cmd /k "title VeriCrop GUI - Instance 3 (Retailer) && echo Starting GUI... && gradlew.bat :vericrop-gui:run -Dapp.instance=3 || gradlew.bat run || gradlew.bat :app:run || gradlew.bat bootRun"
+
+echo.
+echo ✓ GUI instances launched. Check the opened windows.
+echo.
+echo If GUIs don't start, try building first:
+echo   start-all.bat build
+echo.
+echo Troubleshooting:
+echo   1. Make sure Java JDK 11+ is installed
+echo   2. Check Gradle wrapper exists (gradlew.bat)
+echo   3. Try: gradlew.bat tasks (to see available tasks)
+echo.
+goto :end_script
+
+:check_java
+where java >nul 2>&1
+if errorlevel 1 (
+    echo ERROR: Java is not installed or not in PATH.
+    echo Please install JDK 11+ and ensure JAVA_HOME is set.
+    exit /b 1
+)
+echo ✓ Java is available
+goto :eof
+
+:build_java
+echo Building Java artifacts with Gradle...
+echo.
+call :check_java
+if errorlevel 1 goto :end_script
+
+if exist "gradlew.bat" (
+    echo Building all Java modules...
+    gradlew.bat clean build --no-daemon
+    echo.
+    echo ✓ Java build completed!
+) else (
+    echo ERROR: gradlew.bat not found.
+    echo Please run from project root directory.
+)
+goto :end_script
+
+:init_airflow
+echo Initializing Airflow...
+echo.
+echo Step 1: Stopping Airflow services...
+docker-compose stop airflow-scheduler airflow-webserver
+echo.
+echo Step 2: Initializing Airflow database...
+docker-compose run --rm airflow-webserver airflow db init
+if errorlevel 1 (
+    echo ERROR: Failed to initialize Airflow database
+    echo Trying alternative method...
+    goto :fix_airflow
+)
+echo.
+echo Step 3: Creating admin user...
+docker-compose run --rm airflow-webserver airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com
+echo.
+echo Step 4: Starting Airflow services...
+docker-compose up -d airflow-scheduler airflow-webserver
+echo.
+echo ✓ Airflow initialization complete!
+echo   Access at: http://localhost:8080
+echo   Username: admin
+echo   Password: admin
+echo.
+echo Creating initialization marker...
+echo initialized > airflow-initialized.txt
+goto :end_script
+
+:fix_airflow
+echo Using alternative Airflow initialization method...
+echo.
+echo 1. Ensuring postgres-airflow is ready...
+timeout /t 10 /nobreak >nul
+echo.
+echo 2. Checking database connection...
+docker-compose exec postgres-airflow pg_isready -U airflow
+echo.
+echo 3. Initializing with direct exec...
+docker-compose exec airflow-webserver airflow db init
+echo.
+echo 4. Creating user...
+docker-compose exec airflow-webserver airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com
+echo.
+echo 5. Restarting...
+docker-compose restart airflow-scheduler airflow-webserver
+echo.
+echo ✓ Airflow should now be working!
+echo initialized > airflow-initialized.txt
+goto :end_script
+
+:start_infra
+echo Starting infrastructure only...
+echo.
+%DOCKER_COMPOSE% up -d postgres kafka zookeeper redis ml-service
+echo ✓ Infrastructure services started!
+goto :end_script
+
+:show_logs
+echo Showing service logs...
+echo.
+docker-compose logs --tail=50
+echo.
+echo For Airflow specific logs:
+echo docker-compose logs airflow-webserver
+echo docker-compose logs airflow-scheduler
+goto :end_script
+
+:show_status
+call :show_service_status
+goto :end_script
+
+:stop_all
+echo Stopping all services...
+echo.
+docker-compose down
+if exist "airflow-initialized.txt" del airflow-initialized.txt
+echo ✓ All services stopped
+goto :end_script
+
+:show_service_status
+echo ===============================================================
+echo                     Service Status
+echo ===============================================================
+echo.
+docker-compose ps --format "table {{.Name}}\t{{.Status}}\t{{.Ports}}"
+echo.
+echo ===============================================================
 goto :eof
 
 :show_help
 echo.
-echo VeriCrop Start-All Script (Windows)
+echo VeriCrop Start Script Commands:
 echo.
-echo This script helps you start all VeriCrop services with a single command.
+echo   start-all.bat          - Start all services
+echo   start-all.bat infra    - Start infrastructure only
+echo   start-all.bat init-airflow - Initialize Airflow (first time)
+echo   start-all.bat fix-airflow - Alternative Airflow fix
+echo   start-all.bat build    - Build Java artifacts
+echo   start-all.bat run-gui  - Run 3 GUI instances
+echo   start-all.bat logs     - View service logs
+echo   start-all.bat ps       - Check service status
+echo   start-all.bat stop     - Stop all services
+echo   start-all.bat help     - Show this help
 echo.
-echo Usage:
-echo   start-all.bat [mode] [options]
+echo GUI Instances:
+echo   Each instance runs in separate window with different roles:
+echo   - Instance 1: Farmer role
+echo   - Instance 2: Distributor role
+echo   - Instance 3: Retailer role
 echo.
-echo Modes:
-echo   full           - Start all services (default)
-echo   infra          - Start infrastructure only (PostgreSQL, Kafka, Zookeeper)
-echo   kafka          - Start Kafka stack only
-echo   simulation     - Start simulation environment
-echo   prod           - Start production environment
-echo   build          - Build Java artifacts with Gradle
-echo   docker-build   - Build Docker images
-echo   run            - Run the JavaFX GUI application
-echo   all-build      - Build everything (Java + Docker images)
+echo All instances connect to the same backend services.
 echo.
-echo Options:
-echo   -b, --build      Rebuild Docker images before starting
-echo   -h, --help       Show this help message
-echo   --no-cache       Build Docker images without cache
-echo.
-goto :eof
+goto :end_script
 
-endlocal
+:end_script
+echo.
+echo Script completed.
+pause
