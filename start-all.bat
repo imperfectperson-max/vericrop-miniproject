@@ -98,9 +98,11 @@ if exist "airflow-initialized.txt" (
     echo     Run: start-all.bat init-airflow
 )
 echo.
-echo To run 3 GUI instances: start-all.bat run-gui
-echo.
 echo ===============================================================
+echo.
+echo Starting 3 GUI instances...
+echo.
+call :run_gui
 goto :end_script
 
 :run_gui
@@ -114,13 +116,12 @@ echo.
 
 REM Check if Java and Gradle are available
 call :check_java
-if errorlevel 1 goto :end_script
+if errorlevel 1 goto :eof
 
 if not exist "gradlew.bat" (
     echo ERROR: gradlew.bat not found in current directory.
     echo Please run from project root directory.
-    pause
-    goto :end_script
+    goto :eof
 )
 
 echo Starting GUI instances...
@@ -160,17 +161,18 @@ echo   1. Make sure Java JDK 11+ is installed
 echo   2. Check Gradle wrapper exists (gradlew.bat)
 echo   3. Try: gradlew.bat tasks (to see available tasks)
 echo.
-goto :end_script
+goto :eof
 
 :check_java
 where java >nul 2>&1
 if errorlevel 1 (
     echo ERROR: Java is not installed or not in PATH.
     echo Please install JDK 11+ and ensure JAVA_HOME is set.
+    echo Skipping GUI instances...
     exit /b 1
 )
 echo ✓ Java is available
-goto :eof
+exit /b 0
 
 :build_java
 echo Building Java artifacts with Gradle...
@@ -283,18 +285,19 @@ goto :eof
 echo.
 echo VeriCrop Start Script Commands:
 echo.
-echo   start-all.bat          - Start all services
+echo   start-all.bat          - Start all services and 3 GUI instances
 echo   start-all.bat infra    - Start infrastructure only
 echo   start-all.bat init-airflow - Initialize Airflow (first time)
 echo   start-all.bat fix-airflow - Alternative Airflow fix
 echo   start-all.bat build    - Build Java artifacts
-echo   start-all.bat run-gui  - Run 3 GUI instances
+echo   start-all.bat run-gui  - Run 3 GUI instances only
 echo   start-all.bat logs     - View service logs
 echo   start-all.bat ps       - Check service status
 echo   start-all.bat stop     - Stop all services
 echo   start-all.bat help     - Show this help
 echo.
 echo GUI Instances:
+echo   By default, 3 GUI instances are started automatically.
 echo   Each instance runs in separate window with different roles:
 echo   - Instance 1: Farmer role
 echo   - Instance 2: Distributor role
