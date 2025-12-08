@@ -169,10 +169,10 @@ if errorlevel 1 (
     echo ERROR: Java is not installed or not in PATH.
     echo Please install JDK 11+ and ensure JAVA_HOME is set.
     echo Skipping GUI instances...
-    goto :eof
+    exit /b 1
 )
 echo ✓ Java is available
-goto :eof
+exit /b 0
 
 :build_java
 echo Building Java artifacts with Gradle...
