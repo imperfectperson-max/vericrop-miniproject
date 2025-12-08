@@ -529,19 +529,19 @@ run_gui() {
     echo ""
     
     # Create temporary launch scripts with clear feedback
-    # Use mktemp for secure temporary file creation (let it choose the directory)
-    local LAUNCH_SCRIPT_1=$(mktemp -t vericrop-launch-instance1.XXXXXX.sh)
-    local LAUNCH_SCRIPT_2=$(mktemp -t vericrop-launch-instance2.XXXXXX.sh)
-    local LAUNCH_SCRIPT_3=$(mktemp -t vericrop-launch-instance3.XXXXXX.sh)
-    
-    # Use system temp directory for log files (fallback mode)
+    # Use system temp directory (portable across Unix systems)
     local TMPDIR="${TMPDIR:-/tmp}"
+    local LAUNCH_SCRIPT_1=$(mktemp "${TMPDIR}/vericrop-launch-instance1.XXXXXX.sh")
+    local LAUNCH_SCRIPT_2=$(mktemp "${TMPDIR}/vericrop-launch-instance2.XXXXXX.sh")
+    local LAUNCH_SCRIPT_3=$(mktemp "${TMPDIR}/vericrop-launch-instance3.XXXXXX.sh")
+    
+    # Log file paths for fallback mode (when no terminal emulator available)
     local LOG_FILE_1="${TMPDIR}/vericrop-gui-instance1.log"
     local LOG_FILE_2="${TMPDIR}/vericrop-gui-instance2.log"
     local LOG_FILE_3="${TMPDIR}/vericrop-gui-instance3.log"
     
-    # Register cleanup on exit
-    trap "rm -f '$LAUNCH_SCRIPT_1' '$LAUNCH_SCRIPT_2' '$LAUNCH_SCRIPT_3' 2>/dev/null" EXIT INT TERM
+    # Register cleanup on exit (check if variables are set before removing)
+    trap '[[ -n "$LAUNCH_SCRIPT_1" ]] && rm -f "$LAUNCH_SCRIPT_1" 2>/dev/null; [[ -n "$LAUNCH_SCRIPT_2" ]] && rm -f "$LAUNCH_SCRIPT_2" 2>/dev/null; [[ -n "$LAUNCH_SCRIPT_3" ]] && rm -f "$LAUNCH_SCRIPT_3" 2>/dev/null' EXIT INT TERM
     
     # Instance 1
     echo "[1/3] Launching Instance 1 (Farmer) window..."
