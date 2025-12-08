@@ -19,6 +19,11 @@
 #   docker-build   - Build Docker images (vericrop-gui, ml-service)
 #   run            - Run the JavaFX GUI application
 #   all-build      - Build everything (Java + Docker images)
+#   init-airflow   - Initialize Airflow (first time setup)
+#   fix-airflow    - Fix Airflow using alternative method
+#   logs           - Show service logs
+#   ps             - Show service status
+#   stop           - Stop all services
 #
 # Options:
 #   -d, --detach     Run services in detached mode (background)
@@ -60,6 +65,11 @@ if [[ "$1" == "-h" || "$1" == "--help" || "$1" == "help" ]]; then
     echo "  docker-build   - Build Docker images (vericrop-gui, ml-service)"
     echo "  run            - Run the JavaFX GUI application"
     echo "  all-build      - Build everything (Java + Docker images)"
+    echo "  init-airflow   - Initialize Airflow (first time setup)"
+    echo "  fix-airflow    - Fix Airflow using alternative method"
+    echo "  logs           - Show service logs"
+    echo "  ps             - Show service status"
+    echo "  stop           - Stop all services"
     echo ""
     echo "Options:"
     echo "  -d, --detach     Run services in detached mode (background)"
@@ -314,7 +324,115 @@ build_all() {
     echo -e "${GREEN}✓ All builds completed successfully!${NC}"
 }
 
-# Run the JavaFX GUI
+# Initialize Airflow
+init_airflow() {
+    echo -e "${BLUE}Initializing Airflow...${NC}"
+    echo ""
+    
+    echo "Step 1: Stopping Airflow services..."
+    $DOCKER_COMPOSE stop airflow-scheduler airflow-webserver
+    echo ""
+    
+    echo "Step 2: Initializing Airflow database..."
+    if ! $DOCKER_COMPOSE run --rm airflow-webserver airflow db init; then
+        echo -e "${RED}ERROR: Failed to initialize Airflow database${NC}"
+        echo "Trying alternative method..."
+        fix_airflow
+        return
+    fi
+    echo ""
+    
+    echo "Step 3: Creating admin user..."
+    $DOCKER_COMPOSE run --rm airflow-webserver airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com
+    echo ""
+    
+    echo "Step 4: Starting Airflow services..."
+    $DOCKER_COMPOSE up -d airflow-scheduler airflow-webserver
+    echo ""
+    
+    echo -e "${GREEN}✓ Airflow initialization complete!${NC}"
+    echo -e "  Access at: ${CYAN}http://localhost:8080${NC}"
+    echo -e "  Username: ${YELLOW}admin${NC}"
+    echo -e "  Password: ${YELLOW}admin${NC}"
+    echo ""
+    
+    echo "Creating initialization marker..."
+    echo "initialized" > airflow-initialized.txt
+}
+
+# Fix Airflow using alternative method
+fix_airflow() {
+    echo -e "${BLUE}Using alternative Airflow initialization method...${NC}"
+    echo ""
+    
+    echo "1. Ensuring postgres-airflow is ready..."
+    sleep 10  # Wait for PostgreSQL to be fully ready
+    echo ""
+    
+    echo "2. Checking database connection..."
+    $DOCKER_COMPOSE exec postgres-airflow pg_isready -U airflow
+    echo ""
+    
+    echo "3. Initializing with direct exec..."
+    $DOCKER_COMPOSE exec airflow-webserver airflow db init
+    echo ""
+    
+    echo "4. Creating user..."
+    $DOCKER_COMPOSE exec airflow-webserver airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com
+    echo ""
+    
+    echo "5. Restarting..."
+    $DOCKER_COMPOSE restart airflow-scheduler airflow-webserver
+    echo ""
+    
+    echo -e "${GREEN}✓ Airflow should now be working!${NC}"
+    echo "initialized" > airflow-initialized.txt
+}
+
+# Show service logs
+show_logs() {
+    echo -e "${BLUE}Showing service logs...${NC}"
+    echo ""
+    
+    # Show last 50 lines of logs (matches start-all.bat behavior)
+    $DOCKER_COMPOSE logs --tail=50
+    
+    echo ""
+    echo "For Airflow specific logs:"
+    echo "  $DOCKER_COMPOSE logs airflow-webserver"
+    echo "  $DOCKER_COMPOSE logs airflow-scheduler"
+}
+
+# Show service status
+show_status() {
+    echo ""
+    echo -e "${CYAN}═══════════════════════════════════════════════════════════${NC}"
+    echo -e "${CYAN}                     Service Status                         ${NC}"
+    echo -e "${CYAN}═══════════════════════════════════════════════════════════${NC}"
+    echo ""
+    
+    $DOCKER_COMPOSE ps
+    
+    echo ""
+    echo -e "${CYAN}═══════════════════════════════════════════════════════════${NC}"
+}
+
+# Stop all services
+stop_all() {
+    echo -e "${BLUE}Stopping all services...${NC}"
+    echo ""
+    
+    $DOCKER_COMPOSE down
+    
+    if [ -f "airflow-initialized.txt" ]; then
+        rm airflow-initialized.txt
+    fi
+    
+    echo ""
+    echo -e "${GREEN}✓ All services stopped${NC}"
+}
+
+# Run GUI instances
 run_gui() {
     echo -e "${BLUE}Running VeriCrop JavaFX GUI...${NC}"
     echo ""
@@ -381,8 +499,23 @@ main() {
         all-build|build-all)
             build_all
             ;;
-        run)
+        run|run-gui|gui)
             run_gui
+            ;;
+        init-airflow)
+            init_airflow
+            ;;
+        fix-airflow)
+            fix_airflow
+            ;;
+        logs)
+            show_logs
+            ;;
+        ps|status)
+            show_status
+            ;;
+        stop)
+            stop_all
             ;;
         help|-h|--help)
             echo "Run './start-all.sh --help' for usage information"
@@ -401,6 +534,11 @@ main() {
             echo "  docker-build   - Build Docker images"
             echo "  all-build      - Build everything"
             echo "  run            - Run the JavaFX GUI"
+            echo "  init-airflow   - Initialize Airflow"
+            echo "  fix-airflow    - Fix Airflow with alternative method"
+            echo "  logs           - Show service logs"
+            echo "  ps             - Show service status"
+            echo "  stop           - Stop all services"
             echo ""
             exit 1
             ;;

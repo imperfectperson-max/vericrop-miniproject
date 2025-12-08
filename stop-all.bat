@@ -50,22 +50,20 @@ exit /b 1
 REM Print banner
 echo.
 echo ===============================================================
-echo.
-echo           [91m  VeriCrop Stop-All Script (Windows)  [0m
-echo.
+echo        VeriCrop Stop-All Script (Windows)
 echo ===============================================================
 echo.
 
 if defined REMOVE_VOLUMES (
-    echo [93m⚠ Warning: Volumes will be removed. All data will be deleted![0m
+    echo ⚠ Warning: Volumes will be removed. All data will be deleted!
     echo.
 )
 
-echo [94mStopping VeriCrop services...[0m
+echo Stopping VeriCrop services...
 echo.
 
 if "%STOP_ALL%"=="true" (
-    echo [93mStopping services from all docker-compose files...[0m
+    echo Stopping services from all docker-compose files...
     
     REM Main docker-compose
     if exist "docker-compose.yml" (
@@ -95,10 +93,10 @@ if "%STOP_ALL%"=="true" (
 )
 
 echo.
-echo [92m✓ All VeriCrop services stopped.[0m
+echo ✓ All VeriCrop services stopped.
 
 if defined REMOVE_VOLUMES (
-    echo [93m  Volumes have been removed.[0m
+    echo   Volumes have been removed.
 )
 
 echo.
