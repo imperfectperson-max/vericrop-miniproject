@@ -492,8 +492,6 @@ run_gui() {
         echo ""
     fi
     
-    local GRADLE_RUN_CMD="./gradlew :vericrop-gui:run || ./gradlew run || ./gradlew :app:run || ./gradlew bootRun"
-    
     echo -e "${BLUE}Starting $GUI_INSTANCES instances of VeriCrop JavaFX GUI...${NC}"
     echo ""
     echo "Each instance will run in a separate window:"
@@ -531,26 +529,36 @@ run_gui() {
     # Create temporary launch scripts with clear feedback
     # Use system temp directory (portable across Unix systems)
     local temp_dir="${TMPDIR:-/tmp}"
+    
+    # Array to track created temporary files for cleanup
+    local -a temp_files=()
+    
+    # Register cleanup on exit for any files created so far
+    trap 'rm -f "${temp_files[@]}" 2>/dev/null' EXIT INT TERM
+    
+    # Create temporary files with error handling and cleanup tracking
     local LAUNCH_SCRIPT_1=$(mktemp "${temp_dir}/vericrop-launch-instance1.XXXXXX.sh") || {
         echo -e "${RED}❌ Failed to create temporary file for instance 1${NC}"
         return 1
     }
+    temp_files+=("$LAUNCH_SCRIPT_1")
+    
     local LAUNCH_SCRIPT_2=$(mktemp "${temp_dir}/vericrop-launch-instance2.XXXXXX.sh") || {
         echo -e "${RED}❌ Failed to create temporary file for instance 2${NC}"
         return 1
     }
+    temp_files+=("$LAUNCH_SCRIPT_2")
+    
     local LAUNCH_SCRIPT_3=$(mktemp "${temp_dir}/vericrop-launch-instance3.XXXXXX.sh") || {
         echo -e "${RED}❌ Failed to create temporary file for instance 3${NC}"
         return 1
     }
+    temp_files+=("$LAUNCH_SCRIPT_3")
     
     # Log file paths for fallback mode (when no terminal emulator available)
     local LOG_FILE_1="${temp_dir}/vericrop-gui-instance1.log"
     local LOG_FILE_2="${temp_dir}/vericrop-gui-instance2.log"
     local LOG_FILE_3="${temp_dir}/vericrop-gui-instance3.log"
-    
-    # Register cleanup on exit (check if variables are set before removing)
-    trap '[[ -n "$LAUNCH_SCRIPT_1" ]] && rm -f "$LAUNCH_SCRIPT_1" 2>/dev/null; [[ -n "$LAUNCH_SCRIPT_2" ]] && rm -f "$LAUNCH_SCRIPT_2" 2>/dev/null; [[ -n "$LAUNCH_SCRIPT_3" ]] && rm -f "$LAUNCH_SCRIPT_3" 2>/dev/null' EXIT INT TERM
     
     # Instance 1
     echo "[1/3] Launching Instance 1 (Farmer) window..."
