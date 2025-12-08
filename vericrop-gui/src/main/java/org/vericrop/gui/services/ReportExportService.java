@@ -165,13 +165,16 @@ public class ReportExportService {
     }
     
     /**
-     * Convert HTML content to PDF (simple implementation)
-     * Note: This is a placeholder. For production, use a library like iText or Flying Saucer
+     * Convert HTML content to PDF.
+     * Note: Currently saves as HTML with .pdf extension. For true PDF generation,
+     * integrate a library like Apache PDFBox, iText, or Flying Saucer.
+     * This is a minimal implementation to support the PDF format option.
      */
     private String convertHtmlToPdf(String htmlContent) {
-        // For now, return HTML wrapped with PDF note
-        // In production, integrate with a PDF library
-        return "<!-- PDF conversion requires additional library -->\n" + htmlContent;
+        // Save as HTML with .pdf extension - users can open in browser and print to PDF
+        // Or integrate a proper PDF library for production use
+        logger.warn("PDF export currently generates HTML format. Consider integrating a PDF library for production.");
+        return htmlContent;
     }
     
     /**
@@ -809,31 +812,46 @@ public class ReportExportService {
         return sb.toString();
     }
     
-    // Stub implementations for JSON/HTML formats for remaining report types
-    // These follow the same pattern as Shipment Summary but are simplified for brevity
+    // Simplified JSON/HTML implementations for remaining report types
+    // These provide basic JSON structure and reuse TXT content for HTML
+    // Can be expanded in future for more detailed JSON/HTML representations
     
     private String generateTemperatureLogJson(List<PersistedShipment> shipments, 
                                                List<PersistedSimulation> simulations,
                                                LocalDate startDate, LocalDate endDate) {
-        // Simple JSON implementation - can be expanded
-        return "{ \"reportType\": \"Temperature Log\", \"dateRange\": { \"start\": \"" + 
-               startDate.format(DATE_FORMATTER) + "\", \"end\": \"" + endDate.format(DATE_FORMATTER) + 
-               "\" }, \"shipments\": " + shipments.size() + ", \"simulations\": " + simulations.size() + " }";
+        // Basic JSON summary - can be expanded with full data structure
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\n");
+        sb.append("  \"reportType\": \"Temperature Log\",\n");
+        sb.append("  \"dateRange\": {\n");
+        sb.append("    \"start\": \"").append(startDate.format(DATE_FORMATTER)).append("\",\n");
+        sb.append("    \"end\": \"").append(endDate.format(DATE_FORMATTER)).append("\"\n");
+        sb.append("  },\n");
+        sb.append("  \"shipmentCount\": ").append(shipments.size()).append(",\n");
+        sb.append("  \"simulationCount\": ").append(simulations.size()).append("\n");
+        sb.append("}\n");
+        return sb.toString();
     }
     
     private String generateTemperatureLogHtml(List<PersistedShipment> shipments, 
                                                List<PersistedSimulation> simulations,
                                                LocalDate startDate, LocalDate endDate) {
-        // Reuse TXT format wrapped in basic HTML
         String txtContent = generateTemperatureLogTxt(shipments, simulations, startDate, endDate);
         return wrapInBasicHtml("Temperature Log Report", txtContent);
     }
     
     private String generateQualityComplianceJson(List<PersistedSimulation> simulations, 
                                                   LocalDate startDate, LocalDate endDate) {
-        return "{ \"reportType\": \"Quality Compliance\", \"dateRange\": { \"start\": \"" + 
-               startDate.format(DATE_FORMATTER) + "\", \"end\": \"" + endDate.format(DATE_FORMATTER) + 
-               "\" }, \"simulations\": " + simulations.size() + " }";
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\n");
+        sb.append("  \"reportType\": \"Quality Compliance\",\n");
+        sb.append("  \"dateRange\": {\n");
+        sb.append("    \"start\": \"").append(startDate.format(DATE_FORMATTER)).append("\",\n");
+        sb.append("    \"end\": \"").append(endDate.format(DATE_FORMATTER)).append("\"\n");
+        sb.append("  },\n");
+        sb.append("  \"simulationCount\": ").append(simulations.size()).append("\n");
+        sb.append("}\n");
+        return sb.toString();
     }
     
     private String generateQualityComplianceHtml(List<PersistedSimulation> simulations, 
@@ -845,9 +863,17 @@ public class ReportExportService {
     private String generateDeliveryPerformanceJson(List<PersistedSimulation> simulations,
                                                     List<PersistedShipment> shipments,
                                                     LocalDate startDate, LocalDate endDate) {
-        return "{ \"reportType\": \"Delivery Performance\", \"dateRange\": { \"start\": \"" + 
-               startDate.format(DATE_FORMATTER) + "\", \"end\": \"" + endDate.format(DATE_FORMATTER) + 
-               "\" }, \"simulations\": " + simulations.size() + ", \"shipments\": " + shipments.size() + " }";
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\n");
+        sb.append("  \"reportType\": \"Delivery Performance\",\n");
+        sb.append("  \"dateRange\": {\n");
+        sb.append("    \"start\": \"").append(startDate.format(DATE_FORMATTER)).append("\",\n");
+        sb.append("    \"end\": \"").append(endDate.format(DATE_FORMATTER)).append("\"\n");
+        sb.append("  },\n");
+        sb.append("  \"simulationCount\": ").append(simulations.size()).append(",\n");
+        sb.append("  \"shipmentCount\": ").append(shipments.size()).append("\n");
+        sb.append("}\n");
+        return sb.toString();
     }
     
     private String generateDeliveryPerformanceHtml(List<PersistedSimulation> simulations,
@@ -859,9 +885,16 @@ public class ReportExportService {
     
     private String generateSimulationLogJson(List<PersistedSimulation> simulations, 
                                               LocalDate startDate, LocalDate endDate) {
-        return "{ \"reportType\": \"Simulation Log\", \"dateRange\": { \"start\": \"" + 
-               startDate.format(DATE_FORMATTER) + "\", \"end\": \"" + endDate.format(DATE_FORMATTER) + 
-               "\" }, \"simulations\": " + simulations.size() + " }";
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\n");
+        sb.append("  \"reportType\": \"Simulation Log\",\n");
+        sb.append("  \"dateRange\": {\n");
+        sb.append("    \"start\": \"").append(startDate.format(DATE_FORMATTER)).append("\",\n");
+        sb.append("    \"end\": \"").append(endDate.format(DATE_FORMATTER)).append("\"\n");
+        sb.append("  },\n");
+        sb.append("  \"simulationCount\": ").append(simulations.size()).append("\n");
+        sb.append("}\n");
+        return sb.toString();
     }
     
     private String generateSimulationLogHtml(List<PersistedSimulation> simulations, 
