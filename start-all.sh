@@ -528,10 +528,14 @@ run_gui() {
     echo "Each instance takes 10-30 seconds to start (faster on subsequent runs)."
     echo ""
     
-    # Create a launch script with clear feedback
-    local LAUNCH_SCRIPT_1="/tmp/vericrop-launch-instance1.sh"
-    local LAUNCH_SCRIPT_2="/tmp/vericrop-launch-instance2.sh"
-    local LAUNCH_SCRIPT_3="/tmp/vericrop-launch-instance3.sh"
+    # Create temporary launch scripts with clear feedback
+    # Use mktemp for secure temporary file creation
+    local LAUNCH_SCRIPT_1=$(mktemp /tmp/vericrop-launch-instance1.XXXXXX.sh)
+    local LAUNCH_SCRIPT_2=$(mktemp /tmp/vericrop-launch-instance2.XXXXXX.sh)
+    local LAUNCH_SCRIPT_3=$(mktemp /tmp/vericrop-launch-instance3.XXXXXX.sh)
+    
+    # Register cleanup on exit
+    trap "rm -f '$LAUNCH_SCRIPT_1' '$LAUNCH_SCRIPT_2' '$LAUNCH_SCRIPT_3' 2>/dev/null" EXIT INT TERM
     
     # Instance 1
     echo "[1/3] Launching Instance 1 (Farmer) window..."
