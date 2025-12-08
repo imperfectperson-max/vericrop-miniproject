@@ -38,7 +38,6 @@ if [[ "$1" == "-h" || "$1" == "--help" ]]; then
     echo "  -a, --all        Stop services from all compose files"
     echo "  -h, --help       Show this help message"
     echo ""
-    exit 0
 fi
 
 # Script directory
@@ -65,7 +64,6 @@ while [[ $# -gt 0 ]]; do
             ;;
         *)
             echo -e "${RED}Unknown option: $1${NC}"
-            exit 1
             ;;
     esac
 done
@@ -76,7 +74,6 @@ if ! command -v docker-compose &> /dev/null; then
         DOCKER_COMPOSE="docker compose"
     else
         echo -e "${RED}❌ Docker Compose is not installed.${NC}"
-        exit 1
     fi
 else
     DOCKER_COMPOSE="docker-compose"
