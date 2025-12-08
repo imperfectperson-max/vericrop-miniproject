@@ -1787,21 +1787,10 @@ public class LogisticsController implements SimulationListener {
         sb.append("Generated: ").append(timestamp).append("\n\n");
         
         if (!simulations.isEmpty()) {
-            // Separate simulations by type for detailed analysis
-            List<PersistedSimulation> applesSimulations = simulations.stream()
-                    .filter(s -> s.getBatchId().contains("APPLES") || 
-                            (s.getScenarioId() != null && s.getScenarioId().contains("example_1")))
-                    .collect(Collectors.toList());
-            
-            List<PersistedSimulation> carrotsSimulations = simulations.stream()
-                    .filter(s -> s.getBatchId().contains("CARROTS") || 
-                            (s.getScenarioId() != null && s.getScenarioId().contains("example_2")))
-                    .collect(Collectors.toList());
-            
-            List<PersistedSimulation> veggiesSimulations = simulations.stream()
-                    .filter(s -> s.getBatchId().contains("VEGGIES") || s.getBatchId().contains("VEGETABLES") ||
-                            (s.getScenarioId() != null && s.getScenarioId().contains("example_3")))
-                    .collect(Collectors.toList());
+            // Separate simulations by type using helper method
+            List<PersistedSimulation> applesSimulations = filterSimulationsByBatchType(simulations, "example_1");
+            List<PersistedSimulation> carrotsSimulations = filterSimulationsByBatchType(simulations, "example_2");
+            List<PersistedSimulation> veggiesSimulations = filterSimulationsByBatchType(simulations, "example_3");
             
             // Overall compliance statistics
             long compliant = simulations.stream()
@@ -1896,6 +1885,11 @@ public class LogisticsController implements SimulationListener {
      */
     private void appendSimulationTypeCompliance(StringBuilder sb, String typeName, 
             List<PersistedSimulation> simulations, String description) {
+        // Guard against empty list (should not happen due to checks in caller, but defensive)
+        if (simulations.isEmpty()) {
+            return;
+        }
+        
         long compliant = simulations.stream()
                 .filter(s -> "COMPLIANT".equals(s.getComplianceStatus()))
                 .count();
@@ -1910,6 +1904,32 @@ public class LogisticsController implements SimulationListener {
         sb.append("  └─ Compliant: ").append(compliant).append("/").append(simulations.size())
           .append(" (").append(String.format("%.1f%%", complianceRate)).append(")\n");
         sb.append("  └─ Avg Final Quality: ").append(String.format("%.1f%%", avgFinalQuality)).append("\n");
+    }
+    
+    /**
+     * Helper method to filter simulations by type.
+     * Matches logic from ReportExportService.SimulationType enum.
+     */
+    private List<PersistedSimulation> filterSimulationsByBatchType(
+            List<PersistedSimulation> simulations, String example) {
+        return simulations.stream()
+            .filter(s -> {
+                switch (example) {
+                    case "example_1":
+                        return s.getBatchId().contains("APPLES") || 
+                               (s.getScenarioId() != null && s.getScenarioId().contains("example_1"));
+                    case "example_2":
+                        return s.getBatchId().contains("CARROTS") || 
+                               (s.getScenarioId() != null && s.getScenarioId().contains("example_2"));
+                    case "example_3":
+                        return s.getBatchId().contains("VEGGIES") || 
+                               s.getBatchId().contains("VEGETABLES") ||
+                               (s.getScenarioId() != null && s.getScenarioId().contains("example_3"));
+                    default:
+                        return false;
+                }
+            })
+            .collect(Collectors.toList());
     }
     
     /**
