@@ -33,6 +33,8 @@ subprojects {
 
     test {
         useJUnitPlatform()
+        // Enable headless mode for AWT operations (QR code generation/decoding) in CI
+        systemProperty 'java.awt.headless', 'true'
     }
 }
 
