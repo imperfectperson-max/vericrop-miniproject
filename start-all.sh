@@ -676,7 +676,7 @@ main() {
             ;;
         help|-h|--help)
             echo "Run './start-all.sh --help' for usage information"
-            exit 0
+            # exit 0
             ;;
         *)
             echo -e "${RED}Unknown mode: $MODE${NC}"
