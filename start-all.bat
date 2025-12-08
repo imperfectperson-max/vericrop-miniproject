@@ -116,11 +116,37 @@ echo.
 
 REM Check if Java and Gradle are available
 call :check_java
-if errorlevel 1 goto :eof
+if errorlevel 1 (
+    echo.
+    echo 💡 TIP: You can still access VeriCrop services via:
+    echo   • Kafka UI:       http://localhost:8081
+    echo   • Airflow UI:     http://localhost:8080
+    echo   • ML Service:     http://localhost:8000
+    echo   • PostgreSQL:     localhost:5432
+    echo.
+    goto :eof
+)
 
 if not exist "gradlew.bat" (
-    echo ERROR: gradlew.bat not found in current directory.
-    echo Please run from project root directory.
+    echo.
+    echo ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    echo ⚠ WARNING: gradlew.bat not found
+    echo ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    echo.
+    echo The Gradle wrapper is missing. This could mean:
+    echo   1. You're not in the project root directory
+    echo   2. The project was not cloned correctly
+    echo   3. The gradlew.bat file was accidentally deleted
+    echo.
+    echo 📂 Current directory: %CD%
+    echo.
+    echo 🔧 To fix:
+    echo   1. Navigate to the project root directory
+    echo   2. Or re-clone the repository
+    echo   3. Or regenerate Gradle wrapper: gradle wrapper
+    echo.
+    echo ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    echo.
     goto :eof
 )
 
@@ -166,9 +192,30 @@ goto :eof
 :check_java
 where java >nul 2>&1
 if errorlevel 1 (
-    echo ERROR: Java is not installed or not in PATH.
-    echo Please install JDK 11+ and ensure JAVA_HOME is set.
-    echo Skipping GUI instances...
+    echo.
+    echo ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    echo ⚠ WARNING: Java is not installed or not in PATH
+    echo ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    echo.
+    echo The GUI instances require Java JDK 11 or later ^(JDK 17 recommended^).
+    echo.
+    echo 📥 To install Java:
+    echo   1. Download from: https://adoptium.net/
+    echo   2. Install the JDK ^(not just JRE^)
+    echo   3. Set JAVA_HOME environment variable
+    echo   4. Add %%JAVA_HOME%%\bin to your PATH
+    echo.
+    echo 🔍 Quick install commands:
+    echo   • Windows ^(winget^): winget install EclipseAdoptium.Temurin.17.JDK
+    echo   • Windows ^(chocolatey^): choco install temurin17
+    echo.
+    echo 🐳 Alternative: Use Docker to run GUI instances
+    echo   See README.md for Docker-based setup instructions
+    echo.
+    echo ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    echo.
+    echo Skipping GUI instances... ^(infrastructure services will still start^)
+    echo.
     exit /b 1
 )
 echo ✓ Java is available

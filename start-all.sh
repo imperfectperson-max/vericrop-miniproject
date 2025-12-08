@@ -162,8 +162,38 @@ check_prerequisites() {
 # Check Java for Gradle commands
 check_java() {
     if ! command -v java &> /dev/null; then
-        echo -e "${RED}❌ Java is not installed. Please install JDK 11 or later (JDK 17 recommended).${NC}"
-        echo "Skipping GUI instances..."
+        echo ""
+        echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "${YELLOW}⚠ WARNING: Java is not installed or not in PATH${NC}"
+        echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo ""
+        echo "The GUI instances require Java JDK 11 or later (JDK 17 recommended)."
+        echo ""
+        echo -e "${GREEN}📥 To install Java:${NC}"
+        echo ""
+        echo -e "${BLUE}  macOS (Homebrew):${NC}"
+        echo "    brew install openjdk@17"
+        echo "    sudo ln -sfn /opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-17.jdk"
+        echo ""
+        echo -e "${BLUE}  Ubuntu/Debian:${NC}"
+        echo "    sudo apt update"
+        echo "    sudo apt install openjdk-17-jdk"
+        echo ""
+        echo -e "${BLUE}  Fedora/RHEL/CentOS:${NC}"
+        echo "    sudo dnf install java-17-openjdk-devel"
+        echo ""
+        echo -e "${BLUE}  Arch Linux:${NC}"
+        echo "    sudo pacman -S jdk-openjdk"
+        echo ""
+        echo -e "${BLUE}  Or download from:${NC} https://adoptium.net/"
+        echo ""
+        echo -e "${GREEN}🐳 Alternative: Use Docker to run GUI instances${NC}"
+        echo "  See README.md for Docker-based setup instructions"
+        echo ""
+        echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo ""
+        echo "Skipping GUI instances... (infrastructure services will still start)"
+        echo ""
         return 1
     fi
     
@@ -458,11 +488,36 @@ run_gui() {
     echo ""
     
     if ! check_java; then
+        echo ""
+        echo -e "${GREEN}💡 TIP: You can still access VeriCrop services via:${NC}"
+        echo -e "  • Kafka UI:       ${CYAN}http://localhost:8081${NC}"
+        echo -e "  • Airflow UI:     ${CYAN}http://localhost:8080${NC}"
+        echo -e "  • ML Service:     ${CYAN}http://localhost:8000${NC}"
+        echo -e "  • PostgreSQL:     ${CYAN}localhost:5432${NC}"
+        echo ""
         return 1
     fi
     
     if [ ! -f "./gradlew" ]; then
-        echo -e "${RED}❌ Gradle wrapper not found. Please run from project root.${NC}"
+        echo ""
+        echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "${YELLOW}⚠ WARNING: gradlew not found${NC}"
+        echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo ""
+        echo "The Gradle wrapper is missing. This could mean:"
+        echo "  1. You're not in the project root directory"
+        echo "  2. The project was not cloned correctly"
+        echo "  3. The gradlew file was accidentally deleted"
+        echo ""
+        echo -e "${BLUE}📂 Current directory:${NC} $(pwd)"
+        echo ""
+        echo -e "${GREEN}🔧 To fix:${NC}"
+        echo "  1. Navigate to the project root directory"
+        echo "  2. Or re-clone the repository"
+        echo "  3. Or regenerate Gradle wrapper: gradle wrapper"
+        echo ""
+        echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo ""
         return 1
     fi
     
