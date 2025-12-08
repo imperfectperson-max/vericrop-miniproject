@@ -1196,12 +1196,13 @@ public class LogisticsController implements SimulationListener {
     }
     
     /**
-     * Setup export format dropdown with TXT and CSV options.
+     * Setup export format dropdown with multiple format options.
+     * Supports TXT, CSV, JSON, HTML, and PDF formats.
      * Defaults to TXT format.
      */
     private void setupExportFormatCombo() {
         if (exportFormatCombo != null) {
-            exportFormatCombo.getItems().addAll("TXT", "CSV");
+            exportFormatCombo.getItems().addAll("TXT", "CSV", "JSON", "HTML", "PDF");
             exportFormatCombo.setValue("TXT"); // Default to TXT
         }
     }
@@ -1613,6 +1614,10 @@ public class LogisticsController implements SimulationListener {
     
     /**
      * Generate Shipment Summary preview with detailed shipment information.
+     * Enhanced to capture the essence of the 3 simulation examples:
+     * - Example 1: Farm to Consumer Direct (Summer Apples with warehouse stop)
+     * - Example 2: Local Producer Delivery (Organic Carrots, short route)
+     * - Example 3: Cross-Region Long Haul (Mixed Vegetables with temperature events)
      */
     private String generateShipmentSummaryPreview(String dateRange, String timestamp,
             List<PersistedSimulation> simulations, List<PersistedShipment> persistedShipments) {
@@ -1627,6 +1632,29 @@ public class LogisticsController implements SimulationListener {
         sb.append("• In Transit: ").append(countByStatus("IN_TRANSIT")).append("\n");
         sb.append("• At Warehouse: ").append(countByStatus("AT_WAREHOUSE")).append("\n");
         sb.append("• Delivered: ").append(countByStatus("DELIVERED")).append("\n\n");
+        
+        // Count shipments by type to highlight the 3 simulation examples
+        long applesCount = shipments.stream().filter(s -> s.getBatchId().contains("APPLES")).count();
+        long carrotsCount = shipments.stream().filter(s -> s.getBatchId().contains("CARROTS")).count();
+        long veggiesCount = shipments.stream().filter(s -> 
+            s.getBatchId().contains("VEGGIES") || s.getBatchId().contains("VEGETABLES")).count();
+        
+        if (applesCount + carrotsCount + veggiesCount > 0) {
+            sb.append("━━━ BY DELIVERY TYPE ━━━\n");
+            if (applesCount > 0) {
+                sb.append("• Farm to Consumer (Apples): ").append(applesCount)
+                  .append(" - Warehouse stops, optimal cold chain\n");
+            }
+            if (carrotsCount > 0) {
+                sb.append("• Local Producer (Carrots): ").append(carrotsCount)
+                  .append(" - Short direct route, no warehouse\n");
+            }
+            if (veggiesCount > 0) {
+                sb.append("• Cross-Region (Vegetables): ").append(veggiesCount)
+                  .append(" - Extended delivery, temperature events\n");
+            }
+            sb.append("\n");
+        }
         
         // Persisted shipments statistics
         if (!persistedShipments.isEmpty()) {
@@ -1643,10 +1671,29 @@ public class LogisticsController implements SimulationListener {
             sb.append("• Average Temperature: ").append(String.format("%.1f°C", avgTemp)).append("\n");
             sb.append("• Average Humidity: ").append(String.format("%.1f%%", avgHumidity)).append("\n\n");
             
-            // Recent shipments list (last 5)
+            // Count historical shipments by type
+            long histApples = persistedShipments.stream().filter(s -> s.getBatchId().contains("APPLES")).count();
+            long histCarrots = persistedShipments.stream().filter(s -> s.getBatchId().contains("CARROTS")).count();
+            long histVeggies = persistedShipments.stream().filter(s -> 
+                s.getBatchId().contains("VEGGIES") || s.getBatchId().contains("VEGETABLES")).count();
+            
+            if (histApples + histCarrots + histVeggies > 0) {
+                sb.append("━━━ HISTORICAL BY TYPE ━━━\n");
+                if (histApples > 0) sb.append("• Apples (Farm to Consumer): ").append(histApples).append("\n");
+                if (histCarrots > 0) sb.append("• Carrots (Local Producer): ").append(histCarrots).append("\n");
+                if (histVeggies > 0) sb.append("• Vegetables (Cross-Region): ").append(histVeggies).append("\n");
+                sb.append("\n");
+            }
+            
+            // Recent shipments list (last 5) with type indicators
             sb.append("━━━ RECENT SHIPMENTS ━━━\n");
             persistedShipments.stream().limit(5).forEach(s -> {
-                sb.append("• ").append(s.getBatchId())
+                String type = "";
+                if (s.getBatchId().contains("APPLES")) type = " [Farm-to-Consumer]";
+                else if (s.getBatchId().contains("CARROTS")) type = " [Local-Producer]";
+                else if (s.getBatchId().contains("VEGGIES") || s.getBatchId().contains("VEGETABLES")) type = " [Cross-Region]";
+                
+                sb.append("• ").append(s.getBatchId()).append(type)
                   .append(" | ").append(s.getStatus())
                   .append(" | ").append(String.format("%.1f°C", s.getTemperature()))
                   .append("\n");
@@ -1655,6 +1702,7 @@ public class LogisticsController implements SimulationListener {
             sb.append("━━━ NO HISTORICAL DATA ━━━\n");
             sb.append("• No persisted shipments found for this period.\n");
             sb.append("• Run simulations to generate shipment data.\n");
+            sb.append("• Try Example 1 (Apples), Example 2 (Carrots), or Example 3 (Vegetables)\n");
         }
         
         return sb.toString();
@@ -1863,6 +1911,7 @@ public class LogisticsController implements SimulationListener {
     
     /**
      * Generate Simulation Log preview with simulation details.
+     * Enhanced to highlight the 3 simulation example types.
      */
     private String generateSimulationLogPreview(String dateRange, String timestamp,
             List<PersistedSimulation> simulations) {
@@ -1878,6 +1927,37 @@ public class LogisticsController implements SimulationListener {
             long completed = simulations.stream().filter(PersistedSimulation::isCompleted).count();
             sb.append("• Completed: ").append(completed).append("\n");
             sb.append("• Stopped/In Progress: ").append(simulations.size() - completed).append("\n\n");
+            
+            // Count by simulation type (the 3 examples)
+            long example1Count = simulations.stream()
+                    .filter(s -> s.getBatchId().contains("APPLES") || 
+                            (s.getScenarioId() != null && s.getScenarioId().contains("example_1")))
+                    .count();
+            long example2Count = simulations.stream()
+                    .filter(s -> s.getBatchId().contains("CARROTS") || 
+                            (s.getScenarioId() != null && s.getScenarioId().contains("example_2")))
+                    .count();
+            long example3Count = simulations.stream()
+                    .filter(s -> s.getBatchId().contains("VEGGIES") || s.getBatchId().contains("VEGETABLES") ||
+                            (s.getScenarioId() != null && s.getScenarioId().contains("example_3")))
+                    .count();
+            
+            if (example1Count + example2Count + example3Count > 0) {
+                sb.append("━━━ BY SIMULATION TYPE ━━━\n");
+                if (example1Count > 0) {
+                    sb.append("• Example 1 - Farm to Consumer (Apples): ").append(example1Count).append(" runs\n");
+                    sb.append("  └─ Warehouse stops, 30min duration, optimal cold chain\n");
+                }
+                if (example2Count > 0) {
+                    sb.append("• Example 2 - Local Producer (Carrots): ").append(example2Count).append(" runs\n");
+                    sb.append("  └─ Short 15min route, no warehouse, strict temp control\n");
+                }
+                if (example3Count > 0) {
+                    sb.append("• Example 3 - Cross-Region (Vegetables): ").append(example3Count).append(" runs\n");
+                    sb.append("  └─ Extended 45min delivery, temperature spike events\n");
+                }
+                sb.append("\n");
+            }
             
             // Scenario breakdown
             sb.append("━━━ SCENARIOS EXECUTED ━━━\n");
@@ -1896,14 +1976,20 @@ public class LogisticsController implements SimulationListener {
             }
             sb.append("\n");
             
-            // Recent simulations (last 5)
+            // Recent simulations (last 5) with type indicators
             sb.append("━━━ RECENT SIMULATIONS ━━━\n");
             simulations.stream()
                     .sorted((a, b) -> Long.compare(b.getStartTime(), a.getStartTime()))
                     .limit(5)
                     .forEach(sim -> {
                         String status = sim.isCompleted() ? "✓" : "○";
-                        sb.append(status).append(" ").append(sim.getBatchId())
+                        String type = "";
+                        if (sim.getBatchId().contains("APPLES")) type = " [Ex1-Apples]";
+                        else if (sim.getBatchId().contains("CARROTS")) type = " [Ex2-Carrots]";
+                        else if (sim.getBatchId().contains("VEGGIES") || sim.getBatchId().contains("VEGETABLES")) 
+                            type = " [Ex3-Veggies]";
+                        
+                        sb.append(status).append(" ").append(sim.getBatchId()).append(type)
                           .append(" | Quality: ").append(String.format("%.1f%%", sim.getFinalQuality()))
                           .append(" | ").append(sim.getComplianceStatus() != null ? sim.getComplianceStatus() : "N/A")
                           .append("\n");
@@ -1921,6 +2007,10 @@ public class LogisticsController implements SimulationListener {
             sb.append("━━━ NO SIMULATIONS FOUND ━━━\n");
             sb.append("• No simulation logs available for this period.\n");
             sb.append("• Start a simulation from ProducerController to generate logs.\n");
+            sb.append("• Available examples:\n");
+            sb.append("  - Example 1: Farm to Consumer (Summer Apples, 30min)\n");
+            sb.append("  - Example 2: Local Producer (Organic Carrots, 15min)\n");
+            sb.append("  - Example 3: Cross-Region (Mixed Vegetables, 45min)\n");
         }
         
         return sb.toString();
