@@ -606,21 +606,10 @@ public class ReportExportService {
           .format(DATETIME_FORMATTER)).append("\n");
         sb.append("Total Simulations: ").append(simulations.size()).append("\n\n");
         
-        // Separate simulations by type (the 3 examples from ProducerController)
-        List<PersistedSimulation> applesSimulations = simulations.stream()
-                .filter(s -> s.getBatchId().contains("APPLES") || 
-                        (s.getScenarioId() != null && s.getScenarioId().contains("example_1")))
-                .collect(Collectors.toList());
-        
-        List<PersistedSimulation> carrotsSimulations = simulations.stream()
-                .filter(s -> s.getBatchId().contains("CARROTS") || 
-                        (s.getScenarioId() != null && s.getScenarioId().contains("example_2")))
-                .collect(Collectors.toList());
-        
-        List<PersistedSimulation> veggiesSimulations = simulations.stream()
-                .filter(s -> s.getBatchId().contains("VEGGIES") || s.getBatchId().contains("VEGETABLES") ||
-                        (s.getScenarioId() != null && s.getScenarioId().contains("example_3")))
-                .collect(Collectors.toList());
+        // Separate simulations by type using helper method
+        List<PersistedSimulation> applesSimulations = filterSimulationsByType(simulations, SimulationType.EXAMPLE_1_APPLES);
+        List<PersistedSimulation> carrotsSimulations = filterSimulationsByType(simulations, SimulationType.EXAMPLE_2_CARROTS);
+        List<PersistedSimulation> veggiesSimulations = filterSimulationsByType(simulations, SimulationType.EXAMPLE_3_VEGETABLES);
         
         long compliant = simulations.stream()
             .filter(s -> "COMPLIANT".equals(s.getComplianceStatus()))
@@ -665,20 +654,12 @@ public class ReportExportService {
             String status = simulation.isCompleted() ? "✓ COMPLETED" : "○ IN PROGRESS";
             String compliance = "COMPLIANT".equals(simulation.getComplianceStatus()) ? "✓" : "✗";
             
-            // Determine simulation type
-            String simType = "Other";
-            if (simulation.getBatchId().contains("APPLES") || 
-                (simulation.getScenarioId() != null && simulation.getScenarioId().contains("example_1"))) {
-                simType = "[Example 1 - Apples]";
-            } else if (simulation.getBatchId().contains("CARROTS") || 
-                       (simulation.getScenarioId() != null && simulation.getScenarioId().contains("example_2"))) {
-                simType = "[Example 2 - Carrots]";
-            } else if (simulation.getBatchId().contains("VEGGIES") || simulation.getBatchId().contains("VEGETABLES") ||
-                       (simulation.getScenarioId() != null && simulation.getScenarioId().contains("example_3"))) {
-                simType = "[Example 3 - Vegetables]";
-            }
+            // Determine simulation type using helper method
+            SimulationType simType = SimulationType.fromSimulation(simulation);
+            String simTypeLabel = simType == SimulationType.OTHER ? "[Other]" : 
+                                 "[" + simType.getDisplayName().split(" - ")[0] + "]";
             
-            sb.append(String.format("[%s] %s Batch: %s\n", compliance, simType, simulation.getBatchId()));
+            sb.append(String.format("[%s] %s Batch: %s\n", compliance, simTypeLabel, simulation.getBatchId()));
             sb.append(String.format("    Status: %s | Quality: %.1f%% | Violations: %d\n",
                     status, simulation.getFinalQuality(), simulation.getViolationsCount()));
             sb.append(String.format("    Temp Range: %.1f°C - %.1f°C (avg: %.1f°C)\n",
@@ -694,6 +675,11 @@ public class ReportExportService {
      */
     private void appendSimulationTypeComplianceText(StringBuilder sb, String typeName, 
             List<PersistedSimulation> simulations, String description) {
+        // Guard against empty list to prevent division by zero
+        if (simulations.isEmpty()) {
+            return;
+        }
+        
         long compliant = simulations.stream()
                 .filter(s -> "COMPLIANT".equals(s.getComplianceStatus()))
                 .count();
@@ -722,20 +708,9 @@ public class ReportExportService {
         for (PersistedSimulation simulation : simulations) {
             sb.append(escapeCsv(simulation.getBatchId())).append(",");
             
-            // Determine simulation type based on batch ID or scenario ID
-            String simType = "Other";
-            if (simulation.getBatchId().contains("APPLES") || 
-                (simulation.getScenarioId() != null && simulation.getScenarioId().contains("example_1"))) {
-                simType = "Example 1 - Farm to Consumer (Apples)";
-            } else if (simulation.getBatchId().contains("CARROTS") || 
-                       (simulation.getScenarioId() != null && simulation.getScenarioId().contains("example_2"))) {
-                simType = "Example 2 - Local Producer (Carrots)";
-            } else if (simulation.getBatchId().contains("VEGGIES") || simulation.getBatchId().contains("VEGETABLES") ||
-                       (simulation.getScenarioId() != null && simulation.getScenarioId().contains("example_3"))) {
-                simType = "Example 3 - Cross-Region (Vegetables)";
-            }
-            
-            sb.append(escapeCsv(simType)).append(",");
+            // Determine simulation type using helper method
+            SimulationType simType = SimulationType.fromSimulation(simulation);
+            sb.append(escapeCsv(simType.getDisplayName())).append(",");
             sb.append(escapeCsv(simulation.getScenarioId())).append(",");
             sb.append(escapeCsv(simulation.getStatus())).append(",");
             sb.append(simulation.isCompleted()).append(",");
@@ -1061,19 +1036,10 @@ public class ReportExportService {
         sb.append("      <div class=\"stat-card\"><div class=\"stat-value\">").append(String.format("%.1f%%", complianceRate)).append("</div><div class=\"stat-label\">Compliance Rate</div></div>\n");
         sb.append("    </div>\n");
         
-        // By simulation type
-        List<PersistedSimulation> applesSimulations = simulations.stream()
-            .filter(s -> s.getBatchId().contains("APPLES") || 
-                    (s.getScenarioId() != null && s.getScenarioId().contains("example_1")))
-            .collect(Collectors.toList());
-        List<PersistedSimulation> carrotsSimulations = simulations.stream()
-            .filter(s -> s.getBatchId().contains("CARROTS") || 
-                    (s.getScenarioId() != null && s.getScenarioId().contains("example_2")))
-            .collect(Collectors.toList());
-        List<PersistedSimulation> veggiesSimulations = simulations.stream()
-            .filter(s -> s.getBatchId().contains("VEGGIES") || s.getBatchId().contains("VEGETABLES") ||
-                    (s.getScenarioId() != null && s.getScenarioId().contains("example_3")))
-            .collect(Collectors.toList());
+        // By simulation type using helper method
+        List<PersistedSimulation> applesSimulations = filterSimulationsByType(simulations, SimulationType.EXAMPLE_1_APPLES);
+        List<PersistedSimulation> carrotsSimulations = filterSimulationsByType(simulations, SimulationType.EXAMPLE_2_CARROTS);
+        List<PersistedSimulation> veggiesSimulations = filterSimulationsByType(simulations, SimulationType.EXAMPLE_3_VEGETABLES);
         
         if (!applesSimulations.isEmpty() || !carrotsSimulations.isEmpty() || !veggiesSimulations.isEmpty()) {
             sb.append("    <h2>🎯 Compliance by Simulation Type</h2>\n");
@@ -1118,21 +1084,27 @@ public class ReportExportService {
             sb.append("      <tr>\n");
             sb.append("        <td>").append(escapeHtml(simulation.getBatchId())).append("</td>\n");
             
-            // Determine type with badge
+            // Determine type with badge using helper method
+            SimulationType simType = SimulationType.fromSimulation(simulation);
             String badgeClass = "";
-            String typeName = "Other";
-            if (simulation.getBatchId().contains("APPLES") || 
-                (simulation.getScenarioId() != null && simulation.getScenarioId().contains("example_1"))) {
-                badgeClass = "badge-apples";
-                typeName = "Example 1 - Apples";
-            } else if (simulation.getBatchId().contains("CARROTS") || 
-                       (simulation.getScenarioId() != null && simulation.getScenarioId().contains("example_2"))) {
-                badgeClass = "badge-carrots";
-                typeName = "Example 2 - Carrots";
-            } else if (simulation.getBatchId().contains("VEGGIES") || simulation.getBatchId().contains("VEGETABLES") ||
-                       (simulation.getScenarioId() != null && simulation.getScenarioId().contains("example_3"))) {
-                badgeClass = "badge-veggies";
-                typeName = "Example 3 - Veggies";
+            String typeName = simType.getDisplayName();
+            
+            switch (simType) {
+                case EXAMPLE_1_APPLES:
+                    badgeClass = "badge-apples";
+                    typeName = "Example 1 - Apples";
+                    break;
+                case EXAMPLE_2_CARROTS:
+                    badgeClass = "badge-carrots";
+                    typeName = "Example 2 - Carrots";
+                    break;
+                case EXAMPLE_3_VEGETABLES:
+                    badgeClass = "badge-veggies";
+                    typeName = "Example 3 - Veggies";
+                    break;
+                default:
+                    badgeClass = "";
+                    typeName = "Other";
             }
             
             sb.append("        <td><span class=\"badge ").append(badgeClass).append("\">").append(typeName).append("</span></td>\n");
@@ -1278,5 +1250,67 @@ public class ReportExportService {
      */
     public String getReportsDirectoryPath() {
         return reportsDirectory.toAbsolutePath().toString();
+    }
+    
+    // ==================== SIMULATION TYPE CLASSIFICATION ====================
+    
+    /**
+     * Enum representing the 3 simulation types from ProducerController.
+     */
+    private enum SimulationType {
+        EXAMPLE_1_APPLES("Example 1 - Farm to Consumer (Apples)", "example_1", "APPLES"),
+        EXAMPLE_2_CARROTS("Example 2 - Local Producer (Carrots)", "example_2", "CARROTS"),
+        EXAMPLE_3_VEGETABLES("Example 3 - Cross-Region (Vegetables)", "example_3", "VEGGIES", "VEGETABLES"),
+        OTHER("Other", null);
+        
+        private final String displayName;
+        private final String scenarioId;
+        private final String[] batchIdKeywords;
+        
+        SimulationType(String displayName, String scenarioId, String... batchIdKeywords) {
+            this.displayName = displayName;
+            this.scenarioId = scenarioId;
+            this.batchIdKeywords = batchIdKeywords;
+        }
+        
+        public String getDisplayName() {
+            return displayName;
+        }
+        
+        /**
+         * Determine simulation type from a PersistedSimulation.
+         */
+        public static SimulationType fromSimulation(PersistedSimulation simulation) {
+            for (SimulationType type : values()) {
+                if (type == OTHER) continue; // Skip OTHER, it's the default fallback
+                
+                // Check scenario ID
+                if (type.scenarioId != null && simulation.getScenarioId() != null && 
+                    simulation.getScenarioId().contains(type.scenarioId)) {
+                    return type;
+                }
+                
+                // Check batch ID keywords
+                if (type.batchIdKeywords != null) {
+                    for (String keyword : type.batchIdKeywords) {
+                        if (simulation.getBatchId().contains(keyword)) {
+                            return type;
+                        }
+                    }
+                }
+            }
+            return OTHER;
+        }
+    }
+    
+    /**
+     * Filter simulations by type.
+     * Helper method to avoid duplication.
+     */
+    private List<PersistedSimulation> filterSimulationsByType(List<PersistedSimulation> simulations, 
+                                                                SimulationType type) {
+        return simulations.stream()
+                .filter(s -> SimulationType.fromSimulation(s) == type)
+                .collect(Collectors.toList());
     }
 }
