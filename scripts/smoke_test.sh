@@ -62,16 +62,16 @@ echo "--------------------------------"
 FAILED_SERVICES=0
 
 # Check ML Service
-check_service "ML Service" "${ML_SERVICE_URL}/health" || ((FAILED_SERVICES++))
+check_service "ML Service" "${ML_SERVICE_URL}/health" || FAILED_SERVICES=$((FAILED_SERVICES + 1))
 
 # Check VeriCrop API
-check_service "VeriCrop API" "${VERICROP_API_URL}/api/health" || ((FAILED_SERVICES++))
+check_service "VeriCrop API" "${VERICROP_API_URL}/api/health" || FAILED_SERVICES=$((FAILED_SERVICES + 1))
 
 # Check Kafka UI
-check_service "Kafka UI" "${KAFKA_UI_URL}" || ((FAILED_SERVICES++))
+check_service "Kafka UI" "${KAFKA_UI_URL}" || FAILED_SERVICES=$((FAILED_SERVICES + 1))
 
 # Check Airflow UI
-check_service "Airflow UI" "${AIRFLOW_UI_URL}/health" || ((FAILED_SERVICES++))
+check_service "Airflow UI" "${AIRFLOW_UI_URL}/health" || FAILED_SERVICES=$((FAILED_SERVICES + 1))
 
 if [ $FAILED_SERVICES -gt 0 ]; then
     echo -e "${YELLOW}⚠ Warning: $FAILED_SERVICES service(s) failed health check. Continuing anyway...${NC}"
