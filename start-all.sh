@@ -531,9 +531,18 @@ run_gui() {
     # Create temporary launch scripts with clear feedback
     # Use system temp directory (portable across Unix systems)
     local temp_dir="${TMPDIR:-/tmp}"
-    local LAUNCH_SCRIPT_1=$(mktemp "${temp_dir}/vericrop-launch-instance1.XXXXXX.sh")
-    local LAUNCH_SCRIPT_2=$(mktemp "${temp_dir}/vericrop-launch-instance2.XXXXXX.sh")
-    local LAUNCH_SCRIPT_3=$(mktemp "${temp_dir}/vericrop-launch-instance3.XXXXXX.sh")
+    local LAUNCH_SCRIPT_1=$(mktemp "${temp_dir}/vericrop-launch-instance1.XXXXXX.sh") || {
+        echo -e "${RED}❌ Failed to create temporary file for instance 1${NC}"
+        return 1
+    }
+    local LAUNCH_SCRIPT_2=$(mktemp "${temp_dir}/vericrop-launch-instance2.XXXXXX.sh") || {
+        echo -e "${RED}❌ Failed to create temporary file for instance 2${NC}"
+        return 1
+    }
+    local LAUNCH_SCRIPT_3=$(mktemp "${temp_dir}/vericrop-launch-instance3.XXXXXX.sh") || {
+        echo -e "${RED}❌ Failed to create temporary file for instance 3${NC}"
+        return 1
+    }
     
     # Log file paths for fallback mode (when no terminal emulator available)
     local LOG_FILE_1="${temp_dir}/vericrop-gui-instance1.log"
