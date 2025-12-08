@@ -1774,6 +1774,10 @@ public class LogisticsController implements SimulationListener {
     
     /**
      * Generate Quality Compliance preview with quality metrics.
+     * Enhanced to properly interpret the 3 simulation types from ProducerController:
+     * - Example 1: Farm to Consumer (Apples) - warehouse stop, optimal cold chain
+     * - Example 2: Local Producer (Carrots) - short route, strict temp control
+     * - Example 3: Cross-Region (Vegetables) - extended delivery, temp events
      */
     private String generateQualityCompliancePreview(String dateRange, String timestamp,
             List<PersistedSimulation> simulations) {
@@ -1783,20 +1787,55 @@ public class LogisticsController implements SimulationListener {
         sb.append("Generated: ").append(timestamp).append("\n\n");
         
         if (!simulations.isEmpty()) {
-            // Compliance statistics
+            // Categorize simulations by type (the 3 examples from ProducerController)
+            List<PersistedSimulation> applesSimulations = simulations.stream()
+                    .filter(s -> s.getBatchId().contains("APPLES") || 
+                            (s.getScenarioId() != null && s.getScenarioId().contains("example_1")))
+                    .collect(Collectors.toList());
+            List<PersistedSimulation> carrotsSimulations = simulations.stream()
+                    .filter(s -> s.getBatchId().contains("CARROTS") || 
+                            (s.getScenarioId() != null && s.getScenarioId().contains("example_2")))
+                    .collect(Collectors.toList());
+            List<PersistedSimulation> veggiesSimulations = simulations.stream()
+                    .filter(s -> s.getBatchId().contains("VEGGIES") || s.getBatchId().contains("VEGETABLES") ||
+                            (s.getScenarioId() != null && s.getScenarioId().contains("example_3")))
+                    .collect(Collectors.toList());
+            
+            // Overall compliance statistics
             long compliant = simulations.stream()
                     .filter(s -> "COMPLIANT".equals(s.getComplianceStatus()))
                     .count();
             long nonCompliant = simulations.size() - compliant;
             double complianceRate = (compliant * 100.0 / simulations.size());
             
-            sb.append("━━━ COMPLIANCE SUMMARY ━━━\n");
+            sb.append("━━━ OVERALL COMPLIANCE SUMMARY ━━━\n");
             sb.append("• Total Simulations: ").append(simulations.size()).append("\n");
             sb.append("• Compliant: ").append(compliant).append(" (").append(String.format("%.1f%%", complianceRate)).append(")\n");
             sb.append("• Non-Compliant: ").append(nonCompliant).append("\n\n");
             
-            // Quality statistics
-            sb.append("━━━ QUALITY METRICS ━━━\n");
+            // Breakdown by simulation type (the 3 examples)
+            sb.append("━━━ BY SIMULATION TYPE (3 Examples from ProducerController) ━━━\n\n");
+            
+            if (!applesSimulations.isEmpty()) {
+                sb.append("Example 1: Farm to Consumer (Apples)\n");
+                appendSimulationTypeMetrics(sb, applesSimulations, "  • ");
+                sb.append("  Route: Warehouse stop, 30min duration, optimal cold chain\n\n");
+            }
+            
+            if (!carrotsSimulations.isEmpty()) {
+                sb.append("Example 2: Local Producer (Carrots)\n");
+                appendSimulationTypeMetrics(sb, carrotsSimulations, "  • ");
+                sb.append("  Route: Short 15min direct route, no warehouse, strict temp control\n\n");
+            }
+            
+            if (!veggiesSimulations.isEmpty()) {
+                sb.append("Example 3: Cross-Region (Vegetables)\n");
+                appendSimulationTypeMetrics(sb, veggiesSimulations, "  • ");
+                sb.append("  Route: Extended 45min delivery, temperature spike events\n\n");
+            }
+            
+            // Overall quality statistics
+            sb.append("━━━ OVERALL QUALITY METRICS ━━━\n");
             double avgInitialQuality = simulations.stream()
                     .mapToDouble(PersistedSimulation::getInitialQuality)
                     .average().orElse(0.0);
@@ -1809,8 +1848,8 @@ public class LogisticsController implements SimulationListener {
             sb.append("• Avg Final Quality: ").append(String.format("%.1f%%", avgFinalQuality)).append("\n");
             sb.append("• Avg Quality Degradation: ").append(String.format("%.1f%%", qualityDegradation)).append("\n\n");
             
-            // Violations breakdown
-            sb.append("━━━ VIOLATIONS ANALYSIS ━━━\n");
+            // Overall violations breakdown
+            sb.append("━━━ OVERALL VIOLATIONS ANALYSIS ━━━\n");
             int totalViolations = simulations.stream()
                     .mapToInt(PersistedSimulation::getViolationsCount)
                     .sum();
@@ -1824,7 +1863,7 @@ public class LogisticsController implements SimulationListener {
             long mediumQuality = simulations.stream().filter(s -> s.getFinalQuality() >= 60 && s.getFinalQuality() < 80).count();
             long lowQuality = simulations.stream().filter(s -> s.getFinalQuality() < 60).count();
             
-            sb.append("\n━━━ QUALITY GRADES ━━━\n");
+            sb.append("\n━━━ OVERALL QUALITY GRADES ━━━\n");
             sb.append("• High (≥80%): ").append(highQuality).append("\n");
             sb.append("• Medium (60-79%): ").append(mediumQuality).append("\n");
             sb.append("• Low (<60%): ").append(lowQuality).append("\n");
@@ -1832,9 +1871,44 @@ public class LogisticsController implements SimulationListener {
             sb.append("━━━ NO DATA AVAILABLE ━━━\n");
             sb.append("• No simulation data found for this period.\n");
             sb.append("• Run simulations from ProducerController to generate quality data.\n");
+            sb.append("• Available examples:\n");
+            sb.append("  - Example 1: Farm to Consumer (Summer Apples, 30min)\n");
+            sb.append("  - Example 2: Local Producer (Organic Carrots, 15min)\n");
+            sb.append("  - Example 3: Cross-Region (Mixed Vegetables, 45min)\n");
         }
         
         return sb.toString();
+    }
+    
+    /**
+     * Append metrics for a specific simulation type (helper for quality compliance report).
+     * Calculates compliance rate, avg quality, violations for the given simulations.
+     * 
+     * @param sb StringBuilder to append to
+     * @param simulations List of simulations for this type
+     * @param prefix Prefix for each line (e.g., "  • " for indentation)
+     */
+    private void appendSimulationTypeMetrics(StringBuilder sb, List<PersistedSimulation> simulations, String prefix) {
+        if (simulations.isEmpty()) {
+            return;
+        }
+        
+        long compliant = simulations.stream()
+                .filter(s -> "COMPLIANT".equals(s.getComplianceStatus()))
+                .count();
+        double complianceRate = (compliant * 100.0 / simulations.size());
+        double avgFinalQuality = simulations.stream()
+                .mapToDouble(PersistedSimulation::getFinalQuality)
+                .average().orElse(0.0);
+        int violations = simulations.stream()
+                .mapToInt(PersistedSimulation::getViolationsCount)
+                .sum();
+        
+        sb.append(prefix).append("Count: ").append(simulations.size()).append(" runs\n");
+        sb.append(prefix).append("Compliance: ").append(compliant).append("/").append(simulations.size())
+          .append(" (").append(String.format("%.1f%%", complianceRate)).append(")\n");
+        sb.append(prefix).append("Avg Final Quality: ").append(String.format("%.1f%%", avgFinalQuality)).append("\n");
+        sb.append(prefix).append("Total Violations: ").append(violations).append("\n");
     }
     
     /**
