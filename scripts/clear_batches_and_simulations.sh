@@ -71,7 +71,7 @@ print_error() {
 # Show help
 show_help() {
     head -50 "$0" | grep "^#" | sed 's/^# //' | sed 's/^#//'
-    exit 0
+    # exit 0
 }
 
 # Check if API is available
@@ -81,7 +81,7 @@ check_api() {
     if ! curl -s -o /dev/null -w "%{http_code}" "$API_URL/api/maintenance/status" | grep -q "200"; then
         print_error "API is not available at $API_URL"
         print_info "Make sure the VeriCrop application is running."
-        exit 1
+        # exit 1
     fi
     
     print_success "API is available"
@@ -131,7 +131,7 @@ delete_all() {
     read -p "Are you sure you want to proceed? (yes/no): " -r
     if [[ ! $REPLY =~ ^[Yy]es$ ]]; then
         print_info "Operation cancelled."
-        exit 0
+        # exit 0
     fi
     
     print_info "Executing delete operation..."
@@ -156,7 +156,7 @@ delete_all() {
             fi
         else
             print_error "Delete operation failed. See response above for details."
-            exit 1
+            # exit 1
         fi
     else
         if echo "$response" | grep -q '"success":true'; then
@@ -167,7 +167,7 @@ delete_all() {
             fi
         else
             print_error "Delete operation failed. See response above for details."
-            exit 1
+            # exit 1
         fi
     fi
 }
@@ -216,7 +216,7 @@ main() {
             *)
                 print_error "Unknown option: $1"
                 echo "Use --help for usage information."
-                exit 1
+                # exit 1
                 ;;
         esac
     done

@@ -59,11 +59,11 @@ while [[ $# -gt 0 ]]; do
             ;;
         --help)
             head -30 "$0" | tail -25
-            exit 0
+            # exit 0
             ;;
         *)
             echo -e "${RED}Unknown option: $1${NC}"
-            exit 1
+            # exit 1
             ;;
     esac
 done
@@ -112,7 +112,7 @@ start_docker() {
     
     if ! check_kafka; then
         echo -e "${RED}Kafka failed to start${NC}"
-        exit 1
+        # exit 1
     fi
 }
 

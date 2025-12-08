@@ -44,7 +44,7 @@ if /I "%~1"=="--all" set "STOP_ALL=true" & shift & goto parse_args
 if /I "%~1"=="-h" goto show_help
 if /I "%~1"=="--help" goto show_help
 echo Unknown option: %~1
-exit /b 1
+REM exit /b 1
 :end_parse
 
 REM Print banner

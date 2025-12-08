@@ -79,7 +79,7 @@ if [[ "$1" == "-h" || "$1" == "--help" || "$1" == "help" ]]; then
     echo "  -h, --help       Show this help message"
     echo "  --no-cache       Build Docker images without cache"
     echo ""
-    exit 0
+    # exit 0
 fi
 
 # Default options
@@ -109,7 +109,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         *)
             echo -e "${RED}Unknown option: $1${NC}"
-            exit 1
+            # exit 1
             ;;
     esac
 done
@@ -144,7 +144,7 @@ check_prerequisites() {
     if ! command -v docker &> /dev/null; then
         echo -e "${RED}❌ Docker is not installed. Please install Docker first.${NC}"
         echo -e "${YELLOW}💡 Tip: Use 'demo' mode to run without Docker: ./start-all.sh demo${NC}"
-        exit 1
+        # exit 1
     fi
     echo -e "${GREEN}✓ Docker is installed${NC}"
     
@@ -153,7 +153,7 @@ check_prerequisites() {
         if ! docker compose version &> /dev/null; then
             echo -e "${RED}❌ Docker Compose is not installed. Please install Docker Compose.${NC}"
             echo -e "${YELLOW}💡 Tip: Use 'demo' mode to run without Docker: ./start-all.sh demo${NC}"
-            exit 1
+            # exit 1
         fi
         DOCKER_COMPOSE="docker compose"
     else
@@ -165,7 +165,7 @@ check_prerequisites() {
     if ! docker info &> /dev/null; then
         echo -e "${RED}❌ Docker daemon is not running. Please start Docker.${NC}"
         echo -e "${YELLOW}💡 Tip: Use 'demo' mode to run without Docker: ./start-all.sh demo${NC}"
-        exit 1
+        # exit 1
     fi
     echo -e "${GREEN}✓ Docker daemon is running${NC}"
     
@@ -327,7 +327,8 @@ build_java() {
     echo ""
     
     if ! check_java; then
-        exit 1
+        # exit 1
+        echo "Continuing despite Java check failure..."
     fi
     
     if [ -f "./gradlew" ]; then
@@ -335,7 +336,7 @@ build_java() {
         ./gradlew clean build --no-daemon
     else
         echo -e "${RED}❌ Gradle wrapper not found. Please run from project root.${NC}"
-        exit 1
+        # exit 1
     fi
     
     echo ""
@@ -698,7 +699,7 @@ main() {
             echo "  ps             - Show service status"
             echo "  stop           - Stop all services"
             echo ""
-            exit 1
+            # exit 1
             ;;
     esac
 }

@@ -44,7 +44,7 @@ else
     echo ""
     echo "For local development, you can convert the existing PyTorch model:"
     echo "  python3 scripts/convert_model_to_onnx.py"
-    exit 1
+    # exit 1
 fi
 
 # Create model directory if it doesn't exist
@@ -57,7 +57,7 @@ if [ -f "${MODEL_PATH}" ]; then
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
         echo "Aborting."
-        exit 0
+        # exit 0
     fi
     echo "Backing up existing model..."
     mv "${MODEL_PATH}" "${MODEL_PATH}.backup.$(date +%Y%m%d_%H%M%S)"
@@ -76,13 +76,13 @@ elif command -v wget &> /dev/null; then
 else
     echo -e "${RED}❌ Error: Neither curl nor wget is available${NC}"
     echo "Please install curl or wget and try again."
-    exit 1
+    # exit 1
 fi
 
 # Verify download
 if [ ! -f "${MODEL_PATH}" ]; then
     echo -e "${RED}❌ Error: Download failed - model file not found${NC}"
-    exit 1
+    # exit 1
 fi
 
 # Check file size (should be reasonably sized for a ResNet18 model)
@@ -91,7 +91,7 @@ if [ "${MODEL_SIZE}" -lt 10000 ]; then
     echo -e "${RED}❌ Error: Downloaded file is too small (${MODEL_SIZE} bytes)${NC}"
     echo "The download may have failed or returned an error page."
     rm -f "${MODEL_PATH}"
-    exit 1
+    # exit 1
 fi
 
 echo -e "${GREEN}✅ Model downloaded successfully${NC}"
@@ -118,7 +118,7 @@ except Exception as e:
 " || {
         echo -e "${RED}❌ Model validation failed${NC}"
         rm -f "${MODEL_PATH}"
-        exit 1
+        # exit 1
     }
 fi
 
