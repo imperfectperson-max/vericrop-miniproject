@@ -40,6 +40,12 @@ public class ReportExportService {
     private static final String CSV_HEADER_SIMULATION_LOG = 
             "ID,Batch ID,Farmer ID,Scenario,Status,Completed,Initial Quality (%),Final Quality (%),Waypoints,Avg Temp (°C),Min Temp (°C),Max Temp (°C),Avg Humidity (%),Violations,Compliance,Origin,Destination,Start Time,End Time";
     
+    // Simulation type identifiers (the 3 examples from ProducerController)
+    private static final String BATCH_TYPE_APPLES = "APPLES";
+    private static final String BATCH_TYPE_CARROTS = "CARROTS";
+    private static final String BATCH_TYPE_VEGGIES = "VEGGIES";
+    private static final String BATCH_TYPE_VEGETABLES = "VEGETABLES";
+    
     private final ShipmentPersistenceService persistenceService;
     private final Path reportsDirectory;
     
@@ -76,17 +82,27 @@ public class ReportExportService {
     }
     
     /**
-     * Helper class to hold grouped simulations by type
+     * Helper class to hold grouped simulations by type.
+     * Groups simulations into the 3 example types from ProducerController:
+     * - apples: Example 1 (Farm to Consumer Direct with Summer Apples)
+     * - carrots: Example 2 (Local Producer Delivery with Organic Carrots)
+     * - veggies: Example 3 (Cross-Region Long Haul with Mixed Vegetables)
      */
     private static class SimulationGroups {
         final List<PersistedSimulation> apples;
         final List<PersistedSimulation> carrots;
         final List<PersistedSimulation> veggies;
         
+        /**
+         * Constructor with validation to prevent null lists.
+         * @param apples List of apple simulations (must not be null)
+         * @param carrots List of carrot simulations (must not be null)
+         * @param veggies List of vegetable simulations (must not be null)
+         */
         SimulationGroups(List<PersistedSimulation> apples, List<PersistedSimulation> carrots, List<PersistedSimulation> veggies) {
-            this.apples = apples;
-            this.carrots = carrots;
-            this.veggies = veggies;
+            this.apples = apples != null ? apples : new java.util.ArrayList<>();
+            this.carrots = carrots != null ? carrots : new java.util.ArrayList<>();
+            this.veggies = veggies != null ? veggies : new java.util.ArrayList<>();
         }
     }
     
@@ -1043,12 +1059,15 @@ public class ReportExportService {
     }
     
     /**
-     * Get CSS class for temperature value
+     * Get CSS class for temperature value.
+     * - temp-ok: 2-8°C (optimal cold chain range)
+     * - temp-warning: 0-2°C or 8-12°C (caution range)
+     * - temp-danger: <0°C or >12°C (critical range)
      */
     private String getTempClass(double temp) {
         if (temp >= 2.0 && temp <= 8.0) {
             return "temp-ok";
-        } else if (temp >= 0.0 && temp < 2.0 || temp > 8.0 && temp <= 12.0) {
+        } else if ((temp >= 0.0 && temp < 2.0) || (temp > 8.0 && temp <= 12.0)) {
             return "temp-warning";
         } else {
             return "temp-danger";
@@ -1555,17 +1574,18 @@ public class ReportExportService {
     /**
      * Group simulations by type (the 3 simulation examples).
      * Reduces code duplication when analyzing simulations by type.
+     * Uses constants for batch type identifiers to reduce hardcoded strings.
      */
     private SimulationGroups groupSimulationsByType(List<PersistedSimulation> simulations) {
         List<PersistedSimulation> apples = simulations.stream()
-            .filter(s -> s.getBatchId() != null && s.getBatchId().contains("APPLES"))
+            .filter(s -> s.getBatchId() != null && s.getBatchId().contains(BATCH_TYPE_APPLES))
             .collect(Collectors.toList());
         List<PersistedSimulation> carrots = simulations.stream()
-            .filter(s -> s.getBatchId() != null && s.getBatchId().contains("CARROTS"))
+            .filter(s -> s.getBatchId() != null && s.getBatchId().contains(BATCH_TYPE_CARROTS))
             .collect(Collectors.toList());
         List<PersistedSimulation> veggies = simulations.stream()
             .filter(s -> s.getBatchId() != null && 
-                (s.getBatchId().contains("VEGGIES") || s.getBatchId().contains("VEGETABLES")))
+                (s.getBatchId().contains(BATCH_TYPE_VEGGIES) || s.getBatchId().contains(BATCH_TYPE_VEGETABLES)))
             .collect(Collectors.toList());
         
         return new SimulationGroups(apples, carrots, veggies);
