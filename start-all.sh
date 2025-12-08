@@ -10,14 +10,14 @@
 #   ./start-all.sh [mode] [options]
 #
 # Modes:
-#   full           - Start all services (default): Kafka, PostgreSQL, ML Service, Airflow
+#   full           - Start all services and 3 GUI instances (default)
 #   infra          - Start infrastructure only: PostgreSQL, Kafka, Zookeeper
 #   kafka          - Start Kafka stack only (using docker-compose-kafka.yml)
 #   simulation     - Start simulation environment (using docker-compose-simulation.yml)
 #   prod           - Start production environment (using docker-compose.prod.yml)
 #   build          - Build Java artifacts with Gradle
 #   docker-build   - Build Docker images (vericrop-gui, ml-service)
-#   run            - Run the JavaFX GUI application
+#   run            - Run 3 GUI instances only
 #   all-build      - Build everything (Java + Docker images)
 #   init-airflow   - Initialize Airflow (first time setup)
 #   fix-airflow    - Fix Airflow using alternative method
@@ -56,14 +56,14 @@ if [[ "$1" == "-h" || "$1" == "--help" || "$1" == "help" ]]; then
     echo "  ./start-all.sh [mode] [options]"
     echo ""
     echo "Modes:"
-    echo "  full           - Start all services (default): Kafka, PostgreSQL, ML Service, Airflow"
+    echo "  full           - Start all services and 3 GUI instances (default)"
     echo "  infra          - Start infrastructure only: PostgreSQL, Kafka, Zookeeper"
     echo "  kafka          - Start Kafka stack only (using docker-compose-kafka.yml)"
     echo "  simulation     - Start simulation environment (using docker-compose-simulation.yml)"
     echo "  prod           - Start production environment (using docker-compose.prod.yml)"
     echo "  build          - Build Java artifacts with Gradle"
     echo "  docker-build   - Build Docker images (vericrop-gui, ml-service)"
-    echo "  run            - Run the JavaFX GUI application"
+    echo "  run            - Run 3 GUI instances only"
     echo "  all-build      - Build everything (Java + Docker images)"
     echo "  init-airflow   - Initialize Airflow (first time setup)"
     echo "  fix-airflow    - Fix Airflow using alternative method"
@@ -163,7 +163,8 @@ check_prerequisites() {
 check_java() {
     if ! command -v java &> /dev/null; then
         echo -e "${RED}❌ Java is not installed. Please install JDK 11 or later (JDK 17 recommended).${NC}"
-        exit 1
+        echo "Skipping GUI instances..."
+        return 1
     fi
     
     # Parse Java version - handles both old (1.8.0) and new (11.0.1, 17) formats
@@ -185,6 +186,7 @@ check_java() {
     else
         echo -e "${GREEN}✓ Java $JAVA_MAJOR detected${NC}"
     fi
+    return 0
 }
 
 # Start full stack
@@ -197,6 +199,13 @@ start_full() {
     echo ""
     echo -e "${GREEN}✓ Full stack started successfully!${NC}"
     print_service_urls
+    
+    echo ""
+    echo "═══════════════════════════════════════════════════════════"
+    echo ""
+    echo "Starting 3 GUI instances..."
+    echo ""
+    run_gui
 }
 
 # Start infrastructure only
@@ -275,7 +284,9 @@ build_java() {
     echo -e "${BLUE}Building Java artifacts with Gradle...${NC}"
     echo ""
     
-    check_java
+    if ! check_java; then
+        exit 1
+    fi
     
     if [ -f "./gradlew" ]; then
         chmod +x ./gradlew
@@ -434,18 +445,86 @@ stop_all() {
 
 # Run GUI instances
 run_gui() {
-    echo -e "${BLUE}Running VeriCrop JavaFX GUI...${NC}"
+    local GUI_INSTANCES=3
+    echo -e "${BLUE}Starting $GUI_INSTANCES instances of VeriCrop JavaFX GUI...${NC}"
+    echo ""
+    echo "Each instance will run in a separate window:"
+    echo "  - Instance 1: Farmer role (default)"
+    echo "  - Instance 2: Distributor role"
+    echo "  - Instance 3: Retailer role"
     echo ""
     
     check_java
     
-    if [ -f "./gradlew" ]; then
-        chmod +x ./gradlew
-        ./gradlew :vericrop-gui:run
-    else
+    if [ ! -f "./gradlew" ]; then
         echo -e "${RED}❌ Gradle wrapper not found. Please run from project root.${NC}"
-        exit 1
+        return 1
     fi
+    
+    chmod +x ./gradlew
+    
+    echo "Starting GUI instances..."
+    echo ""
+    
+    # Check available Gradle tasks
+    echo "Checking available Gradle tasks..."
+    ./gradlew tasks --console=plain | grep "run" | head -5
+    echo ""
+    
+    echo "Trying to start instances..."
+    echo ""
+    
+    # Instance 1
+    echo "[1/3] Starting Instance 1 (Farmer)..."
+    if command -v gnome-terminal &> /dev/null; then
+        gnome-terminal -- bash -c "./gradlew :vericrop-gui:run || ./gradlew run || ./gradlew :app:run || ./gradlew bootRun; exec bash" &
+    elif command -v xterm &> /dev/null; then
+        xterm -title "VeriCrop GUI - Instance 1 (Farmer)" -e "./gradlew :vericrop-gui:run || ./gradlew run || ./gradlew :app:run || ./gradlew bootRun; exec bash" &
+    elif command -v konsole &> /dev/null; then
+        konsole --title "VeriCrop GUI - Instance 1 (Farmer)" -e bash -c "./gradlew :vericrop-gui:run || ./gradlew run || ./gradlew :app:run || ./gradlew bootRun; exec bash" &
+    else
+        # Fallback: run in background and redirect to log files
+        echo "No terminal emulator found, starting in background mode..."
+        nohup ./gradlew :vericrop-gui:run > /tmp/vericrop-gui-instance1.log 2>&1 &
+    fi
+    sleep 5
+    
+    # Instance 2
+    echo "[2/3] Starting Instance 2 (Distributor)..."
+    if command -v gnome-terminal &> /dev/null; then
+        gnome-terminal -- bash -c "./gradlew :vericrop-gui:run -Dapp.instance=2 || ./gradlew run || ./gradlew :app:run || ./gradlew bootRun; exec bash" &
+    elif command -v xterm &> /dev/null; then
+        xterm -title "VeriCrop GUI - Instance 2 (Distributor)" -e "./gradlew :vericrop-gui:run -Dapp.instance=2 || ./gradlew run || ./gradlew :app:run || ./gradlew bootRun; exec bash" &
+    elif command -v konsole &> /dev/null; then
+        konsole --title "VeriCrop GUI - Instance 2 (Distributor)" -e bash -c "./gradlew :vericrop-gui:run -Dapp.instance=2 || ./gradlew run || ./gradlew :app:run || ./gradlew bootRun; exec bash" &
+    else
+        nohup ./gradlew :vericrop-gui:run -Dapp.instance=2 > /tmp/vericrop-gui-instance2.log 2>&1 &
+    fi
+    sleep 5
+    
+    # Instance 3
+    echo "[3/3] Starting Instance 3 (Retailer)..."
+    if command -v gnome-terminal &> /dev/null; then
+        gnome-terminal -- bash -c "./gradlew :vericrop-gui:run -Dapp.instance=3 || ./gradlew run || ./gradlew :app:run || ./gradlew bootRun; exec bash" &
+    elif command -v xterm &> /dev/null; then
+        xterm -title "VeriCrop GUI - Instance 3 (Retailer)" -e "./gradlew :vericrop-gui:run -Dapp.instance=3 || ./gradlew run || ./gradlew :app:run || ./gradlew bootRun; exec bash" &
+    elif command -v konsole &> /dev/null; then
+        konsole --title "VeriCrop GUI - Instance 3 (Retailer)" -e bash -c "./gradlew :vericrop-gui:run -Dapp.instance=3 || ./gradlew run || ./gradlew :app:run || ./gradlew bootRun; exec bash" &
+    else
+        nohup ./gradlew :vericrop-gui:run -Dapp.instance=3 > /tmp/vericrop-gui-instance3.log 2>&1 &
+    fi
+    
+    echo ""
+    echo -e "${GREEN}✓ GUI instances launched.${NC}"
+    echo ""
+    echo "If GUIs don't start, try building first:"
+    echo "  ./start-all.sh build"
+    echo ""
+    echo "Troubleshooting:"
+    echo "  1. Make sure Java JDK 11+ is installed"
+    echo "  2. Check Gradle wrapper exists (./gradlew)"
+    echo "  3. Try: ./gradlew tasks (to see available tasks)"
+    echo ""
 }
 
 # Print service URLs
@@ -464,7 +543,6 @@ print_service_urls() {
     echo ""
     echo -e "${CYAN}═══════════════════════════════════════════════════════════${NC}"
     echo ""
-    echo -e "To run the JavaFX GUI:  ${YELLOW}./gradlew :vericrop-gui:run${NC}"
     echo -e "To stop all services:   ${YELLOW}./stop-all.sh${NC}"
     echo ""
 }
@@ -525,7 +603,7 @@ main() {
             echo -e "${RED}Unknown mode: $MODE${NC}"
             echo ""
             echo "Available modes:"
-            echo "  full           - Start all services (default)"
+            echo "  full           - Start all services and 3 GUI instances (default)"
             echo "  infra          - Start infrastructure only"
             echo "  kafka          - Start Kafka stack"
             echo "  simulation     - Start simulation environment"
@@ -533,7 +611,7 @@ main() {
             echo "  build          - Build Java artifacts"
             echo "  docker-build   - Build Docker images"
             echo "  all-build      - Build everything"
-            echo "  run            - Run the JavaFX GUI"
+            echo "  run            - Run 3 GUI instances only"
             echo "  init-airflow   - Initialize Airflow"
             echo "  fix-airflow    - Fix Airflow with alternative method"
             echo "  logs           - Show service logs"
