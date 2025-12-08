@@ -25,7 +25,7 @@ if errorlevel 1 (
     echo ERROR: Docker is not installed.
     echo.
     echo TIP: Use demo mode to run without Docker: start-all.bat demo
-    pause
+    echo.
 )
 echo ✓ Docker is installed
 
@@ -34,7 +34,7 @@ if errorlevel 1 (
     echo ERROR: Docker daemon is not running.
     echo.
     echo TIP: Use demo mode to run without Docker: start-all.bat demo
-    pause
+    echo.
 )
 echo ✓ Docker daemon is running
 
@@ -46,7 +46,7 @@ if errorlevel 1 (
         echo ERROR: Docker Compose is not installed.
         echo.
         echo TIP: Use demo mode to run without Docker: start-all.bat demo
-        pause
+        echo.
     )
     set "DOCKER_COMPOSE=docker compose"
 )
@@ -396,4 +396,5 @@ goto :end_script
 :end_script
 echo.
 echo Script completed.
-pause
+echo Press any key to exit...
+pause >nul
