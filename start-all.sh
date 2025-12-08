@@ -524,51 +524,136 @@ run_gui() {
     
     echo "Starting GUI instances..."
     echo ""
+    echo "Please wait - Gradle will download dependencies on first run."
+    echo "Each instance takes 10-30 seconds to start (faster on subsequent runs)."
+    echo ""
+    
+    # Create a launch script with clear feedback
+    local LAUNCH_SCRIPT_1="/tmp/vericrop-launch-instance1.sh"
+    local LAUNCH_SCRIPT_2="/tmp/vericrop-launch-instance2.sh"
+    local LAUNCH_SCRIPT_3="/tmp/vericrop-launch-instance3.sh"
     
     # Instance 1
-    echo "[1/3] Starting Instance 1 (Farmer)..."
+    echo "[1/3] Launching Instance 1 (Farmer) window..."
+    echo "     Status: Initializing Gradle and starting JavaFX application..."
+    cat > "$LAUNCH_SCRIPT_1" << 'EOF'
+#!/bin/bash
+echo "============================================================"
+echo "  VeriCrop GUI - Instance 1 (Farmer)"
+echo "============================================================"
+echo ""
+echo "Loading application, please wait..."
+echo ""
+echo "[INFO] Gradle is building and starting the JavaFX application..."
+echo "[INFO] This may take 10-30 seconds on first run."
+echo ""
+./gradlew :vericrop-gui:run
+echo ""
+echo "Application has exited. Press Enter to close this window..."
+read
+EOF
+    chmod +x "$LAUNCH_SCRIPT_1"
+    
     if command -v gnome-terminal &> /dev/null; then
-        gnome-terminal -- bash -c "$GRADLE_RUN_CMD; exec bash" &
+        gnome-terminal -- bash "$LAUNCH_SCRIPT_1" &
     elif command -v xterm &> /dev/null; then
-        xterm -title "VeriCrop GUI - Instance 1 (Farmer)" -e bash -c "$GRADLE_RUN_CMD; exec bash" &
+        xterm -title "VeriCrop GUI - Instance 1 (Farmer)" -e bash "$LAUNCH_SCRIPT_1" &
     elif command -v konsole &> /dev/null; then
-        konsole --title "VeriCrop GUI - Instance 1 (Farmer)" -e bash -c "$GRADLE_RUN_CMD; exec bash" &
+        konsole --title "VeriCrop GUI - Instance 1 (Farmer)" -e bash "$LAUNCH_SCRIPT_1" &
     else
         # Fallback: run in background and redirect to log files
-        echo "No terminal emulator found, starting in background mode..."
+        echo "     No terminal emulator found, starting in background mode..."
+        echo "     Output will be logged to /tmp/vericrop-gui-instance1.log"
         nohup ./gradlew :vericrop-gui:run > /tmp/vericrop-gui-instance1.log 2>&1 &
     fi
+    echo "     Instance 1 window opened. Waiting 5 seconds before starting next instance..."
     sleep $INSTANCE_START_DELAY
+    echo ""
     
     # Instance 2
-    echo "[2/3] Starting Instance 2 (Distributor)..."
-    local GRADLE_RUN_CMD_INSTANCE2="./gradlew :vericrop-gui:run -Dapp.instance=2 || ./gradlew run -Dapp.instance=2 || ./gradlew :app:run -Dapp.instance=2 || ./gradlew bootRun -Dapp.instance=2"
+    echo "[2/3] Launching Instance 2 (Distributor) window..."
+    echo "     Status: Initializing Gradle and starting JavaFX application..."
+    cat > "$LAUNCH_SCRIPT_2" << 'EOF'
+#!/bin/bash
+echo "============================================================"
+echo "  VeriCrop GUI - Instance 2 (Distributor)"
+echo "============================================================"
+echo ""
+echo "Loading application, please wait..."
+echo ""
+echo "[INFO] Gradle is building and starting the JavaFX application..."
+echo "[INFO] This may take 10-30 seconds on first run."
+echo ""
+./gradlew :vericrop-gui:run -Dapp.instance=2
+echo ""
+echo "Application has exited. Press Enter to close this window..."
+read
+EOF
+    chmod +x "$LAUNCH_SCRIPT_2"
+    
     if command -v gnome-terminal &> /dev/null; then
-        gnome-terminal -- bash -c "$GRADLE_RUN_CMD_INSTANCE2; exec bash" &
+        gnome-terminal -- bash "$LAUNCH_SCRIPT_2" &
     elif command -v xterm &> /dev/null; then
-        xterm -title "VeriCrop GUI - Instance 2 (Distributor)" -e bash -c "$GRADLE_RUN_CMD_INSTANCE2; exec bash" &
+        xterm -title "VeriCrop GUI - Instance 2 (Distributor)" -e bash "$LAUNCH_SCRIPT_2" &
     elif command -v konsole &> /dev/null; then
-        konsole --title "VeriCrop GUI - Instance 2 (Distributor)" -e bash -c "$GRADLE_RUN_CMD_INSTANCE2; exec bash" &
+        konsole --title "VeriCrop GUI - Instance 2 (Distributor)" -e bash "$LAUNCH_SCRIPT_2" &
     else
+        echo "     No terminal emulator found, starting in background mode..."
+        echo "     Output will be logged to /tmp/vericrop-gui-instance2.log"
         nohup ./gradlew :vericrop-gui:run -Dapp.instance=2 > /tmp/vericrop-gui-instance2.log 2>&1 &
     fi
+    echo "     Instance 2 window opened. Waiting 5 seconds before starting next instance..."
     sleep $INSTANCE_START_DELAY
+    echo ""
     
     # Instance 3
-    echo "[3/3] Starting Instance 3 (Retailer)..."
-    local GRADLE_RUN_CMD_INSTANCE3="./gradlew :vericrop-gui:run -Dapp.instance=3 || ./gradlew run -Dapp.instance=3 || ./gradlew :app:run -Dapp.instance=3 || ./gradlew bootRun -Dapp.instance=3"
+    echo "[3/3] Launching Instance 3 (Retailer) window..."
+    echo "     Status: Initializing Gradle and starting JavaFX application..."
+    cat > "$LAUNCH_SCRIPT_3" << 'EOF'
+#!/bin/bash
+echo "============================================================"
+echo "  VeriCrop GUI - Instance 3 (Retailer)"
+echo "============================================================"
+echo ""
+echo "Loading application, please wait..."
+echo ""
+echo "[INFO] Gradle is building and starting the JavaFX application..."
+echo "[INFO] This may take 10-30 seconds on first run."
+echo ""
+./gradlew :vericrop-gui:run -Dapp.instance=3
+echo ""
+echo "Application has exited. Press Enter to close this window..."
+read
+EOF
+    chmod +x "$LAUNCH_SCRIPT_3"
+    
     if command -v gnome-terminal &> /dev/null; then
-        gnome-terminal -- bash -c "$GRADLE_RUN_CMD_INSTANCE3; exec bash" &
+        gnome-terminal -- bash "$LAUNCH_SCRIPT_3" &
     elif command -v xterm &> /dev/null; then
-        xterm -title "VeriCrop GUI - Instance 3 (Retailer)" -e bash -c "$GRADLE_RUN_CMD_INSTANCE3; exec bash" &
+        xterm -title "VeriCrop GUI - Instance 3 (Retailer)" -e bash "$LAUNCH_SCRIPT_3" &
     elif command -v konsole &> /dev/null; then
-        konsole --title "VeriCrop GUI - Instance 3 (Retailer)" -e bash -c "$GRADLE_RUN_CMD_INSTANCE3; exec bash" &
+        konsole --title "VeriCrop GUI - Instance 3 (Retailer)" -e bash "$LAUNCH_SCRIPT_3" &
     else
+        echo "     No terminal emulator found, starting in background mode..."
+        echo "     Output will be logged to /tmp/vericrop-gui-instance3.log"
         nohup ./gradlew :vericrop-gui:run -Dapp.instance=3 > /tmp/vericrop-gui-instance3.log 2>&1 &
     fi
     
     echo ""
-    echo -e "${GREEN}✓ GUI instances launched.${NC}"
+    echo -e "${CYAN}═══════════════════════════════════════════════════════════${NC}"
+    echo -e "${GREEN}✓ All 3 GUI instance windows have been launched!${NC}"
+    echo -e "${CYAN}═══════════════════════════════════════════════════════════${NC}"
+    echo ""
+    echo "IMPORTANT: Each window is now loading the application."
+    echo "You should see 3 separate terminal windows with titles:"
+    echo "  1. \"VeriCrop GUI - Instance 1 (Farmer)\""
+    echo "  2. \"VeriCrop GUI - Instance 2 (Distributor)\""
+    echo "  3. \"VeriCrop GUI - Instance 3 (Retailer)\""
+    echo ""
+    echo "The JavaFX GUI windows will appear once Gradle completes the build."
+    echo "This typically takes:"
+    echo "  - First run:  20-60 seconds (downloading dependencies)"
+    echo "  - Later runs: 10-20 seconds (using cached dependencies)"
     echo ""
     
     if [ "$DEMO_MODE" = "true" ]; then
@@ -580,13 +665,16 @@ run_gui() {
         echo ""
     fi
     
-    echo "If GUIs don't start, try building first:"
-    echo "  ./start-all.sh build"
+    echo "If a GUI doesn't appear after 60 seconds:"
+    echo "  1. Check the terminal window for error messages"
+    echo "  2. Ensure Java JDK 11+ is installed: java -version"
+    echo "  3. Try building first: ./start-all.sh build"
+    echo "  4. Check Gradle wrapper exists: ls -la ./gradlew"
     echo ""
-    echo "Troubleshooting:"
-    echo "  1. Make sure Java JDK 11+ is installed"
-    echo "  2. Check Gradle wrapper exists (./gradlew)"
-    echo "  3. Try: ./gradlew tasks (to see available tasks)"
+    echo "If running in background mode (no terminal emulator):"
+    echo "  - Check logs: tail -f /tmp/vericrop-gui-instance*.log"
+    echo ""
+    echo -e "${CYAN}═══════════════════════════════════════════════════════════${NC}"
     echo ""
 }
 
