@@ -529,10 +529,16 @@ run_gui() {
     echo ""
     
     # Create temporary launch scripts with clear feedback
-    # Use mktemp for secure temporary file creation
-    local LAUNCH_SCRIPT_1=$(mktemp /tmp/vericrop-launch-instance1.XXXXXX.sh)
-    local LAUNCH_SCRIPT_2=$(mktemp /tmp/vericrop-launch-instance2.XXXXXX.sh)
-    local LAUNCH_SCRIPT_3=$(mktemp /tmp/vericrop-launch-instance3.XXXXXX.sh)
+    # Use mktemp for secure temporary file creation (let it choose the directory)
+    local LAUNCH_SCRIPT_1=$(mktemp -t vericrop-launch-instance1.XXXXXX.sh)
+    local LAUNCH_SCRIPT_2=$(mktemp -t vericrop-launch-instance2.XXXXXX.sh)
+    local LAUNCH_SCRIPT_3=$(mktemp -t vericrop-launch-instance3.XXXXXX.sh)
+    
+    # Use system temp directory for log files (fallback mode)
+    local TMPDIR="${TMPDIR:-/tmp}"
+    local LOG_FILE_1="${TMPDIR}/vericrop-gui-instance1.log"
+    local LOG_FILE_2="${TMPDIR}/vericrop-gui-instance2.log"
+    local LOG_FILE_3="${TMPDIR}/vericrop-gui-instance3.log"
     
     # Register cleanup on exit
     trap "rm -f '$LAUNCH_SCRIPT_1' '$LAUNCH_SCRIPT_2' '$LAUNCH_SCRIPT_3' 2>/dev/null" EXIT INT TERM
@@ -567,8 +573,8 @@ EOF
     else
         # Fallback: run in background and redirect to log files
         echo "     No terminal emulator found, starting in background mode..."
-        echo "     Output will be logged to /tmp/vericrop-gui-instance1.log"
-        nohup ./gradlew :vericrop-gui:run > /tmp/vericrop-gui-instance1.log 2>&1 &
+        echo "     Output will be logged to $LOG_FILE_1"
+        nohup ./gradlew :vericrop-gui:run > "$LOG_FILE_1" 2>&1 &
     fi
     echo "     Instance 1 window opened. Waiting 5 seconds before starting next instance..."
     sleep $INSTANCE_START_DELAY
@@ -603,8 +609,8 @@ EOF
         konsole --title "VeriCrop GUI - Instance 2 (Distributor)" -e bash "$LAUNCH_SCRIPT_2" &
     else
         echo "     No terminal emulator found, starting in background mode..."
-        echo "     Output will be logged to /tmp/vericrop-gui-instance2.log"
-        nohup ./gradlew :vericrop-gui:run -Dapp.instance=2 > /tmp/vericrop-gui-instance2.log 2>&1 &
+        echo "     Output will be logged to $LOG_FILE_2"
+        nohup ./gradlew :vericrop-gui:run -Dapp.instance=2 > "$LOG_FILE_2" 2>&1 &
     fi
     echo "     Instance 2 window opened. Waiting 5 seconds before starting next instance..."
     sleep $INSTANCE_START_DELAY
@@ -639,8 +645,8 @@ EOF
         konsole --title "VeriCrop GUI - Instance 3 (Retailer)" -e bash "$LAUNCH_SCRIPT_3" &
     else
         echo "     No terminal emulator found, starting in background mode..."
-        echo "     Output will be logged to /tmp/vericrop-gui-instance3.log"
-        nohup ./gradlew :vericrop-gui:run -Dapp.instance=3 > /tmp/vericrop-gui-instance3.log 2>&1 &
+        echo "     Output will be logged to $LOG_FILE_3"
+        nohup ./gradlew :vericrop-gui:run -Dapp.instance=3 > "$LOG_FILE_3" 2>&1 &
     fi
     
     echo ""
@@ -676,7 +682,7 @@ EOF
     echo "  4. Check Gradle wrapper exists: ls -la ./gradlew"
     echo ""
     echo "If running in background mode (no terminal emulator):"
-    echo "  - Check logs: tail -f /tmp/vericrop-gui-instance*.log"
+    echo "  - Check logs: tail -f ${TMPDIR:-/tmp}/vericrop-gui-instance*.log"
     echo ""
     echo -e "${CYAN}═══════════════════════════════════════════════════════════${NC}"
     echo ""
