@@ -530,15 +530,15 @@ run_gui() {
     
     # Create temporary launch scripts with clear feedback
     # Use system temp directory (portable across Unix systems)
-    local TMPDIR="${TMPDIR:-/tmp}"
-    local LAUNCH_SCRIPT_1=$(mktemp "${TMPDIR}/vericrop-launch-instance1.XXXXXX.sh")
-    local LAUNCH_SCRIPT_2=$(mktemp "${TMPDIR}/vericrop-launch-instance2.XXXXXX.sh")
-    local LAUNCH_SCRIPT_3=$(mktemp "${TMPDIR}/vericrop-launch-instance3.XXXXXX.sh")
+    local temp_dir="${TMPDIR:-/tmp}"
+    local LAUNCH_SCRIPT_1=$(mktemp "${temp_dir}/vericrop-launch-instance1.XXXXXX.sh")
+    local LAUNCH_SCRIPT_2=$(mktemp "${temp_dir}/vericrop-launch-instance2.XXXXXX.sh")
+    local LAUNCH_SCRIPT_3=$(mktemp "${temp_dir}/vericrop-launch-instance3.XXXXXX.sh")
     
     # Log file paths for fallback mode (when no terminal emulator available)
-    local LOG_FILE_1="${TMPDIR}/vericrop-gui-instance1.log"
-    local LOG_FILE_2="${TMPDIR}/vericrop-gui-instance2.log"
-    local LOG_FILE_3="${TMPDIR}/vericrop-gui-instance3.log"
+    local LOG_FILE_1="${temp_dir}/vericrop-gui-instance1.log"
+    local LOG_FILE_2="${temp_dir}/vericrop-gui-instance2.log"
+    local LOG_FILE_3="${temp_dir}/vericrop-gui-instance3.log"
     
     # Register cleanup on exit (check if variables are set before removing)
     trap '[[ -n "$LAUNCH_SCRIPT_1" ]] && rm -f "$LAUNCH_SCRIPT_1" 2>/dev/null; [[ -n "$LAUNCH_SCRIPT_2" ]] && rm -f "$LAUNCH_SCRIPT_2" 2>/dev/null; [[ -n "$LAUNCH_SCRIPT_3" ]] && rm -f "$LAUNCH_SCRIPT_3" 2>/dev/null' EXIT INT TERM
