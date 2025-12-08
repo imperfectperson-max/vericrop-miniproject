@@ -13,12 +13,18 @@ echo        VeriCrop Start-All Script (Windows)
 echo ===============================================================
 echo.
 
+REM Check if demo mode
+if /I "%~1"=="demo" goto :skip_docker_check
+if /I "%~1"=="standalone" goto :skip_docker_check
+
 REM Check prerequisites
 echo Checking prerequisites...
 
 where docker >nul 2>&1
 if errorlevel 1 (
     echo ERROR: Docker is not installed.
+    echo.
+    echo TIP: Use demo mode to run without Docker: start-all.bat demo
     pause
     exit /b 1
 )
@@ -27,6 +33,8 @@ echo ✓ Docker is installed
 docker info >nul 2>&1
 if errorlevel 1 (
     echo ERROR: Docker daemon is not running.
+    echo.
+    echo TIP: Use demo mode to run without Docker: start-all.bat demo
     pause
     exit /b 1
 )
@@ -38,6 +46,8 @@ if errorlevel 1 (
     docker compose version >nul 2>&1
     if errorlevel 1 (
         echo ERROR: Docker Compose is not installed.
+        echo.
+        echo TIP: Use demo mode to run without Docker: start-all.bat demo
         pause
         exit /b 1
     )
@@ -45,6 +55,13 @@ if errorlevel 1 (
 )
 echo ✓ Docker Compose is available
 echo.
+goto :after_docker_check
+
+:skip_docker_check
+echo Skipping Docker checks (demo mode)
+echo.
+
+:after_docker_check
 
 REM Create Airflow marker if it doesn't exist (for first run)
 if not exist "airflow-initialized.txt" (
@@ -59,6 +76,8 @@ if not exist "airflow-initialized.txt" (
 REM Command handling
 if "%~1"=="" goto :start_all
 
+if /I "%~1"=="demo" goto :start_demo
+if /I "%~1"=="standalone" goto :start_demo
 if /I "%~1"=="init-airflow" goto :init_airflow
 if /I "%~1"=="fix-airflow" goto :fix_airflow
 if /I "%~1"=="infra" goto :start_infra
@@ -105,6 +124,38 @@ echo.
 call :run_gui
 goto :end_script
 
+:start_demo
+echo.
+echo ===============================================================
+echo                      DEMO MODE
+echo ===============================================================
+echo.
+echo Demo mode features:
+echo   ✓ No external dependencies (PostgreSQL, Kafka, ML Service)
+echo   ✓ In-memory blockchain
+echo   ✓ Mock ML predictions
+echo   ✓ Demo data in all screens
+echo   ✓ Fully functional delivery simulator
+echo   ✓ QR code generation
+echo   ✓ All UI flows operational
+echo.
+echo Perfect for:
+echo   • Quick demonstrations
+echo   • Development without infrastructure setup
+echo   • Testing UI flows in isolation
+echo   • Offline scenarios
+echo.
+echo ===============================================================
+echo.
+
+REM Set demo mode environment variable
+set "VERICROP_LOAD_DEMO=true"
+
+echo Starting 3 GUI instances in demo mode...
+echo.
+call :run_gui_demo
+goto :end_script
+
 :run_gui
 echo Starting %GUI_INSTANCES% instances of VeriCrop JavaFX GUI...
 echo.
@@ -123,6 +174,30 @@ if not exist "gradlew.bat" (
     echo Please run from project root directory.
     goto :eof
 )
+goto :run_gui_common
+
+:run_gui_demo
+REM Demo mode version with VERICROP_LOAD_DEMO set
+echo Demo Mode Enabled - No external dependencies required
+echo.
+echo Demo Mode Credentials:
+echo   • admin / admin123
+echo   • farmer / farmer123
+echo   • supplier / supplier123
+echo   • consumer / consumer123
+echo.
+
+REM Check if Java and Gradle are available
+call :check_java
+if errorlevel 1 goto :eof
+
+if not exist "gradlew.bat" (
+    echo ERROR: gradlew.bat not found in current directory.
+    echo Please run from project root directory.
+    goto :eof
+)
+
+:run_gui_common
 
 echo Starting GUI instances...
 echo.
@@ -153,6 +228,16 @@ start "VeriCrop GUI - Instance 3 (Retailer)" cmd /k "title VeriCrop GUI - Instan
 echo.
 echo ✓ GUI instances launched. Check the opened windows.
 echo.
+
+if "%VERICROP_LOAD_DEMO%"=="true" (
+    echo Demo Mode Active:
+    echo   • Using in-memory blockchain
+    echo   • Mock ML predictions
+    echo   • Demo data in all screens
+    echo   • No external services required
+    echo.
+)
+
 echo If GUIs don't start, try building first:
 echo   start-all.bat build
 echo.
@@ -286,6 +371,7 @@ echo.
 echo VeriCrop Start Script Commands:
 echo.
 echo   start-all.bat          - Start all services and 3 GUI instances
+echo   start-all.bat demo     - Start 3 GUI instances in demo mode (no Docker)
 echo   start-all.bat infra    - Start infrastructure only
 echo   start-all.bat init-airflow - Initialize Airflow (first time)
 echo   start-all.bat fix-airflow - Alternative Airflow fix
@@ -302,6 +388,11 @@ echo   Each instance runs in separate window with different roles:
 echo   - Instance 1: Farmer role
 echo   - Instance 2: Distributor role
 echo   - Instance 3: Retailer role
+echo.
+echo Demo Mode:
+echo   Use "start-all.bat demo" to run without Docker dependencies.
+echo   Perfect for quick demonstrations and offline scenarios.
+echo   All UI features work with mock data and in-memory services.
 echo.
 echo All instances connect to the same backend services.
 echo.

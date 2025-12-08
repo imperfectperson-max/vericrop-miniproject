@@ -50,7 +50,16 @@ VeriCrop GUI can run in a **self-contained demo mode** without requiring externa
 - Testing UI flows in isolation
 - Offline scenarios
 
-**To enable demo mode:**
+**⭐ Easiest way - Use the start script:**
+```bash
+# Unix/Linux/Mac - Starts 3 GUI instances in demo mode
+./start-all.sh demo
+
+# Windows - Starts 3 GUI instances in demo mode
+start-all.bat demo
+```
+
+**Alternative methods:**
 ```bash
 # Using environment variable
 export VERICROP_LOAD_DEMO=true
@@ -1132,6 +1141,9 @@ For convenience, we provide start/stop scripts that handle all services in one c
 # Start all services with one command
 ./start-all.sh
 
+# Start 3 GUI instances in demo mode (no Docker required!)
+./start-all.sh demo
+
 # Start only infrastructure (PostgreSQL, Kafka, ML Service)
 ./start-all.sh infra
 
@@ -1155,6 +1167,9 @@ For convenience, we provide start/stop scripts that handle all services in one c
 ```cmd
 REM Start all services with one command
 start-all.bat
+
+REM Start 3 GUI instances in demo mode (no Docker required!)
+start-all.bat demo
 
 REM Start only infrastructure (PostgreSQL, Kafka, ML Service)
 start-all.bat infra
@@ -1180,6 +1195,7 @@ stop-all.bat -v
 | Mode | Description |
 |------|-------------|
 | `full` | Start all services (default): Kafka, PostgreSQL, ML Service, Airflow |
+| `demo` | **⭐ Start 3 GUI instances in demo mode (no Docker required!)** |
 | `infra` | Start infrastructure only: PostgreSQL, Kafka, Zookeeper, ML Service |
 | `kafka` | Start Kafka stack only |
 | `simulation` | Start simulation environment |
@@ -1188,6 +1204,13 @@ stop-all.bat -v
 | `docker-build` | Build Docker images |
 | `all-build` | Build everything (Java + Docker) |
 | `run` | Run the JavaFX GUI application |
+
+**⭐ New: Demo Mode** - Perfect for quick demonstrations without Docker! The `demo` mode:
+- Starts 3 GUI instances automatically
+- Requires **only Java** (no Docker, PostgreSQL, Kafka, or ML Service)
+- Uses in-memory blockchain and mock ML predictions
+- Includes demo data in all screens
+- Perfect for presentations, testing, and offline scenarios
 
 For help: `./start-all.sh --help` or `start-all.bat --help`
 

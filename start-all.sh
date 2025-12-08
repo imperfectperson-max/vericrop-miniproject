@@ -11,6 +11,7 @@
 #
 # Modes:
 #   full           - Start all services and 3 GUI instances (default)
+#   demo           - Start 3 GUI instances in demo mode (no Docker dependencies)
 #   infra          - Start infrastructure only: PostgreSQL, Kafka, Zookeeper
 #   kafka          - Start Kafka stack only (using docker-compose-kafka.yml)
 #   simulation     - Start simulation environment (using docker-compose-simulation.yml)
@@ -57,6 +58,7 @@ if [[ "$1" == "-h" || "$1" == "--help" || "$1" == "help" ]]; then
     echo ""
     echo "Modes:"
     echo "  full           - Start all services and 3 GUI instances (default)"
+    echo "  demo           - Start 3 GUI instances in demo mode (no Docker dependencies)"
     echo "  infra          - Start infrastructure only: PostgreSQL, Kafka, Zookeeper"
     echo "  kafka          - Start Kafka stack only (using docker-compose-kafka.yml)"
     echo "  simulation     - Start simulation environment (using docker-compose-simulation.yml)"
@@ -128,11 +130,20 @@ print_banner() {
 
 # Check prerequisites
 check_prerequisites() {
+    local SKIP_DOCKER="${1:-false}"
+    
+    if [ "$SKIP_DOCKER" = "true" ]; then
+        echo -e "${YELLOW}Skipping Docker checks (demo mode)${NC}"
+        echo ""
+        return 0
+    fi
+    
     echo -e "${BLUE}Checking prerequisites...${NC}"
     
     # Check Docker
     if ! command -v docker &> /dev/null; then
         echo -e "${RED}❌ Docker is not installed. Please install Docker first.${NC}"
+        echo -e "${YELLOW}💡 Tip: Use 'demo' mode to run without Docker: ./start-all.sh demo${NC}"
         exit 1
     fi
     echo -e "${GREEN}✓ Docker is installed${NC}"
@@ -141,6 +152,7 @@ check_prerequisites() {
     if ! command -v docker-compose &> /dev/null; then
         if ! docker compose version &> /dev/null; then
             echo -e "${RED}❌ Docker Compose is not installed. Please install Docker Compose.${NC}"
+            echo -e "${YELLOW}💡 Tip: Use 'demo' mode to run without Docker: ./start-all.sh demo${NC}"
             exit 1
         fi
         DOCKER_COMPOSE="docker compose"
@@ -152,6 +164,7 @@ check_prerequisites() {
     # Check if Docker is running
     if ! docker info &> /dev/null; then
         echo -e "${RED}❌ Docker daemon is not running. Please start Docker.${NC}"
+        echo -e "${YELLOW}💡 Tip: Use 'demo' mode to run without Docker: ./start-all.sh demo${NC}"
         exit 1
     fi
     echo -e "${GREEN}✓ Docker daemon is running${NC}"
@@ -189,6 +202,35 @@ check_java() {
     return 0
 }
 
+# Start demo mode (no Docker)
+start_demo() {
+    echo -e "${BLUE}Starting VeriCrop in Demo Mode...${NC}"
+    echo ""
+    echo -e "${YELLOW}═══════════════════════════════════════════════════════════${NC}"
+    echo -e "${YELLOW}                     DEMO MODE                             ${NC}"
+    echo -e "${YELLOW}═══════════════════════════════════════════════════════════${NC}"
+    echo ""
+    echo -e "Demo mode features:"
+    echo -e "  ✓ No external dependencies (PostgreSQL, Kafka, ML Service)"
+    echo -e "  ✓ In-memory blockchain"
+    echo -e "  ✓ Mock ML predictions"
+    echo -e "  ✓ Demo data in all screens"
+    echo -e "  ✓ Fully functional delivery simulator"
+    echo -e "  ✓ QR code generation"
+    echo -e "  ✓ All UI flows operational"
+    echo ""
+    echo -e "${CYAN}Perfect for:${NC}"
+    echo -e "  • Quick demonstrations"
+    echo -e "  • Development without infrastructure setup"
+    echo -e "  • Testing UI flows in isolation"
+    echo -e "  • Offline scenarios"
+    echo ""
+    echo -e "${YELLOW}═══════════════════════════════════════════════════════════${NC}"
+    echo ""
+    
+    run_gui true
+}
+
 # Start full stack
 start_full() {
     echo -e "${BLUE}Starting full VeriCrop stack...${NC}"
@@ -205,7 +247,7 @@ start_full() {
     echo ""
     echo "Starting 3 GUI instances..."
     echo ""
-    run_gui
+    run_gui false
 }
 
 # Start infrastructure only
@@ -445,8 +487,18 @@ stop_all() {
 
 # Run GUI instances
 run_gui() {
+    local DEMO_MODE="${1:-false}"
     local GUI_INSTANCES=3
     local INSTANCE_START_DELAY=5
+    
+    # Set demo mode environment variable if requested
+    if [ "$DEMO_MODE" = "true" ]; then
+        export VERICROP_LOAD_DEMO=true
+        echo -e "${YELLOW}🎭 Demo Mode Enabled${NC}"
+        echo -e "${YELLOW}   No external dependencies required (PostgreSQL, Kafka, ML Service)${NC}"
+        echo ""
+    fi
+    
     local GRADLE_RUN_CMD="./gradlew :vericrop-gui:run || ./gradlew run || ./gradlew :app:run || ./gradlew bootRun"
     
     echo -e "${BLUE}Starting $GUI_INSTANCES instances of VeriCrop JavaFX GUI...${NC}"
@@ -456,6 +508,15 @@ run_gui() {
     echo "  - Instance 2: Distributor role"
     echo "  - Instance 3: Retailer role"
     echo ""
+    
+    if [ "$DEMO_MODE" = "true" ]; then
+        echo -e "${CYAN}Demo Mode Credentials:${NC}"
+        echo "  • admin / admin123"
+        echo "  • farmer / farmer123"
+        echo "  • supplier / supplier123"
+        echo "  • consumer / consumer123"
+        echo ""
+    fi
     
     if ! check_java; then
         return 1
@@ -516,6 +577,16 @@ run_gui() {
     echo ""
     echo -e "${GREEN}✓ GUI instances launched.${NC}"
     echo ""
+    
+    if [ "$DEMO_MODE" = "true" ]; then
+        echo -e "${YELLOW}Demo Mode Active:${NC}"
+        echo "  • Using in-memory blockchain"
+        echo "  • Mock ML predictions"
+        echo "  • Demo data in all screens"
+        echo "  • No external services required"
+        echo ""
+    fi
+    
     echo "If GUIs don't start, try building first:"
     echo "  ./start-all.sh build"
     echo ""
@@ -549,9 +620,18 @@ print_service_urls() {
 # Main execution
 main() {
     print_banner
-    check_prerequisites
+    
+    # Check if demo mode - skip Docker prerequisites
+    if [ "$MODE" = "demo" ] || [ "$MODE" = "standalone" ]; then
+        check_prerequisites true
+    else
+        check_prerequisites false
+    fi
     
     case $MODE in
+        demo|standalone)
+            start_demo
+            ;;
         full)
             start_full
             ;;
@@ -577,7 +657,7 @@ main() {
             build_all
             ;;
         run|run-gui|gui)
-            run_gui
+            run_gui false
             ;;
         init-airflow)
             init_airflow
@@ -603,6 +683,7 @@ main() {
             echo ""
             echo "Available modes:"
             echo "  full           - Start all services and 3 GUI instances (default)"
+            echo "  demo           - Start 3 GUI instances in demo mode (no Docker)"
             echo "  infra          - Start infrastructure only"
             echo "  kafka          - Start Kafka stack"
             echo "  simulation     - Start simulation environment"
