@@ -2262,11 +2262,11 @@ public class LogisticsController implements SimulationListener {
         // Remove from stopped simulations if restarting (allows chart updates again)
         stoppedSimulations.remove(batchId);
         
-        // This callback indicates the simulation was started locally via SimulationManager,
-        // not via Kafka from another instance. Remove from kafkaManagedSimulations if present.
-        // This handles the race condition where a Kafka START event arrives before this callback.
-        if (kafkaManagedSimulations.remove(batchId)) {
-            logger.debug("Removed {} from kafkaManagedSimulations - now locally managed", batchId);
+        // Check if this simulation is already tracked via Kafka (from another instance)
+        // If so, skip local initialization to avoid duplicate tracking
+        if (kafkaManagedSimulations.contains(batchId)) {
+            logger.info("Simulation {} already tracked via Kafka - skipping local initialization", batchId);
+            return;
         }
         
         logger.info("Simulation started for batch: {} from farmer: {}", batchId, farmerId);
@@ -2818,15 +2818,19 @@ public class LogisticsController implements SimulationListener {
     
     @Override
     public void onSimulationStopped(String batchId, boolean completed) {
+        // Check if this is a Kafka-managed simulation (from another instance)
+        // If so, skip local stop handling as it will be handled by Kafka STOP event
+        if (kafkaManagedSimulations.contains(batchId)) {
+            logger.info("Simulation {} managed via Kafka - skipping local stop handling", batchId);
+            return;
+        }
+        
         // Check if already stopped to avoid duplicate alerts
         // Use putIfAbsent semantics - only proceed if not already stopped
         if (!stoppedSimulations.add(batchId)) {
             logger.debug("Ignoring duplicate stop event for already stopped simulation: {}", batchId);
             return;
         }
-        
-        // Remove from kafkaManagedSimulations if present (cleanup tracking state)
-        kafkaManagedSimulations.remove(batchId);
         
         logger.info("Simulation stopped for batch: {} (completed: {})", batchId, completed);
         
