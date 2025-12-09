@@ -1100,9 +1100,12 @@ public class ReportExportService {
             
             sb.append("        <td><span class=\"badge ").append(badgeClass).append("\">").append(typeName).append("</span></td>\n");
             
-            String complianceBadge = "COMPLIANT".equals(simulation.getComplianceStatus()) ? 
-                "badge-compliant\">✓ Compliant" : "badge-non-compliant\">✗ Non-Compliant";
-            sb.append("        <td><span class=\"badge ").append(complianceBadge).append("</span></td>\n");
+            String complianceClass = "COMPLIANT".equals(simulation.getComplianceStatus()) ? 
+                "badge-compliant" : "badge-non-compliant";
+            String complianceText = "COMPLIANT".equals(simulation.getComplianceStatus()) ?
+                "✓ Compliant" : "✗ Non-Compliant";
+            sb.append("        <td><span class=\"badge ").append(complianceClass).append("\">")
+              .append(complianceText).append("</span></td>\n");
             sb.append("        <td>").append(String.format("%.1f%%", simulation.getFinalQuality())).append("</td>\n");
             sb.append("        <td>").append(simulation.getViolationsCount()).append("</td>\n");
             sb.append("        <td>").append(String.format("%.1f°C", simulation.getAvgTemperature())).append("</td>\n");
