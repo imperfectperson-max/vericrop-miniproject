@@ -1774,6 +1774,10 @@ public class LogisticsController implements SimulationListener {
     
     /**
      * Generate Quality Compliance preview with quality metrics.
+     * Enhanced to properly interpret the 3 simulation types from ProducerController:
+     * - Example 1 (Apples): Farm to Consumer Direct with warehouse stops
+     * - Example 2 (Carrots): Local Producer Delivery, short route
+     * - Example 3 (Vegetables): Cross-Region Long Haul with temperature events
      */
     private String generateQualityCompliancePreview(String dateRange, String timestamp,
             List<PersistedSimulation> simulations) {
@@ -1783,20 +1787,40 @@ public class LogisticsController implements SimulationListener {
         sb.append("Generated: ").append(timestamp).append("\n\n");
         
         if (!simulations.isEmpty()) {
-            // Compliance statistics
+            // Separate simulations by type using helper method
+            List<PersistedSimulation> applesSimulations = filterSimulationsByBatchType(simulations, "example_1");
+            List<PersistedSimulation> carrotsSimulations = filterSimulationsByBatchType(simulations, "example_2");
+            List<PersistedSimulation> veggiesSimulations = filterSimulationsByBatchType(simulations, "example_3");
+            
+            // Overall compliance statistics
             long compliant = simulations.stream()
                     .filter(s -> "COMPLIANT".equals(s.getComplianceStatus()))
                     .count();
             long nonCompliant = simulations.size() - compliant;
             double complianceRate = (compliant * 100.0 / simulations.size());
             
-            sb.append("━━━ COMPLIANCE SUMMARY ━━━\n");
+            sb.append("━━━ OVERALL COMPLIANCE ━━━\n");
             sb.append("• Total Simulations: ").append(simulations.size()).append("\n");
             sb.append("• Compliant: ").append(compliant).append(" (").append(String.format("%.1f%%", complianceRate)).append(")\n");
             sb.append("• Non-Compliant: ").append(nonCompliant).append("\n\n");
             
-            // Quality statistics
-            sb.append("━━━ QUALITY METRICS ━━━\n");
+            // Breakdown by simulation type (the 3 examples from ProducerController)
+            sb.append("━━━ COMPLIANCE BY SIMULATION TYPE ━━━\n");
+            if (!applesSimulations.isEmpty()) {
+                appendSimulationTypeCompliance(sb, "Example 1 - Farm to Consumer (Apples)", 
+                    applesSimulations, "30min warehouse route, optimal cold chain");
+            }
+            if (!carrotsSimulations.isEmpty()) {
+                appendSimulationTypeCompliance(sb, "Example 2 - Local Producer (Carrots)", 
+                    carrotsSimulations, "15min direct route, strict temp control");
+            }
+            if (!veggiesSimulations.isEmpty()) {
+                appendSimulationTypeCompliance(sb, "Example 3 - Cross-Region (Vegetables)", 
+                    veggiesSimulations, "45min extended route, temp spike events");
+            }
+            
+            // Overall quality statistics
+            sb.append("━━━ QUALITY METRICS (ALL SIMULATIONS) ━━━\n");
             double avgInitialQuality = simulations.stream()
                     .mapToDouble(PersistedSimulation::getInitialQuality)
                     .average().orElse(0.0);
@@ -1819,6 +1843,20 @@ public class LogisticsController implements SimulationListener {
             sb.append("• Total Violations: ").append(totalViolations).append("\n");
             sb.append("• Avg Violations/Simulation: ").append(String.format("%.1f", avgViolationsPerSim)).append("\n");
             
+            // Violations by simulation type
+            if (!applesSimulations.isEmpty()) {
+                int applesViolations = applesSimulations.stream().mapToInt(PersistedSimulation::getViolationsCount).sum();
+                sb.append("• Example 1 (Apples) Violations: ").append(applesViolations).append("\n");
+            }
+            if (!carrotsSimulations.isEmpty()) {
+                int carrotsViolations = carrotsSimulations.stream().mapToInt(PersistedSimulation::getViolationsCount).sum();
+                sb.append("• Example 2 (Carrots) Violations: ").append(carrotsViolations).append("\n");
+            }
+            if (!veggiesSimulations.isEmpty()) {
+                int veggiesViolations = veggiesSimulations.stream().mapToInt(PersistedSimulation::getViolationsCount).sum();
+                sb.append("• Example 3 (Vegetables) Violations: ").append(veggiesViolations).append("\n");
+            }
+            
             // Quality grade distribution
             long highQuality = simulations.stream().filter(s -> s.getFinalQuality() >= 80).count();
             long mediumQuality = simulations.stream().filter(s -> s.getFinalQuality() >= 60 && s.getFinalQuality() < 80).count();
@@ -1832,9 +1870,71 @@ public class LogisticsController implements SimulationListener {
             sb.append("━━━ NO DATA AVAILABLE ━━━\n");
             sb.append("• No simulation data found for this period.\n");
             sb.append("• Run simulations from ProducerController to generate quality data.\n");
+            sb.append("• Available simulation types:\n");
+            sb.append("  - Example 1: Farm to Consumer (Summer Apples)\n");
+            sb.append("  - Example 2: Local Producer (Organic Carrots)\n");
+            sb.append("  - Example 3: Cross-Region (Mixed Vegetables)\n");
         }
         
         return sb.toString();
+    }
+    
+    /**
+     * Append compliance statistics for a specific simulation type.
+     * Helper method for generating detailed compliance breakdown.
+     */
+    private void appendSimulationTypeCompliance(StringBuilder sb, String typeName, 
+            List<PersistedSimulation> simulations, String description) {
+        // Guard against empty list (should not happen due to checks in caller, but defensive)
+        if (simulations.isEmpty()) {
+            return;
+        }
+        
+        long compliant = simulations.stream()
+                .filter(s -> "COMPLIANT".equals(s.getComplianceStatus()))
+                .count();
+        double complianceRate = (compliant * 100.0 / simulations.size());
+        double avgFinalQuality = simulations.stream()
+                .mapToDouble(PersistedSimulation::getFinalQuality)
+                .average().orElse(0.0);
+        
+        sb.append("\n• ").append(typeName).append("\n");
+        sb.append("  └─ Description: ").append(description).append("\n");
+        sb.append("  └─ Runs: ").append(simulations.size()).append("\n");
+        sb.append("  └─ Compliant: ").append(compliant).append("/").append(simulations.size())
+          .append(" (").append(String.format("%.1f%%", complianceRate)).append(")\n");
+        sb.append("  └─ Avg Final Quality: ").append(String.format("%.1f%%", avgFinalQuality)).append("\n");
+    }
+    
+    /**
+     * Helper method to filter simulations by type.
+     * 
+     * Note: This duplicates logic from ReportExportService.SimulationType enum.
+     * The duplication is intentional to avoid creating a dependency between GUI controllers
+     * and the service layer's internal enum. This keeps the controllers decoupled from
+     * service implementation details. If this classification logic becomes more complex,
+     * consider extracting it to a shared utility class.
+     */
+    private List<PersistedSimulation> filterSimulationsByBatchType(
+            List<PersistedSimulation> simulations, String example) {
+        return simulations.stream()
+            .filter(s -> {
+                switch (example) {
+                    case "example_1":
+                        return s.getBatchId().contains("APPLES") || 
+                               (s.getScenarioId() != null && s.getScenarioId().contains("example_1"));
+                    case "example_2":
+                        return s.getBatchId().contains("CARROTS") || 
+                               (s.getScenarioId() != null && s.getScenarioId().contains("example_2"));
+                    case "example_3":
+                        return s.getBatchId().contains("VEGGIES") || 
+                               s.getBatchId().contains("VEGETABLES") ||
+                               (s.getScenarioId() != null && s.getScenarioId().contains("example_3"));
+                    default:
+                        return false;
+                }
+            })
+            .collect(Collectors.toList());
     }
     
     /**

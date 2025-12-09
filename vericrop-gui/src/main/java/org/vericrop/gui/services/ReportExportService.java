@@ -34,7 +34,7 @@ public class ReportExportService {
     private static final String CSV_HEADER_TEMPERATURE_LOG = 
             "Batch ID,Timestamp,Temperature (°C),Humidity (%),Status,Location,Source";
     private static final String CSV_HEADER_QUALITY_COMPLIANCE = 
-            "Batch ID,Scenario,Status,Completed,Final Quality (%),Initial Quality (%),Violations,Compliance Status,Avg Temp (°C),Min Temp (°C),Max Temp (°C),Start Time,End Time";
+            "Batch ID,Simulation Type,Scenario,Status,Completed,Final Quality (%),Initial Quality (%),Violations,Compliance Status,Avg Temp (°C),Min Temp (°C),Max Temp (°C),Start Time,End Time";
     private static final String CSV_HEADER_DELIVERY_PERFORMANCE = 
             "Batch ID,Type,Status,Duration (min),Final Quality (%),Avg Temperature (°C),Waypoints,Start Time,End Time";
     private static final String CSV_HEADER_SIMULATION_LOG = 
@@ -197,15 +197,47 @@ public class ReportExportService {
     
     /**
      * Convert HTML content to PDF.
-     * Note: Currently saves as HTML with .pdf extension. For true PDF generation,
-     * integrate a library like Apache PDFBox, iText, or Flying Saucer.
-     * This is a minimal implementation to support the PDF format option.
+     * Note: For true PDF generation, this would require integrating a library like Apache PDFBox, iText, or Flying Saucer.
+     * For now, we return the HTML content with a note that PDF format is not fully supported.
+     * This allows the file to be opened in a browser and manually saved as PDF if needed.
      */
     private String convertHtmlToPdf(String htmlContent) {
-        // Save as HTML with .pdf extension - users can open in browser and print to PDF
-        // Or integrate a proper PDF library for production use
-        logger.warn("PDF export currently generates HTML format. Consider integrating a PDF library for production.");
-        return htmlContent;
+        // Add a prominent note at the top of the HTML content indicating it's HTML format
+        StringBuilder sb = new StringBuilder();
+        sb.append("<!DOCTYPE html>\n<html>\n<head>\n");
+        sb.append("<meta charset=\"UTF-8\">\n");
+        sb.append("<title>VeriCrop Report (HTML Format)</title>\n");
+        sb.append("<style>\n");
+        sb.append(".pdf-notice { background-color: #fff3cd; border: 2px solid #ffc107; padding: 15px; margin: 20px; border-radius: 5px; }\n");
+        sb.append(".pdf-notice h3 { margin-top: 0; color: #856404; }\n");
+        sb.append("</style>\n");
+        sb.append("</head>\n<body>\n");
+        sb.append("<div class=\"pdf-notice\">\n");
+        sb.append("<h3>⚠️ PDF Export Notice</h3>\n");
+        sb.append("<p>This report was exported in HTML format with a .pdf extension. ");
+        sb.append("To view as PDF:</p>\n");
+        sb.append("<ol>\n");
+        sb.append("<li>Open this file in a web browser (Chrome, Firefox, Edge)</li>\n");
+        sb.append("<li>Use the browser's Print function (Ctrl+P or Cmd+P)</li>\n");
+        sb.append("<li>Select 'Save as PDF' as the destination</li>\n");
+        sb.append("</ol>\n");
+        sb.append("<p>For true PDF generation, integrate a PDF library like Apache PDFBox or iText.</p>\n");
+        sb.append("</div>\n");
+        
+        // Extract the body content from the HTML and append it
+        int bodyStart = htmlContent.indexOf("<body>");
+        int bodyEnd = htmlContent.indexOf("</body>");
+        if (bodyStart >= 0 && bodyEnd > bodyStart) {
+            sb.append(htmlContent.substring(bodyStart + 6, bodyEnd));
+        } else {
+            // If no body tags, append the whole content
+            sb.append(htmlContent);
+        }
+        
+        sb.append("\n</body>\n</html>");
+        
+        logger.info("PDF export generated as HTML with instructions for manual conversion.");
+        return sb.toString();
     }
     
     /**
@@ -605,6 +637,11 @@ public class ReportExportService {
           .format(DATETIME_FORMATTER)).append("\n");
         sb.append("Total Simulations: ").append(simulations.size()).append("\n\n");
         
+        // Separate simulations by type using helper method
+        List<PersistedSimulation> applesSimulations = filterSimulationsByType(simulations, SimulationType.EXAMPLE_1_APPLES);
+        List<PersistedSimulation> carrotsSimulations = filterSimulationsByType(simulations, SimulationType.EXAMPLE_2_CARROTS);
+        List<PersistedSimulation> veggiesSimulations = filterSimulationsByType(simulations, SimulationType.EXAMPLE_3_VEGETABLES);
+        
         long compliant = simulations.stream()
             .filter(s -> "COMPLIANT".equals(s.getComplianceStatus()))
             .count();
@@ -657,6 +694,28 @@ public class ReportExportService {
             sb.append("\n");
         }
         
+        // Breakdown by simulation type
+        if (!applesSimulations.isEmpty() || !carrotsSimulations.isEmpty() || !veggiesSimulations.isEmpty()) {
+            sb.append("-------------------------------------------------\n");
+            sb.append("COMPLIANCE BY SIMULATION TYPE\n");
+            sb.append("-------------------------------------------------\n\n");
+            
+            if (!applesSimulations.isEmpty()) {
+                appendSimulationTypeComplianceText(sb, "Example 1 - Farm to Consumer (Apples)", 
+                    applesSimulations, "30min warehouse route, optimal cold chain");
+            }
+            
+            if (!carrotsSimulations.isEmpty()) {
+                appendSimulationTypeComplianceText(sb, "Example 2 - Local Producer (Carrots)", 
+                    carrotsSimulations, "15min direct route, strict temp control");
+            }
+            
+            if (!veggiesSimulations.isEmpty()) {
+                appendSimulationTypeComplianceText(sb, "Example 3 - Cross-Region (Vegetables)", 
+                    veggiesSimulations, "45min extended route, temp spike events");
+            }
+        }
+        
         sb.append("-------------------------------------------------\n");
         sb.append("DETAILED COMPLIANCE DATA\n");
         sb.append("-------------------------------------------------\n\n");
@@ -666,21 +725,14 @@ public class ReportExportService {
             String compliance = "COMPLIANT".equals(simulation.getComplianceStatus()) ? "✓" : "✗";
             double degradation = simulation.getInitialQuality() - simulation.getFinalQuality();
             
-            // Determine type
-            String type = "Other";
-            if (simulation.getBatchId() != null) {
-                if (simulation.getBatchId().contains("APPLES")) {
-                    type = "[Ex1-Apples]";
-                } else if (simulation.getBatchId().contains("CARROTS")) {
-                    type = "[Ex2-Carrots]";
-                } else if (simulation.getBatchId().contains("VEGGIES") || simulation.getBatchId().contains("VEGETABLES")) {
-                    type = "[Ex3-Veggies]";
-                }
-            }
+            // Determine simulation type using helper method
+            SimulationType simType = SimulationType.fromSimulation(simulation);
+            String simTypeLabel = simType == SimulationType.OTHER ? "[Other]" : 
+                                 "[" + simType.getDisplayName().split(" - ")[0] + "]";
             
-            sb.append(String.format("[%s] %s %s\n", compliance, type, simulation.getBatchId()));
-            sb.append(String.format("    Status: %s | Quality: %.1f%% → %.1f%% (loss: %.1f%%) | Violations: %d\n",
-                    status, simulation.getInitialQuality(), simulation.getFinalQuality(), degradation, simulation.getViolationsCount()));
+            sb.append(String.format("[%s] %s Batch: %s\n", compliance, simTypeLabel, simulation.getBatchId()));
+            sb.append(String.format("    Status: %s | Quality: %.1f%% | Violations: %d\n",
+                    status, simulation.getFinalQuality(), simulation.getViolationsCount()));
             sb.append(String.format("    Temp Range: %.1f°C - %.1f°C (avg: %.1f°C)\n",
                     simulation.getMinTemperature(), simulation.getMaxTemperature(), simulation.getAvgTemperature()));
             sb.append("\n");
@@ -690,27 +742,33 @@ public class ReportExportService {
     }
     
     /**
-     * Append scenario-specific analysis to text report
+     * Helper method to append simulation type compliance statistics in text format.
      */
-    private void appendScenarioAnalysisTxt(StringBuilder sb, List<PersistedSimulation> scenarios) {
-        long compliant = scenarios.stream().filter(s -> "COMPLIANT".equals(s.getComplianceStatus())).count();
-        double complianceRate = (compliant * 100.0) / scenarios.size();
-        double avgInitialQuality = scenarios.stream().mapToDouble(PersistedSimulation::getInitialQuality).average().orElse(0);
-        double avgFinalQuality = scenarios.stream().mapToDouble(PersistedSimulation::getFinalQuality).average().orElse(0);
-        double avgDegradation = avgInitialQuality - avgFinalQuality;
-        int totalViolations = scenarios.stream().mapToInt(PersistedSimulation::getViolationsCount).sum();
-        double avgViolations = (double) totalViolations / scenarios.size();
-        double avgTempMin = scenarios.stream().mapToDouble(PersistedSimulation::getMinTemperature).average().orElse(0);
-        double avgTempMax = scenarios.stream().mapToDouble(PersistedSimulation::getMaxTemperature).average().orElse(0);
-        double avgTemp = scenarios.stream().mapToDouble(PersistedSimulation::getAvgTemperature).average().orElse(0);
+    private void appendSimulationTypeComplianceText(StringBuilder sb, String typeName, 
+            List<PersistedSimulation> simulations, String description) {
+        // Guard against empty list to prevent division by zero
+        if (simulations.isEmpty()) {
+            return;
+        }
         
-        sb.append("Simulations Run:         ").append(scenarios.size()).append("\n");
-        sb.append("Compliance Rate:         ").append(String.format("%.1f%% (%d/%d compliant)", complianceRate, compliant, scenarios.size())).append("\n");
-        sb.append("Avg Initial Quality:     ").append(String.format("%.1f%%", avgInitialQuality)).append("\n");
-        sb.append("Avg Final Quality:       ").append(String.format("%.1f%%", avgFinalQuality)).append("\n");
-        sb.append("Avg Quality Degradation: ").append(String.format("%.1f%%", avgDegradation)).append("\n");
-        sb.append("Total Violations:        ").append(totalViolations).append(" (avg: ").append(String.format("%.1f", avgViolations)).append(" per sim)\n");
-        sb.append("Temp Range:              ").append(String.format("%.1f°C - %.1f°C (avg: %.1f°C)", avgTempMin, avgTempMax, avgTemp)).append("\n");
+        long compliant = simulations.stream()
+                .filter(s -> "COMPLIANT".equals(s.getComplianceStatus()))
+                .count();
+        double complianceRate = (compliant * 100.0 / simulations.size());
+        double avgFinalQuality = simulations.stream()
+                .mapToDouble(PersistedSimulation::getFinalQuality)
+                .average().orElse(0.0);
+        int totalViolations = simulations.stream()
+                .mapToInt(PersistedSimulation::getViolationsCount)
+                .sum();
+        
+        sb.append(typeName).append("\n");
+        sb.append("  Description:        ").append(description).append("\n");
+        sb.append("  Runs:               ").append(simulations.size()).append("\n");
+        sb.append("  Compliant:          ").append(compliant).append("/").append(simulations.size())
+          .append(" (").append(String.format("%.1f%%", complianceRate)).append(")\n");
+        sb.append("  Avg Final Quality:  ").append(String.format("%.1f%%", avgFinalQuality)).append("\n");
+        sb.append("  Total Violations:   ").append(totalViolations).append("\n\n");
     }
     
     private String generateQualityComplianceCsv(List<PersistedSimulation> simulations, 
@@ -720,6 +778,10 @@ public class ReportExportService {
         
         for (PersistedSimulation simulation : simulations) {
             sb.append(escapeCsv(simulation.getBatchId())).append(",");
+            
+            // Determine simulation type using helper method
+            SimulationType simType = SimulationType.fromSimulation(simulation);
+            sb.append(escapeCsv(simType.getDisplayName())).append(",");
             sb.append(escapeCsv(simulation.getScenarioId())).append(",");
             sb.append(escapeCsv(simulation.getStatus())).append(",");
             sb.append(simulation.isCompleted()).append(",");
@@ -1083,7 +1145,31 @@ public class ReportExportService {
         sb.append("    \"start\": \"").append(startDate.format(DATE_FORMATTER)).append("\",\n");
         sb.append("    \"end\": \"").append(endDate.format(DATE_FORMATTER)).append("\"\n");
         sb.append("  },\n");
-        sb.append("  \"simulationCount\": ").append(simulations.size()).append("\n");
+        sb.append("  \"generated\": \"").append(Instant.now().toString()).append("\",\n");
+        sb.append("  \"simulationCount\": ").append(simulations.size()).append(",\n");
+        
+        // Overall compliance stats
+        long compliant = simulations.stream()
+            .filter(s -> "COMPLIANT".equals(s.getComplianceStatus()))
+            .count();
+        double complianceRate = simulations.isEmpty() ? 0 : (compliant * 100.0 / simulations.size());
+        
+        sb.append("  \"overallCompliance\": {\n");
+        sb.append("    \"compliant\": ").append(compliant).append(",\n");
+        sb.append("    \"nonCompliant\": ").append(simulations.size() - compliant).append(",\n");
+        sb.append("    \"complianceRate\": ").append(String.format("%.1f", complianceRate)).append("\n");
+        sb.append("  },\n");
+        
+        // Breakdown by simulation type using helper method
+        long applesCount = filterSimulationsByType(simulations, SimulationType.EXAMPLE_1_APPLES).size();
+        long carrotsCount = filterSimulationsByType(simulations, SimulationType.EXAMPLE_2_CARROTS).size();
+        long veggiesCount = filterSimulationsByType(simulations, SimulationType.EXAMPLE_3_VEGETABLES).size();
+        
+        sb.append("  \"bySimulationType\": {\n");
+        sb.append("    \"example1Apples\": ").append(applesCount).append(",\n");
+        sb.append("    \"example2Carrots\": ").append(carrotsCount).append(",\n");
+        sb.append("    \"example3Vegetables\": ").append(veggiesCount).append("\n");
+        sb.append("  }\n");
         sb.append("}\n");
         return sb.toString();
     }
@@ -1099,27 +1185,25 @@ public class ReportExportService {
         sb.append("    .container { max-width: 1200px; margin: 0 auto; background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }\n");
         sb.append("    h1 { color: #2563eb; border-bottom: 3px solid #2563eb; padding-bottom: 10px; }\n");
         sb.append("    h2 { color: #1e40af; margin-top: 30px; }\n");
-        sb.append("    h3 { color: #3b82f6; margin-top: 20px; }\n");
         sb.append("    .header-info { background-color: #eff6ff; padding: 15px; border-radius: 5px; margin-bottom: 20px; }\n");
         sb.append("    table { width: 100%; border-collapse: collapse; margin-top: 20px; }\n");
         sb.append("    th { background-color: #2563eb; color: white; padding: 12px; text-align: left; }\n");
         sb.append("    td { padding: 10px; border-bottom: 1px solid #e5e7eb; }\n");
         sb.append("    tr:hover { background-color: #f9fafb; }\n");
+        sb.append("    .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }\n");
+        sb.append("    .badge-compliant { background-color: #dcfce7; color: #166534; }\n");
+        sb.append("    .badge-non-compliant { background-color: #fee2e2; color: #991b1b; }\n");
+        sb.append("    .badge-apples { background-color: #dcfce7; color: #166534; }\n");
+        sb.append("    .badge-carrots { background-color: #fef3c7; color: #92400e; }\n");
+        sb.append("    .badge-veggies { background-color: #e0e7ff; color: #3730a3; }\n");
         sb.append("    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 20px; }\n");
         sb.append("    .stat-card { background-color: #f9fafb; padding: 15px; border-radius: 5px; border-left: 4px solid #2563eb; }\n");
         sb.append("    .stat-value { font-size: 24px; font-weight: bold; color: #1e40af; }\n");
         sb.append("    .stat-label { font-size: 14px; color: #6b7280; }\n");
-        sb.append("    .compliant { color: #16a34a; font-weight: bold; }\n");
-        sb.append("    .non-compliant { color: #dc2626; font-weight: bold; }\n");
-        sb.append("    .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }\n");
-        sb.append("    .badge-apples { background-color: #dcfce7; color: #166534; }\n");
-        sb.append("    .badge-carrots { background-color: #fef3c7; color: #92400e; }\n");
-        sb.append("    .badge-veggies { background-color: #e0e7ff; color: #3730a3; }\n");
-        sb.append("    .scenario-section { background-color: #f9fafb; padding: 20px; border-radius: 5px; margin-top: 15px; }\n");
         sb.append("  </style>\n");
         sb.append("</head>\n<body>\n");
         sb.append("  <div class=\"container\">\n");
-        sb.append("    <h1>✅ Quality Compliance Report</h1>\n");
+        sb.append("    <h1>📊 Quality Compliance Report</h1>\n");
         sb.append("    <div class=\"header-info\">\n");
         sb.append("      <strong>Date Range:</strong> ").append(startDate.format(DATE_FORMATTER))
           .append(" to ").append(endDate.format(DATE_FORMATTER)).append("<br>\n");
@@ -1128,93 +1212,98 @@ public class ReportExportService {
         sb.append("      <strong>Total Simulations:</strong> ").append(simulations.size()).append("\n");
         sb.append("    </div>\n");
         
-        // Calculate overall compliance statistics
-        long compliant = simulations.stream().filter(s -> "COMPLIANT".equals(s.getComplianceStatus())).count();
-        long nonCompliant = simulations.size() - compliant;
+        // Overall compliance stats
+        long compliant = simulations.stream()
+            .filter(s -> "COMPLIANT".equals(s.getComplianceStatus()))
+            .count();
         double complianceRate = simulations.isEmpty() ? 0 : (compliant * 100.0 / simulations.size());
-        double avgInitialQuality = simulations.stream().mapToDouble(PersistedSimulation::getInitialQuality).average().orElse(0);
-        double avgFinalQuality = simulations.stream().mapToDouble(PersistedSimulation::getFinalQuality).average().orElse(0);
-        int totalViolations = simulations.stream().mapToInt(PersistedSimulation::getViolationsCount).sum();
         
-        sb.append("    <h2>📊 Overall Compliance Summary</h2>\n");
+        sb.append("    <h2>📈 Overall Compliance</h2>\n");
         sb.append("    <div class=\"stats\">\n");
-        sb.append("      <div class=\"stat-card\"><div class=\"stat-value\">").append(String.format("%.1f%%", complianceRate)).append("</div><div class=\"stat-label\">Compliance Rate</div></div>\n");
         sb.append("      <div class=\"stat-card\"><div class=\"stat-value\">").append(compliant).append("</div><div class=\"stat-label\">Compliant Simulations</div></div>\n");
-        sb.append("      <div class=\"stat-card\"><div class=\"stat-value\">").append(nonCompliant).append("</div><div class=\"stat-label\">Non-Compliant Simulations</div></div>\n");
-        sb.append("      <div class=\"stat-card\"><div class=\"stat-value\">").append(totalViolations).append("</div><div class=\"stat-label\">Total Violations</div></div>\n");
-        sb.append("      <div class=\"stat-card\"><div class=\"stat-value\">").append(String.format("%.1f%%", avgFinalQuality)).append("</div><div class=\"stat-label\">Average Final Quality</div></div>\n");
-        sb.append("      <div class=\"stat-card\"><div class=\"stat-value\">").append(String.format("%.1f%%", avgInitialQuality - avgFinalQuality)).append("</div><div class=\"stat-label\">Average Quality Degradation</div></div>\n");
+        sb.append("      <div class=\"stat-card\"><div class=\"stat-value\">").append(simulations.size() - compliant).append("</div><div class=\"stat-label\">Non-Compliant</div></div>\n");
+        sb.append("      <div class=\"stat-card\"><div class=\"stat-value\">").append(String.format("%.1f%%", complianceRate)).append("</div><div class=\"stat-label\">Compliance Rate</div></div>\n");
         sb.append("    </div>\n");
         
-        // Group simulations by type (the 3 simulation examples)
-        SimulationGroups groups = groupSimulationsByType(simulations);
+        // By simulation type using helper method
+        List<PersistedSimulation> applesSimulations = filterSimulationsByType(simulations, SimulationType.EXAMPLE_1_APPLES);
+        List<PersistedSimulation> carrotsSimulations = filterSimulationsByType(simulations, SimulationType.EXAMPLE_2_CARROTS);
+        List<PersistedSimulation> veggiesSimulations = filterSimulationsByType(simulations, SimulationType.EXAMPLE_3_VEGETABLES);
         
-        // Add section for the 3 simulation types
-        sb.append("    <h2>🍎🥕🥬 Analysis by Simulation Type (3 Examples from ProducerController)</h2>\n");
-        sb.append("    <p>The following analysis breaks down compliance by the 3 simulation examples: Farm-to-Consumer (Apples), Local Producer (Carrots), and Cross-Region (Vegetables).</p>\n");
-        
-        // Example 1: Farm to Consumer (Apples)
-        if (!groups.apples.isEmpty()) {
-            sb.append("    <div class=\"scenario-section\">\n");
-            sb.append("      <h3><span class=\"badge badge-apples\">Example 1</span> Farm to Consumer Direct (Summer Apples)</h3>\n");
-            sb.append("      <p><strong>Characteristics:</strong> Warehouse stops included, optimal cold chain management, 30-minute duration</p>\n");
-            generateScenarioAnalysis(sb, groups.apples);
-            sb.append("    </div>\n");
-        }
-        
-        // Example 2: Local Producer (Carrots)
-        if (!groups.carrots.isEmpty()) {
-            sb.append("    <div class=\"scenario-section\">\n");
-            sb.append("      <h3><span class=\"badge badge-carrots\">Example 2</span> Local Producer Delivery (Organic Carrots)</h3>\n");
-            sb.append("      <p><strong>Characteristics:</strong> Short direct route, no warehouse stops, strict temperature control, 15-minute duration</p>\n");
-            generateScenarioAnalysis(sb, groups.carrots);
-            sb.append("    </div>\n");
-        }
-        
-        // Example 3: Cross-Region (Vegetables)
-        if (!groups.veggies.isEmpty()) {
-            sb.append("    <div class=\"scenario-section\">\n");
-            sb.append("      <h3><span class=\"badge badge-veggies\">Example 3</span> Cross-Region Long Haul (Mixed Vegetables)</h3>\n");
-            sb.append("      <p><strong>Characteristics:</strong> Extended delivery with temperature events, multiple environmental challenges, 45-minute duration</p>\n");
-            generateScenarioAnalysis(sb, groups.veggies);
-            sb.append("    </div>\n");
-        }
-        
-        // Detailed compliance table
-        sb.append("    <h2>📋 Detailed Compliance Data</h2>\n");
-        sb.append("    <table>\n");
-        sb.append("      <tr><th>Batch ID</th><th>Type</th><th>Scenario</th><th>Status</th><th>Initial Quality</th><th>Final Quality</th><th>Degradation</th><th>Violations</th><th>Compliance</th></tr>\n");
-        
-        for (PersistedSimulation simulation : simulations) {
-            String complianceClass = "COMPLIANT".equals(simulation.getComplianceStatus()) ? "compliant" : "non-compliant";
-            double degradation = simulation.getInitialQuality() - simulation.getFinalQuality();
+        if (!applesSimulations.isEmpty() || !carrotsSimulations.isEmpty() || !veggiesSimulations.isEmpty()) {
+            sb.append("    <h2>🎯 Compliance by Simulation Type</h2>\n");
+            sb.append("    <div class=\"stats\">\n");
             
-            // Determine type
-            String badgeClass = "";
-            String typeName = "Other";
-            if (simulation.getBatchId() != null) {
-                if (simulation.getBatchId().contains("APPLES")) {
-                    badgeClass = "badge-apples";
-                    typeName = "Farm to Consumer";
-                } else if (simulation.getBatchId().contains("CARROTS")) {
-                    badgeClass = "badge-carrots";
-                    typeName = "Local Producer";
-                } else if (simulation.getBatchId().contains("VEGGIES") || simulation.getBatchId().contains("VEGETABLES")) {
-                    badgeClass = "badge-veggies";
-                    typeName = "Cross-Region";
-                }
+            if (!applesSimulations.isEmpty()) {
+                long applesCompliant = applesSimulations.stream()
+                    .filter(s -> "COMPLIANT".equals(s.getComplianceStatus())).count();
+                sb.append("      <div class=\"stat-card\">\n");
+                sb.append("        <div class=\"stat-value\">").append(applesCompliant).append("/").append(applesSimulations.size()).append("</div>\n");
+                sb.append("        <div class=\"stat-label\">Example 1 - Apples<br>Farm to Consumer</div>\n");
+                sb.append("      </div>\n");
             }
             
+            if (!carrotsSimulations.isEmpty()) {
+                long carrotsCompliant = carrotsSimulations.stream()
+                    .filter(s -> "COMPLIANT".equals(s.getComplianceStatus())).count();
+                sb.append("      <div class=\"stat-card\">\n");
+                sb.append("        <div class=\"stat-value\">").append(carrotsCompliant).append("/").append(carrotsSimulations.size()).append("</div>\n");
+                sb.append("        <div class=\"stat-label\">Example 2 - Carrots<br>Local Producer</div>\n");
+                sb.append("      </div>\n");
+            }
+            
+            if (!veggiesSimulations.isEmpty()) {
+                long veggiesCompliant = veggiesSimulations.stream()
+                    .filter(s -> "COMPLIANT".equals(s.getComplianceStatus())).count();
+                sb.append("      <div class=\"stat-card\">\n");
+                sb.append("        <div class=\"stat-value\">").append(veggiesCompliant).append("/").append(veggiesSimulations.size()).append("</div>\n");
+                sb.append("        <div class=\"stat-label\">Example 3 - Vegetables<br>Cross-Region</div>\n");
+                sb.append("      </div>\n");
+            }
+            
+            sb.append("    </div>\n");
+        }
+        
+        // Detailed table
+        sb.append("    <h2>📋 Detailed Compliance Data</h2>\n");
+        sb.append("    <table>\n");
+        sb.append("      <tr><th>Batch ID</th><th>Type</th><th>Compliance</th><th>Final Quality</th><th>Violations</th><th>Avg Temp</th></tr>\n");
+        
+        for (PersistedSimulation simulation : simulations) {
             sb.append("      <tr>\n");
             sb.append("        <td>").append(escapeHtml(simulation.getBatchId())).append("</td>\n");
+            
+            // Determine type with badge using helper method
+            SimulationType simType = SimulationType.fromSimulation(simulation);
+            String badgeClass = "";
+            String typeName = simType.getDisplayName();
+            
+            switch (simType) {
+                case EXAMPLE_1_APPLES:
+                    badgeClass = "badge-apples";
+                    typeName = "Example 1 - Apples";
+                    break;
+                case EXAMPLE_2_CARROTS:
+                    badgeClass = "badge-carrots";
+                    typeName = "Example 2 - Carrots";
+                    break;
+                case EXAMPLE_3_VEGETABLES:
+                    badgeClass = "badge-veggies";
+                    typeName = "Example 3 - Vegetables"; // Consistent with enum display name
+                    break;
+                default:
+                    badgeClass = "";
+                    typeName = "Other";
+            }
+            
             sb.append("        <td><span class=\"badge ").append(badgeClass).append("\">").append(typeName).append("</span></td>\n");
-            sb.append("        <td>").append(escapeHtml(simulation.getScenarioId())).append("</td>\n");
-            sb.append("        <td>").append(simulation.isCompleted() ? "✓ Completed" : "○ In Progress").append("</td>\n");
-            sb.append("        <td>").append(String.format("%.1f%%", simulation.getInitialQuality())).append("</td>\n");
+            
+            String complianceBadge = "COMPLIANT".equals(simulation.getComplianceStatus()) ? 
+                "badge-compliant\">✓ Compliant" : "badge-non-compliant\">✗ Non-Compliant";
+            sb.append("        <td><span class=\"badge ").append(complianceBadge).append("</span></td>\n");
             sb.append("        <td>").append(String.format("%.1f%%", simulation.getFinalQuality())).append("</td>\n");
-            sb.append("        <td>").append(String.format("%.1f%%", degradation)).append("</td>\n");
             sb.append("        <td>").append(simulation.getViolationsCount()).append("</td>\n");
-            sb.append("        <td class=\"").append(complianceClass).append("\">").append(escapeHtml(simulation.getComplianceStatus())).append("</td>\n");
+            sb.append("        <td>").append(String.format("%.1f°C", simulation.getAvgTemperature())).append("</td>\n");
             sb.append("      </tr>\n");
         }
         
@@ -1223,38 +1312,6 @@ public class ReportExportService {
         sb.append("</body>\n</html>\n");
         
         return sb.toString();
-    }
-    
-    /**
-     * Generate scenario-specific analysis section
-     */
-    private void generateScenarioAnalysis(StringBuilder sb, List<PersistedSimulation> scenarios) {
-        if (scenarios.isEmpty()) {
-            sb.append("      <p>No simulations available for this type.</p>\n");
-            return;
-        }
-        
-        long compliant = scenarios.stream().filter(s -> "COMPLIANT".equals(s.getComplianceStatus())).count();
-        double complianceRate = (compliant * 100.0) / scenarios.size();
-        double avgInitialQuality = scenarios.stream().mapToDouble(PersistedSimulation::getInitialQuality).average().orElse(0);
-        double avgFinalQuality = scenarios.stream().mapToDouble(PersistedSimulation::getFinalQuality).average().orElse(0);
-        double avgDegradation = avgInitialQuality - avgFinalQuality;
-        int totalViolations = scenarios.stream().mapToInt(PersistedSimulation::getViolationsCount).sum();
-        double avgViolations = (double) totalViolations / scenarios.size();
-        double avgTempMin = scenarios.stream().mapToDouble(PersistedSimulation::getMinTemperature).average().orElse(0);
-        double avgTempMax = scenarios.stream().mapToDouble(PersistedSimulation::getMaxTemperature).average().orElse(0);
-        double avgTemp = scenarios.stream().mapToDouble(PersistedSimulation::getAvgTemperature).average().orElse(0);
-        
-        sb.append("      <table style=\"width: 100%; margin-top: 10px;\">\n");
-        sb.append("        <tr><th>Metric</th><th>Value</th></tr>\n");
-        sb.append("        <tr><td>Simulations Run</td><td>").append(scenarios.size()).append("</td></tr>\n");
-        sb.append("        <tr><td>Compliance Rate</td><td>").append(String.format("%.1f%% (%d/%d)", complianceRate, compliant, scenarios.size())).append("</td></tr>\n");
-        sb.append("        <tr><td>Average Initial Quality</td><td>").append(String.format("%.1f%%", avgInitialQuality)).append("</td></tr>\n");
-        sb.append("        <tr><td>Average Final Quality</td><td>").append(String.format("%.1f%%", avgFinalQuality)).append("</td></tr>\n");
-        sb.append("        <tr><td>Average Quality Degradation</td><td>").append(String.format("%.1f%%", avgDegradation)).append("</td></tr>\n");
-        sb.append("        <tr><td>Total Violations</td><td>").append(totalViolations).append(" (avg: ").append(String.format("%.1f", avgViolations)).append(" per simulation)</td></tr>\n");
-        sb.append("        <tr><td>Temperature Range</td><td>").append(String.format("%.1f°C - %.1f°C (avg: %.1f°C)", avgTempMin, avgTempMax, avgTemp)).append("</td></tr>\n");
-        sb.append("      </table>\n");
     }
     
     private String generateDeliveryPerformanceJson(List<PersistedSimulation> simulations,
@@ -1571,49 +1628,70 @@ public class ReportExportService {
         return reportsDirectory.toAbsolutePath().toString();
     }
     
+    // ==================== SIMULATION TYPE CLASSIFICATION ====================
+    
     /**
-     * Group simulations by type (the 3 simulation examples).
-     * Reduces code duplication when analyzing simulations by type.
-     * Uses constants for batch type identifiers to reduce hardcoded strings.
+     * Enum representing the 3 simulation types from ProducerController.
      */
-    private SimulationGroups groupSimulationsByType(List<PersistedSimulation> simulations) {
-        List<PersistedSimulation> apples = simulations.stream()
-            .filter(s -> s.getBatchId() != null && s.getBatchId().contains(BATCH_TYPE_APPLES))
-            .collect(Collectors.toList());
-        List<PersistedSimulation> carrots = simulations.stream()
-            .filter(s -> s.getBatchId() != null && s.getBatchId().contains(BATCH_TYPE_CARROTS))
-            .collect(Collectors.toList());
-        List<PersistedSimulation> veggies = simulations.stream()
-            .filter(s -> s.getBatchId() != null && 
-                (s.getBatchId().contains(BATCH_TYPE_VEGGIES) || s.getBatchId().contains(BATCH_TYPE_VEGETABLES)))
-            .collect(Collectors.toList());
+    private enum SimulationType {
+        EXAMPLE_1_APPLES("Example 1 - Farm to Consumer (Apples)", "example_1", "APPLES"),
+        EXAMPLE_2_CARROTS("Example 2 - Local Producer (Carrots)", "example_2", "CARROTS"),
+        EXAMPLE_3_VEGETABLES("Example 3 - Cross-Region (Vegetables)", "example_3", "VEGGIES", "VEGETABLES"),
+        OTHER("Other", null);
         
-        return new SimulationGroups(apples, carrots, veggies);
+        private final String displayName;
+        private final String scenarioId;
+        private final String[] batchIdKeywords;
+        
+        SimulationType(String displayName, String scenarioId, String... batchIdKeywords) {
+            this.displayName = displayName;
+            this.scenarioId = scenarioId;
+            this.batchIdKeywords = batchIdKeywords;
+        }
+        
+        public String getDisplayName() {
+            return displayName;
+        }
+        
+        /**
+         * Determine simulation type from a PersistedSimulation.
+         */
+        public static SimulationType fromSimulation(PersistedSimulation simulation) {
+            // Defensive: handle null simulation or null batch ID
+            if (simulation == null || simulation.getBatchId() == null) {
+                return OTHER;
+            }
+            
+            for (SimulationType type : values()) {
+                if (type == OTHER) continue; // Skip OTHER, it's the default fallback
+                
+                // Check scenario ID
+                if (type.scenarioId != null && simulation.getScenarioId() != null && 
+                    simulation.getScenarioId().contains(type.scenarioId)) {
+                    return type;
+                }
+                
+                // Check batch ID keywords (batch ID is guaranteed non-null here)
+                if (type.batchIdKeywords != null) {
+                    for (String keyword : type.batchIdKeywords) {
+                        if (simulation.getBatchId().contains(keyword)) {
+                            return type;
+                        }
+                    }
+                }
+            }
+            return OTHER;
+        }
     }
     
     /**
-     * Calculate average duration in minutes from completed simulations.
-     * Reduces code duplication when calculating delivery durations.
+     * Filter simulations by type.
+     * Helper method to avoid duplication.
      */
-    private double calculateAverageDuration(List<PersistedSimulation> simulations) {
-        if (simulations.isEmpty()) {
-            return 0;
-        }
-        
-        long totalDuration = 0;
-        int validCount = 0;
-        
-        for (PersistedSimulation s : simulations) {
-            if (s.isCompleted() && s.getEndTime() > s.getStartTime()) {
-                totalDuration += (s.getEndTime() - s.getStartTime());
-                validCount++;
-            }
-        }
-        
-        if (validCount == 0) {
-            return 0;
-        }
-        
-        return (totalDuration / validCount) / (1000.0 * 60.0);
+    private List<PersistedSimulation> filterSimulationsByType(List<PersistedSimulation> simulations, 
+                                                                SimulationType type) {
+        return simulations.stream()
+                .filter(s -> SimulationType.fromSimulation(s) == type)
+                .collect(Collectors.toList());
     }
 }

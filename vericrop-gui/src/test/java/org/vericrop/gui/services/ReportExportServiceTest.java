@@ -220,7 +220,8 @@ class ReportExportServiceTest {
         assertTrue(exportedFile.exists());
         String content = Files.readString(exportedFile.toPath());
         
-        assertTrue(content.contains("Batch ID,Scenario,Status,Completed,Final Quality"));
+        // Updated to check for new CSV header format with "Simulation Type" column
+        assertTrue(content.contains("Batch ID,Simulation Type,Scenario,Status,Completed,Final Quality"));
         assertTrue(content.contains("COMPLIANT"));
         assertTrue(content.contains("NON_COMPLIANT"));
     }
