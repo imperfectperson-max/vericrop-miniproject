@@ -607,9 +607,9 @@ public class ReportExportService {
         sb.append("Total Simulations: ").append(simulations.size()).append("\n\n");
         
         // Separate simulations by type using helper method
-        List<PersistedSimulation> applesSimulations = filterSimulationsByType(simulations, SimulationType.EXAMPLE_1_APPLES);
-        List<PersistedSimulation> carrotsSimulations = filterSimulationsByType(simulations, SimulationType.EXAMPLE_2_CARROTS);
-        List<PersistedSimulation> veggiesSimulations = filterSimulationsByType(simulations, SimulationType.EXAMPLE_3_VEGETABLES);
+        List<PersistedSimulation> smoothSimulations = filterSimulationsByType(simulations, SimulationType.EXAMPLE_1_SMOOTH);
+        List<PersistedSimulation> alertSimulations = filterSimulationsByType(simulations, SimulationType.EXAMPLE_2_ALERT);
+        List<PersistedSimulation> qualitySimulations = filterSimulationsByType(simulations, SimulationType.EXAMPLE_3_QUALITY);
         
         long compliant = simulations.stream()
             .filter(s -> "COMPLIANT".equals(s.getComplianceStatus()))
@@ -625,24 +625,24 @@ public class ReportExportService {
         sb.append("Compliance Rate:    ").append(String.format("%.1f%%", complianceRate)).append("\n\n");
         
         // Breakdown by simulation type
-        if (!applesSimulations.isEmpty() || !carrotsSimulations.isEmpty() || !veggiesSimulations.isEmpty()) {
+        if (!smoothSimulations.isEmpty() || !alertSimulations.isEmpty() || !qualitySimulations.isEmpty()) {
             sb.append("-------------------------------------------------\n");
             sb.append("COMPLIANCE BY SIMULATION TYPE\n");
             sb.append("-------------------------------------------------\n\n");
             
-            if (!applesSimulations.isEmpty()) {
-                appendSimulationTypeComplianceText(sb, "Example 1 - Farm to Consumer (Apples)", 
-                    applesSimulations, "30min warehouse route, optimal cold chain");
+            if (!smoothSimulations.isEmpty()) {
+                appendSimulationTypeComplianceText(sb, "Example 1 - Smooth Delivery", 
+                    smoothSimulations, "2min normal operations, stable temperatures, optimal cold chain");
             }
             
-            if (!carrotsSimulations.isEmpty()) {
-                appendSimulationTypeComplianceText(sb, "Example 2 - Local Producer (Carrots)", 
-                    carrotsSimulations, "15min direct route, strict temp control");
+            if (!alertSimulations.isEmpty()) {
+                appendSimulationTypeComplianceText(sb, "Example 2 - Temperature Alert", 
+                    alertSimulations, "2min demo with temperature spikes and alert generation");
             }
             
-            if (!veggiesSimulations.isEmpty()) {
-                appendSimulationTypeComplianceText(sb, "Example 3 - Cross-Region (Vegetables)", 
-                    veggiesSimulations, "45min extended route, temp spike events");
+            if (!qualitySimulations.isEmpty()) {
+                appendSimulationTypeComplianceText(sb, "Example 3 - Quality Journey", 
+                    qualitySimulations, "2min full journey with quality checkpoints and tracking");
             }
         }
         
@@ -963,14 +963,14 @@ public class ReportExportService {
         sb.append("  },\n");
         
         // Breakdown by simulation type using helper method
-        long applesCount = filterSimulationsByType(simulations, SimulationType.EXAMPLE_1_APPLES).size();
-        long carrotsCount = filterSimulationsByType(simulations, SimulationType.EXAMPLE_2_CARROTS).size();
-        long veggiesCount = filterSimulationsByType(simulations, SimulationType.EXAMPLE_3_VEGETABLES).size();
+        long smoothCount = filterSimulationsByType(simulations, SimulationType.EXAMPLE_1_SMOOTH).size();
+        long alertCount = filterSimulationsByType(simulations, SimulationType.EXAMPLE_2_ALERT).size();
+        long qualityCount = filterSimulationsByType(simulations, SimulationType.EXAMPLE_3_QUALITY).size();
         
         sb.append("  \"bySimulationType\": {\n");
-        sb.append("    \"example1Apples\": ").append(applesCount).append(",\n");
-        sb.append("    \"example2Carrots\": ").append(carrotsCount).append(",\n");
-        sb.append("    \"example3Vegetables\": ").append(veggiesCount).append("\n");
+        sb.append("    \"example1Smooth\": ").append(smoothCount).append(",\n");
+        sb.append("    \"example2Alert\": ").append(alertCount).append(",\n");
+        sb.append("    \"example3Quality\": ").append(qualityCount).append("\n");
         sb.append("  }\n");
         sb.append("}\n");
         return sb.toString();
@@ -1028,38 +1028,38 @@ public class ReportExportService {
         sb.append("    </div>\n");
         
         // By simulation type using helper method
-        List<PersistedSimulation> applesSimulations = filterSimulationsByType(simulations, SimulationType.EXAMPLE_1_APPLES);
-        List<PersistedSimulation> carrotsSimulations = filterSimulationsByType(simulations, SimulationType.EXAMPLE_2_CARROTS);
-        List<PersistedSimulation> veggiesSimulations = filterSimulationsByType(simulations, SimulationType.EXAMPLE_3_VEGETABLES);
+        List<PersistedSimulation> smoothSimulations = filterSimulationsByType(simulations, SimulationType.EXAMPLE_1_SMOOTH);
+        List<PersistedSimulation> alertSimulations = filterSimulationsByType(simulations, SimulationType.EXAMPLE_2_ALERT);
+        List<PersistedSimulation> qualitySimulations = filterSimulationsByType(simulations, SimulationType.EXAMPLE_3_QUALITY);
         
-        if (!applesSimulations.isEmpty() || !carrotsSimulations.isEmpty() || !veggiesSimulations.isEmpty()) {
+        if (!smoothSimulations.isEmpty() || !alertSimulations.isEmpty() || !qualitySimulations.isEmpty()) {
             sb.append("    <h2>🎯 Compliance by Simulation Type</h2>\n");
             sb.append("    <div class=\"stats\">\n");
             
-            if (!applesSimulations.isEmpty()) {
-                long applesCompliant = applesSimulations.stream()
+            if (!smoothSimulations.isEmpty()) {
+                long smoothCompliant = smoothSimulations.stream()
                     .filter(s -> "COMPLIANT".equals(s.getComplianceStatus())).count();
                 sb.append("      <div class=\"stat-card\">\n");
-                sb.append("        <div class=\"stat-value\">").append(applesCompliant).append("/").append(applesSimulations.size()).append("</div>\n");
-                sb.append("        <div class=\"stat-label\">Example 1 - Apples<br>Farm to Consumer</div>\n");
+                sb.append("        <div class=\"stat-value\">").append(smoothCompliant).append("/").append(smoothSimulations.size()).append("</div>\n");
+                sb.append("        <div class=\"stat-label\">Example 1 - Smooth Delivery<br>Normal Operations</div>\n");
                 sb.append("      </div>\n");
             }
             
-            if (!carrotsSimulations.isEmpty()) {
-                long carrotsCompliant = carrotsSimulations.stream()
+            if (!alertSimulations.isEmpty()) {
+                long alertCompliant = alertSimulations.stream()
                     .filter(s -> "COMPLIANT".equals(s.getComplianceStatus())).count();
                 sb.append("      <div class=\"stat-card\">\n");
-                sb.append("        <div class=\"stat-value\">").append(carrotsCompliant).append("/").append(carrotsSimulations.size()).append("</div>\n");
-                sb.append("        <div class=\"stat-label\">Example 2 - Carrots<br>Local Producer</div>\n");
+                sb.append("        <div class=\"stat-value\">").append(alertCompliant).append("/").append(alertSimulations.size()).append("</div>\n");
+                sb.append("        <div class=\"stat-label\">Example 2 - Temperature Alert<br>With Temp Spikes</div>\n");
                 sb.append("      </div>\n");
             }
             
-            if (!veggiesSimulations.isEmpty()) {
-                long veggiesCompliant = veggiesSimulations.stream()
+            if (!qualitySimulations.isEmpty()) {
+                long qualityCompliant = qualitySimulations.stream()
                     .filter(s -> "COMPLIANT".equals(s.getComplianceStatus())).count();
                 sb.append("      <div class=\"stat-card\">\n");
-                sb.append("        <div class=\"stat-value\">").append(veggiesCompliant).append("/").append(veggiesSimulations.size()).append("</div>\n");
-                sb.append("        <div class=\"stat-label\">Example 3 - Vegetables<br>Cross-Region</div>\n");
+                sb.append("        <div class=\"stat-value\">").append(qualityCompliant).append("/").append(qualitySimulations.size()).append("</div>\n");
+                sb.append("        <div class=\"stat-label\">Example 3 - Quality Journey<br>Full Tracking</div>\n");
                 sb.append("      </div>\n");
             }
             
@@ -1081,17 +1081,17 @@ public class ReportExportService {
             String typeName = simType.getDisplayName();
             
             switch (simType) {
-                case EXAMPLE_1_APPLES:
-                    badgeClass = "badge-apples";
-                    typeName = "Example 1 - Apples";
+                case EXAMPLE_1_SMOOTH:
+                    badgeClass = "badge-apples";  // Reuse green badge for smooth delivery
+                    typeName = "Example 1 - Smooth";
                     break;
-                case EXAMPLE_2_CARROTS:
-                    badgeClass = "badge-carrots";
-                    typeName = "Example 2 - Carrots";
+                case EXAMPLE_2_ALERT:
+                    badgeClass = "badge-carrots";  // Reuse yellow badge for alerts
+                    typeName = "Example 2 - Alert";
                     break;
-                case EXAMPLE_3_VEGETABLES:
-                    badgeClass = "badge-veggies";
-                    typeName = "Example 3 - Vegetables"; // Consistent with enum display name
+                case EXAMPLE_3_QUALITY:
+                    badgeClass = "badge-veggies";  // Reuse blue badge for quality
+                    typeName = "Example 3 - Quality";
                     break;
                 default:
                     badgeClass = "";
@@ -1250,11 +1250,12 @@ public class ReportExportService {
     
     /**
      * Enum representing the 3 simulation types from ProducerController.
+     * Updated to match the actual presentation scenario batch prefixes and IDs.
      */
     private enum SimulationType {
-        EXAMPLE_1_APPLES("Example 1 - Farm to Consumer (Apples)", "example_1", "APPLES"),
-        EXAMPLE_2_CARROTS("Example 2 - Local Producer (Carrots)", "example_2", "CARROTS"),
-        EXAMPLE_3_VEGETABLES("Example 3 - Cross-Region (Vegetables)", "example_3", "VEGGIES", "VEGETABLES"),
+        EXAMPLE_1_SMOOTH("Example 1 - Smooth Delivery", "presentation_scenario_1", "SMOOTH"),
+        EXAMPLE_2_ALERT("Example 2 - Temperature Alert", "presentation_scenario_2", "ALERT"),
+        EXAMPLE_3_QUALITY("Example 3 - Quality Journey", "presentation_scenario_3", "QUALITY"),
         OTHER("Other", null);
         
         private final String displayName;
