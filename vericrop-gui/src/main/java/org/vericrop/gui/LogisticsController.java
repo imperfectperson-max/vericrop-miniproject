@@ -275,9 +275,9 @@ public class LogisticsController implements SimulationListener {
             // Initialize alert producer
             try {
                 qualityAlertProducer = new QualityAlertProducer();
-                System.out.println("✅ Quality alert producer initialized");
+                logger.info("Quality alert producer initialized successfully");
             } catch (Exception e) {
-                System.err.println("⚠️ Failed to initialize alert producer: " + e.getMessage());
+                logger.warn("Failed to initialize alert producer: {} - continuing without alert producer", e.getMessage());
                 // Continue without alert producer
             }
             
