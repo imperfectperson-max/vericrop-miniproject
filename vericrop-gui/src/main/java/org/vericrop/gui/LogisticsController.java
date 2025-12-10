@@ -118,6 +118,9 @@ public class LogisticsController implements SimulationListener {
     // Track latest environmental data by batch ID for shipments table
     private Map<String, ShipmentEnvironmentalData> environmentalDataMap = new ConcurrentHashMap<>();
     
+    // Track last progress per batch ID to prevent backward progress (same as ConsumerController)
+    private Map<String, Double> lastProgressMap = new ConcurrentHashMap<>();
+    
     // Report type display name to enum mapping
     private static final Map<String, ReportExportService.ReportType> REPORT_TYPE_MAP = new HashMap<>();
     static {
@@ -231,6 +234,9 @@ public class LogisticsController implements SimulationListener {
                     double progress = manager.getProgress();
                     String location = manager.getCurrentLocation();
                     String farmerId = manager.getCurrentProducer();
+                    
+                    // Initialize progress tracking for this batch
+                    lastProgressMap.put(batchId, progress);
                     
                     Platform.runLater(() -> {
                         alerts.add(0, "📍 Active simulation detected: " + batchId);
@@ -365,6 +371,9 @@ public class LogisticsController implements SimulationListener {
                     // Remove from stopped simulations if restarting
                     stoppedSimulations.remove(batchId);
                     
+                    // Initialize progress tracking for this batch
+                    lastProgressMap.put(batchId, 0.0);
+                    
                     // Mark this simulation as Kafka-managed (not locally managed by DeliverySimulator)
                     // This prevents syncWithDeliverySimulator() from incorrectly marking it as completed
                     // when the local DeliverySimulator doesn't know about it
@@ -409,6 +418,9 @@ public class LogisticsController implements SimulationListener {
                     // Remove from kafkaManagedSimulations as it's now stopped
                     kafkaManagedSimulations.remove(batchId);
                     logger.debug("Removed {} from kafkaManagedSimulations (remaining: {})", batchId, kafkaManagedSimulations.size());
+                    
+                    // Clean up progress tracking for this batch
+                    lastProgressMap.remove(batchId);
                     
                     alerts.add(0, "⏹ Simulation stopped via Kafka: " + batchId);
                     if (alerts.size() > MAX_ALERT_ITEMS) {
@@ -456,28 +468,53 @@ public class LogisticsController implements SimulationListener {
         
         Platform.runLater(() -> {
             try {
-                // Update environmental data tracking from map event
+                String batchId = event.getBatchId();
+                double progressPercent = event.getProgress() * 100; // Convert from 0-1 to 0-100
+                
+                // Update environmental data tracking from map event (always do this, even if progress goes backward)
                 ShipmentEnvironmentalData envData = environmentalDataMap.computeIfAbsent(
-                    event.getBatchId(), k -> new ShipmentEnvironmentalData());
+                    batchId, k -> new ShipmentEnvironmentalData());
                 double previousHumidity = envData.humidity;
                 envData.temperature = event.getTemperature();
                 envData.humidity = event.getHumidity();
                 
+                // Update shipments table with new environmental data (always update, even if progress goes backward)
+                updateShipmentEnvironmentalData(batchId);
+                
+                // Generate humidity alerts when thresholds are breached (always check, even if progress goes backward)
+                // Optimal humidity for cold chain is 65-85%
+                checkAndGenerateHumidityAlert(batchId, event.getHumidity(), 
+                                             event.getLocationName(), previousHumidity);
+                
+                // Generate temperature alerts for extreme values from map event (always check, even if progress goes backward)
+                // (complements TemperatureComplianceEvent which handles detailed temp monitoring)
+                checkAndGenerateTemperatureAlert(batchId, event.getTemperature(),
+                                                event.getLocationName());
+                
+                // Skip backward progress updates for UI display (prevent restart issues)
+                // Use strict less-than to allow events at the same progress level to update
+                // map position, timeline, and status
+                Double lastProgress = lastProgressMap.get(batchId);
+                if (lastProgress != null && progressPercent < lastProgress) {
+                    logger.debug("Skipping backward progress for {}: {} < {} (environmental data still updated)", 
+                        batchId, progressPercent, lastProgress);
+                    return;
+                }
+                
+                // Update last progress for this batch
+                lastProgressMap.put(batchId, progressPercent);
+                
                 // Update map marker position based on event data
                 updateMapFromEvent(event);
                 
-                // Update shipments table with new environmental data (if row exists)
-                updateShipmentEnvironmentalData(event.getBatchId());
-                
                 // Determine status based on progress to detect transitions
-                double progressPercent = event.getProgress() * 100;
                 String newStatus = determineStatusFromProgress(progressPercent);
                 
                 // Update timeline with current progress
-                updateTimeline(event.getBatchId(), progressPercent, newStatus);
+                updateTimeline(batchId, progressPercent, newStatus);
                 
                 // Get visualization to track last status
-                MapVisualization visualization = activeShipments.get(event.getBatchId());
+                MapVisualization visualization = activeShipments.get(batchId);
                 if (visualization != null) {
                     String lastStatus = visualization.lastStatus;
                     
@@ -485,7 +522,7 @@ public class LogisticsController implements SimulationListener {
                     if (lastStatus == null || !lastStatus.equals(newStatus)) {
                         String locationName = event.getLocationName() != null ? event.getLocationName() : "Unknown Location";
                         String alertMsg = String.format("🗺️ %s: %s - %s", 
-                            event.getBatchId(), newStatus, locationName);
+                            batchId, newStatus, locationName);
                         alerts.add(0, alertMsg);
                         if (alerts.size() > MAX_ALERT_ITEMS) {
                             alerts.remove(alerts.size() - 1);
@@ -493,19 +530,9 @@ public class LogisticsController implements SimulationListener {
                         
                         // Update last status to prevent duplicates
                         visualization.lastStatus = newStatus;
-                        logger.info("Status transition: {} -> {}", event.getBatchId(), newStatus);
+                        logger.info("Status transition: {} -> {}", batchId, newStatus);
                     }
                 }
-                
-                // Generate humidity alerts when thresholds are breached
-                // Optimal humidity for cold chain is 65-85%
-                checkAndGenerateHumidityAlert(event.getBatchId(), event.getHumidity(), 
-                                             event.getLocationName(), previousHumidity);
-                
-                // Generate temperature alerts for extreme values from map event
-                // (complements TemperatureComplianceEvent which handles detailed temp monitoring)
-                checkAndGenerateTemperatureAlert(event.getBatchId(), event.getTemperature(),
-                                                event.getLocationName());
                 
             } catch (Exception e) {
                 logger.error("Error handling map simulation event: {}", e.getMessage(), e);
@@ -2365,6 +2392,9 @@ public class LogisticsController implements SimulationListener {
         // Remove from stopped simulations if restarting (allows chart updates again)
         stoppedSimulations.remove(batchId);
         
+        // Initialize progress tracking for this batch
+        lastProgressMap.put(batchId, 0.0);
+        
         // Check if this simulation is already tracked via Kafka (from another instance)
         // If so, skip local initialization to avoid duplicate tracking
         if (kafkaManagedSimulations.contains(batchId)) {
@@ -2936,6 +2966,9 @@ public class LogisticsController implements SimulationListener {
         }
         
         logger.info("Simulation stopped for batch: {} (completed: {})", batchId, completed);
+        
+        // Clean up progress tracking for this batch
+        lastProgressMap.remove(batchId);
         
         Platform.runLater(() -> {
             String message = completed ? 
