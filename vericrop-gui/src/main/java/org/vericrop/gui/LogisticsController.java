@@ -206,10 +206,11 @@ public class LogisticsController implements SimulationListener {
         try {
             this.instanceRegistry = new InstanceRegistry(InstanceHeartbeatEvent.Role.LOGISTICS);
             this.instanceRegistry.start();
-            logger.info("📡 LogisticsController instance registry started with ID: {} (role: {})",
+            logger.info("LogisticsController instance registry started with ID: {} (role: {})",
                        instanceRegistry.getInstanceId(), instanceRegistry.getRole());
+            logger.info("Multi-instance mode: This LogisticsController will receive ALL events via unique consumer groups");
         } catch (Exception e) {
-            logger.warn("⚠️ Failed to initialize instance registry: {} - simulation coordination may be affected", 
+            logger.warn("Failed to initialize instance registry: {} - simulation coordination may be affected", 
                        e.getMessage());
         }
     }
@@ -281,8 +282,9 @@ public class LogisticsController implements SimulationListener {
             }
             
             // Create unique consumer group IDs for this instance to receive all events
-            // Format: logistics-{type}-{timestamp} ensures each instance gets its own group
-            long instanceId = System.currentTimeMillis();
+            // Format: logistics-{type}-{uuid} ensures true uniqueness even if instances start simultaneously
+            // Using UUID instead of timestamp to avoid collisions in rapid multi-instance startup scenarios
+            String instanceId = java.util.UUID.randomUUID().toString();
             String mapGroupId = "logistics-map-" + instanceId;
             String tempGroupId = "logistics-temp-" + instanceId;
             String controlGroupId = "logistics-control-" + instanceId;
@@ -334,7 +336,7 @@ public class LogisticsController implements SimulationListener {
                 }
             });
             
-            logger.info("✅ Kafka consumers initialized for logistics monitoring (map: {}, temp: {}, control: {})",
+            logger.info("Kafka consumers initialized successfully for logistics monitoring (map: {}, temp: {}, control: {})",
                        mapGroupId, tempGroupId, controlGroupId);
         } catch (Exception e) {
             logger.error("⚠️ Failed to initialize Kafka consumers: {}", e.getMessage(), e);
