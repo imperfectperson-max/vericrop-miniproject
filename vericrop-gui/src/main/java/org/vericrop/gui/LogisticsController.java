@@ -1348,10 +1348,26 @@ public class LogisticsController implements SimulationListener {
         LocalDate startDate = startDatePicker.getValue();
         LocalDate endDate = endDatePicker.getValue();
         
-        if (startDate == null || endDate == null) {
-            // Use default date range (last 30 days)
-            endDate = LocalDate.now();
-            startDate = endDate.minusDays(30);
+        // Validate date range for Quality Compliance reports (required)
+        if ("Quality Compliance".equals(reportType)) {
+            if (startDate == null || endDate == null) {
+                showAlert(Alert.AlertType.WARNING, "Date Range Required",
+                        "Quality Compliance reports require both Start Date and End Date to be selected.\n\n" +
+                        "Please select a date range to filter simulations.");
+                return;
+            }
+            if (startDate.isAfter(endDate)) {
+                showAlert(Alert.AlertType.WARNING, "Invalid Date Range",
+                        "Start Date must be before or equal to End Date.");
+                return;
+            }
+        } else {
+            // For other report types, use default date range if not provided
+            if (startDate == null || endDate == null) {
+                // Use default date range (last 30 days)
+                endDate = LocalDate.now();
+                startDate = endDate.minusDays(30);
+            }
         }
         
         // Get export format using enum parsing
@@ -1557,12 +1573,45 @@ public class LogisticsController implements SimulationListener {
         final String reportType = reportTypeCombo.getValue() != null ?
                 reportTypeCombo.getValue() : "General Report";
         
-        // Get date range or use default (last 30 days)
+        // Get date range
         LocalDate startDate = startDatePicker.getValue();
         LocalDate endDate = endDatePicker.getValue();
-        if (startDate == null || endDate == null) {
-            endDate = LocalDate.now();
-            startDate = endDate.minusDays(30);
+        
+        // Validate date range for Quality Compliance reports (required)
+        if ("Quality Compliance".equals(reportType)) {
+            if (startDate == null || endDate == null) {
+                Platform.runLater(() -> {
+                    reportArea.setText("=== ERROR ===\n\n" +
+                        "Quality Compliance reports require both Start Date and End Date to be selected.\n\n" +
+                        "Please select a date range from the Date Range section above to filter simulations " +
+                        "and generate an accurate Quality Compliance report.\n\n" +
+                        "The date range is used to:\n" +
+                        "- Filter simulations by their creation/completion timestamp\n" +
+                        "- Calculate compliance statistics for the selected period\n" +
+                        "- Determine quality grades and violation counts\n\n" +
+                        "For other report types, the date range is optional and defaults to the last 30 days.");
+                });
+                showAlert(Alert.AlertType.WARNING, "Date Range Required",
+                        "Quality Compliance reports require both Start Date and End Date.\n\n" +
+                        "Please select a date range to filter simulations.");
+                return;
+            }
+            if (startDate.isAfter(endDate)) {
+                Platform.runLater(() -> {
+                    reportArea.setText("=== ERROR ===\n\n" +
+                        "Invalid Date Range: Start Date must be before or equal to End Date.\n\n" +
+                        "Please adjust the date range and try again.");
+                });
+                showAlert(Alert.AlertType.WARNING, "Invalid Date Range",
+                        "Start Date must be before or equal to End Date.");
+                return;
+            }
+        } else {
+            // For other report types, use default date range if not provided
+            if (startDate == null || endDate == null) {
+                endDate = LocalDate.now();
+                startDate = endDate.minusDays(30);
+            }
         }
         
         final String dateRange = "Date Range: " + startDate + " to " + endDate + "\n";

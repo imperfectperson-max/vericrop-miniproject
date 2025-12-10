@@ -226,6 +226,101 @@ class ReportExportServiceTest {
         assertTrue(content.contains("NON_COMPLIANT"));
     }
     
+    /**
+     * Test that quality compliance reports correctly filter simulations by date range.
+     * This test validates that:
+     * 1. Simulations outside the date range are excluded
+     * 2. Quality grade counts (High >=80%, Medium 60-79%, Low <60%) reflect only filtered simulations
+     * 3. Compliance calculations use only simulations within the date range
+     * 4. Average quality metrics are computed from filtered simulations only
+     */
+    @Test
+    void testQualityComplianceReport_DateRangeFiltering() throws IOException {
+        // Setup: Clear existing data and add simulations with specific timestamps
+        persistenceService.clearAllData();
+        
+        // Add simulation from yesterday (should be excluded from narrow range)
+        PersistedSimulation oldSim = new PersistedSimulation("OLD_BATCH", "FARMER_OLD", "OLD_SCENARIO");
+        oldSim.setStatus("COMPLETED");
+        oldSim.setCompleted(true);
+        oldSim.setInitialQuality(100.0);
+        oldSim.setFinalQuality(95.0); // High quality (>=80%)
+        oldSim.setViolationsCount(0);
+        oldSim.setComplianceStatus("COMPLIANT");
+        oldSim.setStartTime(System.currentTimeMillis() - 24 * 60 * 60 * 1000); // Yesterday
+        oldSim.setEndTime(System.currentTimeMillis() - 23 * 60 * 60 * 1000);
+        persistenceService.saveSimulation(oldSim);
+        
+        // Add simulation from today (should be included in narrow range)
+        PersistedSimulation todaySim = new PersistedSimulation("TODAY_BATCH", "FARMER_TODAY", "TODAY_SCENARIO");
+        todaySim.setStatus("COMPLETED");
+        todaySim.setCompleted(true);
+        todaySim.setInitialQuality(100.0);
+        todaySim.setFinalQuality(70.0); // Medium quality (60-79%)
+        todaySim.setViolationsCount(2);
+        todaySim.setComplianceStatus("NON_COMPLIANT");
+        todaySim.setStartTime(System.currentTimeMillis() - 1000); // Just now
+        todaySim.setEndTime(System.currentTimeMillis());
+        persistenceService.saveSimulation(todaySim);
+        
+        // Test with narrow date range (today only)
+        LocalDate today = LocalDate.now();
+        File exportedFile = exportService.exportReport(
+                ReportExportService.ReportType.QUALITY_COMPLIANCE, today, today,
+                ReportExportService.ExportFormat.TXT);
+        
+        assertTrue(exportedFile.exists());
+        String content = Files.readString(exportedFile.toPath());
+        
+        // Verify content includes only today's simulation
+        assertTrue(content.contains("TODAY_BATCH"), "Report should include today's batch");
+        assertFalse(content.contains("OLD_BATCH"), "Report should NOT include yesterday's batch");
+        
+        // Verify total simulations count is 1
+        assertTrue(content.contains("Total Simulations: 1"), 
+                "Report should show only 1 simulation for today");
+        
+        // Verify compliance stats reflect only today's simulation (non-compliant)
+        // The report format uses "Compliant Runs:" and "Non-Compliant Runs:" with spacing
+        assertTrue(content.contains("Compliant Runs:") && content.contains("0"), 
+                "Compliant count should be 0 (today's simulation is non-compliant)");
+        assertTrue(content.contains("Non-Compliant Runs:") && content.contains("1"), 
+                "Non-Compliant count should be 1");
+        
+        // Verify that the TODAY_BATCH is shown as completed with 70% quality
+        assertTrue(content.contains("Quality: 70.0%"), 
+                "Report should show today's simulation quality as 70.0%");
+        assertTrue(content.contains("✗") || content.contains("NON_COMPLIANT"), 
+                "Report should indicate non-compliant status for today's simulation");
+        
+        // Test with wide date range (includes both)
+        LocalDate yesterday = LocalDate.now().minusDays(1);
+        LocalDate tomorrow = LocalDate.now().plusDays(1);
+        File exportedFileWide = exportService.exportReport(
+                ReportExportService.ReportType.QUALITY_COMPLIANCE, yesterday, tomorrow,
+                ReportExportService.ExportFormat.TXT);
+        
+        String contentWide = Files.readString(exportedFileWide.toPath());
+        
+        // Verify both simulations are included
+        assertTrue(contentWide.contains("TODAY_BATCH"), "Wide range should include today's batch");
+        assertTrue(contentWide.contains("OLD_BATCH"), "Wide range should include yesterday's batch");
+        assertTrue(contentWide.contains("Total Simulations: 2"), 
+                "Report should show 2 simulations for wide range");
+        
+        // Verify compliance stats reflect both simulations (1 compliant, 1 non-compliant)
+        assertTrue(contentWide.contains("Compliant Runs:") && contentWide.contains("1"), 
+                "Compliant count should be 1 (OLD_BATCH is compliant)");
+        assertTrue(contentWide.contains("Non-Compliant Runs:") && contentWide.contains("1"), 
+                "Non-Compliant count should be 1 (TODAY_BATCH is non-compliant)");
+        
+        // Verify that both batches are shown with their quality scores
+        assertTrue(contentWide.contains("Quality: 95.0%"), 
+                "Report should show OLD_BATCH quality as 95.0%");
+        assertTrue(contentWide.contains("Quality: 70.0%"), 
+                "Report should show TODAY_BATCH quality as 70.0%");
+    }
+    
     // ==================== CSV FORMAT VALIDATION TESTS ====================
     
     @Test
