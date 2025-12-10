@@ -471,30 +471,41 @@ public class LogisticsController implements SimulationListener {
                 String batchId = event.getBatchId();
                 double progressPercent = event.getProgress() * 100; // Convert from 0-1 to 0-100
                 
-                // Skip backward progress updates (prevent restart issues)
-                // Use strict less-than to allow events at the same progress level to update
-                // temperature, location, and other fields
-                Double lastProgress = lastProgressMap.get(batchId);
-                if (lastProgress != null && progressPercent < lastProgress) {
-                    logger.debug("Skipping backward progress for {}: {} < {}", batchId, progressPercent, lastProgress);
-                    return;
-                }
-                
-                // Update last progress for this batch
-                lastProgressMap.put(batchId, progressPercent);
-                
-                // Update environmental data tracking from map event
+                // Update environmental data tracking from map event (always do this, even if progress goes backward)
                 ShipmentEnvironmentalData envData = environmentalDataMap.computeIfAbsent(
                     batchId, k -> new ShipmentEnvironmentalData());
                 double previousHumidity = envData.humidity;
                 envData.temperature = event.getTemperature();
                 envData.humidity = event.getHumidity();
                 
+                // Update shipments table with new environmental data (always update, even if progress goes backward)
+                updateShipmentEnvironmentalData(batchId);
+                
+                // Generate humidity alerts when thresholds are breached (always check, even if progress goes backward)
+                // Optimal humidity for cold chain is 65-85%
+                checkAndGenerateHumidityAlert(batchId, event.getHumidity(), 
+                                             event.getLocationName(), previousHumidity);
+                
+                // Generate temperature alerts for extreme values from map event (always check, even if progress goes backward)
+                // (complements TemperatureComplianceEvent which handles detailed temp monitoring)
+                checkAndGenerateTemperatureAlert(batchId, event.getTemperature(),
+                                                event.getLocationName());
+                
+                // Skip backward progress updates for UI display (prevent restart issues)
+                // Use strict less-than to allow events at the same progress level to update
+                // map position, timeline, and status
+                Double lastProgress = lastProgressMap.get(batchId);
+                if (lastProgress != null && progressPercent < lastProgress) {
+                    logger.debug("Skipping backward progress for {}: {} < {} (environmental data still updated)", 
+                        batchId, progressPercent, lastProgress);
+                    return;
+                }
+                
+                // Update last progress for this batch
+                lastProgressMap.put(batchId, progressPercent);
+                
                 // Update map marker position based on event data
                 updateMapFromEvent(event);
-                
-                // Update shipments table with new environmental data (if row exists)
-                updateShipmentEnvironmentalData(batchId);
                 
                 // Determine status based on progress to detect transitions
                 String newStatus = determineStatusFromProgress(progressPercent);
@@ -522,16 +533,6 @@ public class LogisticsController implements SimulationListener {
                         logger.info("Status transition: {} -> {}", batchId, newStatus);
                     }
                 }
-                
-                // Generate humidity alerts when thresholds are breached
-                // Optimal humidity for cold chain is 65-85%
-                checkAndGenerateHumidityAlert(batchId, event.getHumidity(), 
-                                             event.getLocationName(), previousHumidity);
-                
-                // Generate temperature alerts for extreme values from map event
-                // (complements TemperatureComplianceEvent which handles detailed temp monitoring)
-                checkAndGenerateTemperatureAlert(batchId, event.getTemperature(),
-                                                event.getLocationName());
                 
             } catch (Exception e) {
                 logger.error("Error handling map simulation event: {}", e.getMessage(), e);
