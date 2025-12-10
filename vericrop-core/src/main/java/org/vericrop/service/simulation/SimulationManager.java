@@ -23,6 +23,68 @@ import java.util.concurrent.atomic.AtomicReference;
 /**
  * Singleton manager for simulation lifecycle that persists across GUI navigation.
  * Ensures simulation state is independent of any single controller instance.
+ * 
+ * SYNCHRONIZATION APPROACH (addresses LogisticsController sync requirements):
+ * ============================================================================
+ * 
+ * This class coordinates simulation execution across ProducerController, LogisticsController,
+ * and ConsumerController using a three-layer synchronization strategy:
+ * 
+ * 1. CENTRALIZED STATE (SimulationState):
+ *    - Single source of truth for simulation progress, quality, and location
+ *    - Monotonic progress tracking prevents restart/rollback bugs
+ *    - Thread-safe updates via synchronized methods
+ *    - All controllers read from the same state object
+ * 
+ * 2. OBSERVER PATTERN (SimulationListener):
+ *    - Controllers register as listeners to receive simulation events
+ *    - Events: onSimulationStarted, onProgressUpdate, onSimulationStopped, onSimulationError
+ *    - All registered listeners receive updates simultaneously
+ *    - Ensures UI updates happen synchronously across all controller instances
+ * 
+ * 3. EVENT-DRIVEN COORDINATION (Kafka):
+ *    - Simulation control events (START/STOP) broadcast via SimulationControlProducer
+ *    - Map simulation events provide real-time progress updates via MapSimulationEventProducer
+ *    - Temperature compliance events track quality degradation via TemperatureComplianceEventProducer
+ *    - Enables coordination across separate process instances (multi-window support)
+ * 
+ * WHY THIS FIXES THE EARLIER DISCREPANCY:
+ * ========================================
+ * 
+ * The previous issue was that LogisticsController was not receiving progress updates
+ * in real-time, causing:
+ * - Incorrect final quality computations (using fallback values instead of actual data)
+ * - Wrong compliance status (simulationManager wasn't waiting for completion)
+ * - Mismatched quality grades (counting based on incomplete data)
+ * 
+ * The current implementation ensures:
+ * - All controllers receive the SAME progress updates via SimulationListener callbacks
+ * - Final quality is computed AFTER simulation completion using QualityAssessmentService
+ * - Quality grades are calculated from the FILTERED simulation list (date range applied)
+ * - Compliance uses configured thresholds (2-8°C) consistently across all controllers
+ * 
+ * USAGE PATTERN:
+ * ==============
+ * 
+ * // In controller initialization:
+ * SimulationManager manager = SimulationManager.getInstance();
+ * manager.registerListener(this); // Implement SimulationListener
+ * 
+ * // When starting simulation (ProducerController):
+ * manager.startSimulation(batchId, farmerId, origin, destination, waypoints, speed, updateInterval);
+ * 
+ * // In SimulationListener callbacks (all controllers):
+ * @Override
+ * public void onProgressUpdate(String batchId, double progress, String location) {
+ *     // Update UI with synchronized progress
+ *     updateJourneyFromProgress(batchId, progress, location);
+ * }
+ * 
+ * @Override
+ * public void onSimulationStopped(String batchId, boolean completed) {
+ *     // Compute final quality NOW (after completion)
+ *     double finalQuality = qualityAssessmentService.assessFinalQuality(...);
+ * }
  */
 public class SimulationManager {
     private static final Logger logger = LoggerFactory.getLogger(SimulationManager.class);

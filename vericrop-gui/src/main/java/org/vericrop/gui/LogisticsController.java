@@ -1628,9 +1628,22 @@ public class LogisticsController implements SimulationListener {
      * Generate report content based on report type.
      * Pulls data from persistence service and computes relevant statistics.
      * 
+     * DATE RANGE FILTERING (Quality Compliance requirement):
+     * =======================================================
+     * For Quality Compliance reports, the date range is MANDATORY and validated
+     * in handleGenerateReport() and handleExportReport(). The date range filters
+     * simulations by their creation/completion timestamp before any aggregations.
+     * 
+     * This ensures:
+     * - Quality metrics (avg initial/final quality, degradation) reflect only the selected period
+     * - Compliance counts (compliant vs non-compliant) are accurate for the time range
+     * - Quality grade buckets (High >=80%, Medium 60-79%, Low <60%) count filtered simulations
+     * 
+     * For other report types, date range is optional and defaults to last 30 days.
+     * 
      * @param reportType The type of report to generate
-     * @param startDate Start date for the report period
-     * @param endDate End date for the report period
+     * @param startDate Start date for the report period (validated for Quality Compliance)
+     * @param endDate End date for the report period (validated for Quality Compliance)
      * @param dateRange Formatted date range string
      * @return Formatted report content
      */
@@ -1841,6 +1854,33 @@ public class LogisticsController implements SimulationListener {
      * - Example 1 (Apples): Farm to Consumer Direct with warehouse stops
      * - Example 2 (Carrots): Local Producer Delivery, short route
      * - Example 3 (Vegetables): Cross-Region Long Haul with temperature events
+     * 
+     * QUALITY CALCULATIONS (using configured thresholds):
+     * ====================================================
+     * 1. Compliance Determination (per simulation):
+     *    - Uses configured temperature threshold: 2-8°C (cold chain compliance)
+     *    - Compliant: Zero violations (all temperatures within range)
+     *    - Non-Compliant: One or more violations
+     *    - Threshold is configured in SimulationResult.calculateStatistics() line 129
+     * 
+     * 2. Quality Grades (buckets):
+     *    - High: finalQuality >= 80%
+     *    - Medium: 60% <= finalQuality < 80%
+     *    - Low: finalQuality < 60%
+     *    - See lines 1924-1926 for implementation
+     *    - Counts reflect ONLY simulations in the filtered date range
+     * 
+     * 3. Average Quality Metrics:
+     *    - Avg Initial Quality: mean of each simulation's initialQuality
+     *    - Avg Final Quality: mean of each simulation's finalQuality (NOT 100% fallback)
+     *    - Avg Quality Degradation: Avg Initial - Avg Final
+     *    - Computed from filtered simulations only (see lines 1887-1897)
+     * 
+     * 4. Final Quality Computation:
+     *    - Uses QualityAssessmentService.assessFinalQualityFromMonitoring()
+     *    - Factors in temperature violations, time elapsed, and initial quality
+     *    - Computed AFTER simulation completion (not during transit)
+     *    - See ConsumerController.onSimulationStopped() for implementation
      */
     private String generateQualityCompliancePreview(String dateRange, String timestamp,
             List<PersistedSimulation> simulations) {
