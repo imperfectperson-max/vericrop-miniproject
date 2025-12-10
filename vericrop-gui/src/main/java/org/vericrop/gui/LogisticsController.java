@@ -261,6 +261,9 @@ public class LogisticsController implements SimulationListener {
     /**
      * Setup Kafka consumers for real-time map and temperature events.
      * Runs consumers in background threads and handles events on JavaFX UI thread.
+     * 
+     * IMPORTANT: For multi-instance setups, each instance needs a unique consumer group ID
+     * so that all instances receive all events (not load-balanced by Kafka).
      */
     private void setupKafkaConsumers() {
         try {
@@ -277,55 +280,64 @@ public class LogisticsController implements SimulationListener {
                 // Continue without alert producer
             }
             
-            // Create map simulation consumer with event handler
+            // Create unique consumer group IDs for this instance to receive all events
+            // Format: logistics-{type}-{timestamp} ensures each instance gets its own group
+            long instanceId = System.currentTimeMillis();
+            String mapGroupId = "logistics-map-" + instanceId;
+            String tempGroupId = "logistics-temp-" + instanceId;
+            String controlGroupId = "logistics-control-" + instanceId;
+            
+            // Create map simulation consumer with unique group ID per instance
             mapSimulationConsumer = new MapSimulationEventConsumer(
-                "logistics-ui-group",
+                mapGroupId,
                 this::handleMapSimulationEvent
             );
             
-            // Create temperature compliance consumer with event handler
+            // Create temperature compliance consumer with unique group ID per instance
             temperatureComplianceConsumer = new TemperatureComplianceEventConsumer(
-                "logistics-ui-group",
+                tempGroupId,
                 this::handleTemperatureComplianceEvent
             );
             
             // Create simulation control consumer with unique group ID per instance
             // Using unique group ID ensures each instance receives all simulation control events
-            String uniqueGroupId = "logistics-simulation-control-" + System.currentTimeMillis();
             simulationControlConsumer = new SimulationControlConsumer(
-                uniqueGroupId,
+                controlGroupId,
                 this::handleSimulationControlEvent
             );
             
             // Start consumers in background threads
             kafkaConsumerExecutor.submit(() -> {
                 try {
+                    logger.info("Starting map simulation consumer with group ID: {}", mapGroupId);
                     mapSimulationConsumer.startConsuming();
                 } catch (Exception e) {
-                    System.err.println("Map simulation consumer error: " + e.getMessage());
+                    logger.error("Map simulation consumer error: {}", e.getMessage(), e);
                 }
             });
             
             kafkaConsumerExecutor.submit(() -> {
                 try {
+                    logger.info("Starting temperature compliance consumer with group ID: {}", tempGroupId);
                     temperatureComplianceConsumer.startConsuming();
                 } catch (Exception e) {
-                    System.err.println("Temperature compliance consumer error: " + e.getMessage());
+                    logger.error("Temperature compliance consumer error: {}", e.getMessage(), e);
                 }
             });
             
             kafkaConsumerExecutor.submit(() -> {
                 try {
+                    logger.info("Starting simulation control consumer with group ID: {}", controlGroupId);
                     simulationControlConsumer.startConsuming();
                 } catch (Exception e) {
-                    System.err.println("Simulation control consumer error: " + e.getMessage());
+                    logger.error("Simulation control consumer error: {}", e.getMessage(), e);
                 }
             });
             
-            System.out.println("✅ Kafka consumers initialized for logistics monitoring");
+            logger.info("✅ Kafka consumers initialized for logistics monitoring (map: {}, temp: {}, control: {})",
+                       mapGroupId, tempGroupId, controlGroupId);
         } catch (Exception e) {
-            System.err.println("⚠️ Failed to initialize Kafka consumers: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("⚠️ Failed to initialize Kafka consumers: {}", e.getMessage(), e);
             // Continue without Kafka - fallback to SimulationListener updates
         }
     }
