@@ -795,7 +795,87 @@ public class ConsumerController implements SimulationListener {
 
     @FXML
     private void handleExportHistory() {
-        showAlert(Alert.AlertType.INFORMATION, "Export", "Verification history exported successfully");
+        if (verificationHistory == null || verificationHistory.isEmpty()) {
+            showAlert(Alert.AlertType.WARNING, "No History", "There is no verification history to export.");
+            return;
+        }
+        
+        // Create file chooser for export
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Export Verification History");
+        fileChooser.setInitialFileName("verification_history_" + 
+            LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".txt");
+        
+        // Add file extension filters
+        fileChooser.getExtensionFilters().addAll(
+            new FileChooser.ExtensionFilter("Text Files", "*.txt"),
+            new FileChooser.ExtensionFilter("CSV Files", "*.csv"),
+            new FileChooser.ExtensionFilter("All Files", "*.*")
+        );
+        
+        // Get the current stage (window)
+        Stage stage = (Stage) verificationHistoryList.getScene().getWindow();
+        
+        // Show save dialog
+        File selectedFile = fileChooser.showSaveDialog(stage);
+        
+        if (selectedFile != null) {
+            try {
+                // Determine format based on file extension
+                String fileName = selectedFile.getName().toLowerCase();
+                boolean isCsv = fileName.endsWith(".csv");
+                
+                // Write history to file
+                try (java.io.PrintWriter writer = new java.io.PrintWriter(
+                        new java.io.FileWriter(selectedFile))) {
+                    
+                    // Write header
+                    if (isCsv) {
+                        writer.println("Verification History Export - " + 
+                            LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                        writer.println("Timestamp,Batch ID,Status,Details");
+                        writer.println(); // Empty line
+                    } else {
+                        writer.println("==============================================");
+                        writer.println("VERICROP - Verification History Export");
+                        writer.println("Export Date: " + 
+                            LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                        writer.println("==============================================");
+                        writer.println();
+                    }
+                    
+                    // Write each history entry
+                    for (String entry : verificationHistory) {
+                        if (isCsv) {
+                            // Parse and format as CSV
+                            // Entry format: "timestamp: batch_id - status (details)"
+                            String csvEntry = entry.replace(",", ";"); // Escape commas
+                            writer.println(csvEntry);
+                        } else {
+                            writer.println(entry);
+                        }
+                    }
+                    
+                    // Write footer
+                    if (!isCsv) {
+                        writer.println();
+                        writer.println("==============================================");
+                        writer.println("Total Entries: " + verificationHistory.size());
+                        writer.println("==============================================");
+                    }
+                }
+                
+                logger.info("Verification history exported successfully to: {}", selectedFile.getAbsolutePath());
+                showAlert(Alert.AlertType.INFORMATION, "Export Successful", 
+                    "Verification history exported successfully to:\n" + selectedFile.getAbsolutePath() +
+                    "\n\nTotal entries: " + verificationHistory.size());
+                
+            } catch (IOException e) {
+                logger.error("Failed to export verification history: {}", e.getMessage());
+                showAlert(Alert.AlertType.ERROR, "Export Failed", 
+                    "Failed to export verification history:\n" + e.getMessage());
+            }
+        }
     }
 
     @FXML

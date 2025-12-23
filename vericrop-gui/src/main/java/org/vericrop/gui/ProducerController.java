@@ -1457,8 +1457,15 @@ public class ProducerController implements SimulationListener {
                 return;
             }
             
-            // Use scenario batch prefix to generate unique batch ID
-            final String generatedBatchId = selectedScenario.generateBatchId();
+            // Allow user to select an existing batch or use a generated one
+            String selectedBatchId = selectBatchForSimulation(selectedScenario);
+            if (selectedBatchId == null) {
+                simStatusLabel.setText("⚠ Simulation cancelled - no batch selected");
+                simStatusLabel.setStyle("-fx-text-fill: #DC2626;");
+                return;
+            }
+            
+            final String generatedBatchId = selectedBatchId;
             
             // Get farmer ID from field or use default (make it final for lambda)
             final String farmerId = getFarmerIdOrDefault();
@@ -2453,6 +2460,38 @@ public class ProducerController implements SimulationListener {
         return new double[] {primeRate, rejectionRate};
     }
 
+    /**
+     * Show a dialog to select a batch for simulation.
+     * Offers to use an existing batch from recent batches or generate a new one.
+     * Returns the selected/generated batch ID or null if cancelled.
+     */
+    private String selectBatchForSimulation(SimulationLoader.SimulationDefinition scenario) {
+        // Create a confirmation dialog with three options
+        Alert confirmDialog = new Alert(Alert.AlertType.CONFIRMATION);
+        confirmDialog.setTitle("Select Batch for Simulation");
+        confirmDialog.setHeaderText("Choose Batch for Scenario: " + scenario.getName());
+        confirmDialog.setContentText("Select an existing batch or generate a new one for the simulation.");
+        
+        ButtonType useExisting = new ButtonType("Use Existing Batch");
+        ButtonType generateNew = new ButtonType("Generate New Batch");
+        ButtonType cancel = new ButtonType("Cancel", ButtonBar.ButtonData.CANCEL_CLOSE);
+        
+        confirmDialog.getButtonTypes().setAll(useExisting, generateNew, cancel);
+        
+        Optional<ButtonType> result = confirmDialog.showAndWait();
+        if (result.isPresent()) {
+            if (result.get() == generateNew) {
+                // Generate a new batch ID using the scenario's batch prefix
+                return scenario.generateBatchId();
+            } else if (result.get() == useExisting) {
+                // Select from existing batches
+                return selectBatchForAction("Select Existing Batch for Simulation");
+            }
+        }
+        
+        return null; // Cancelled
+    }
+    
     /**
      * Show a dialog to select a batch for QR generation or simulation.
      * Returns the selected batch ID or null if cancelled.
