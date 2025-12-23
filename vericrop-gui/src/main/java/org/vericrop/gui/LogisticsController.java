@@ -2045,9 +2045,15 @@ public class LogisticsController implements SimulationListener {
      * Helper method to filter simulations by type.
      * 
      * Matches the 3 presentation scenarios from ProducerController using batch prefixes:
-     * - Example 1: SMOOTH (Smooth Delivery scenario - Apples)
-     * - Example 2: ALERT (Temperature Alert scenario - Carrots)
-     * - Example 3: QUALITY (Quality Journey scenario - Vegetables)
+     * - Scenario 1 (example_1): SMOOTH - Smooth Delivery
+     * - Scenario 2 (example_2): ALERT - Temperature Alert
+     * - Scenario 3 (example_3): QUALITY - Quality Journey
+     * 
+     * @param simulations List of simulations to filter
+     * @param example The scenario identifier ("example_1", "example_2", or "example_3")
+     *                Note: Uses "example" naming internally to match scenario ID field in persistence,
+     *                while user-facing labels use "Scenario" naming for clarity.
+     * @return Filtered list of simulations matching the specified scenario type
      * 
      * Also supports legacy batch IDs that contain APPLES, CARROTS, or VEGGIES.
      * 
