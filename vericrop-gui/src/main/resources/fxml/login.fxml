@@ -5,6 +5,8 @@
 <?import javafx.scene.layout.*?>
 <?import javafx.scene.text.*?>
 <?import javafx.scene.shape.*?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.image.Image?>
 
 <VBox xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="org.vericrop.gui.controller.EnhancedLoginController"
@@ -19,7 +21,11 @@
     <!-- Header -->
     <VBox spacing="15" alignment="CENTER">
         <HBox spacing="10" alignment="CENTER">
-            <Circle radius="30" fill="linear-gradient(to right, #2E8B57, #3CB371)"/>
+            <ImageView fitHeight="60" fitWidth="60" preserveRatio="true">
+                <image>
+                    <Image url="@../images/vericrop-icon.png"/>
+                </image>
+            </ImageView>
             <VBox spacing="2">
                 <Label text="VeriCrop" style="-fx-font-size: 32px; -fx-font-weight: bold; -fx-text-fill: #2E8B57;"/>
                 <Label text="Supply Chain Management Platform" style="-fx-font-size: 14px; -fx-text-fill: #666;"/>
