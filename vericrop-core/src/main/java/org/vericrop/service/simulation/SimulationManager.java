@@ -339,7 +339,7 @@ public class SimulationManager {
             if (isRunning()) {
                 SimulationState state = currentSimulation.get();
                 if (state != null) {
-                    notifyStarted(state.batchId, state.farmerId);
+                    notifyStarted(state.batchId, state.farmerId, state.scenarioId);
                     notifyProgress(state.batchId, state.progress, state.currentLocation);
                 }
             }
