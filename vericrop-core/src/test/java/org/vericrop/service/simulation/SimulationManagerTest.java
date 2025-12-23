@@ -76,7 +76,7 @@ public class SimulationManagerTest {
         
         SimulationListener listener = new SimulationListener() {
             @Override
-            public void onSimulationStarted(String batchId, String farmerId) {
+            public void onSimulationStarted(String batchId, String farmerId, String scenarioId) {
                 callCount.incrementAndGet();
             }
             
@@ -111,7 +111,7 @@ public class SimulationManagerTest {
         
         SimulationListener listener1 = new SimulationListener() {
             @Override
-            public void onSimulationStarted(String batchId, String farmerId) {
+            public void onSimulationStarted(String batchId, String farmerId, String scenarioId) {
                 listener1Called.set(true);
             }
             
@@ -124,7 +124,7 @@ public class SimulationManagerTest {
         
         SimulationListener listener2 = new SimulationListener() {
             @Override
-            public void onSimulationStarted(String batchId, String farmerId) {
+            public void onSimulationStarted(String batchId, String farmerId, String scenarioId) {
                 listener2Called.set(true);
             }
             
@@ -164,7 +164,7 @@ public class SimulationManagerTest {
         
         simulationManager.registerListener(new SimulationListener() {
             @Override
-            public void onSimulationStarted(String batchId, String farmerId) {
+            public void onSimulationStarted(String batchId, String farmerId, String scenarioId) {
                 startLatch.countDown();
             }
             
@@ -212,7 +212,7 @@ public class SimulationManagerTest {
         
         simulationManager.registerListener(new SimulationListener() {
             @Override
-            public void onSimulationStarted(String batchId, String farmerId) {
+            public void onSimulationStarted(String batchId, String farmerId, String scenarioId) {
                 // Not needed for this test
             }
             
@@ -253,7 +253,7 @@ public class SimulationManagerTest {
         
         SimulationListener listener1 = new SimulationListener() {
             @Override
-            public void onSimulationStarted(String batchId, String farmerId) {
+            public void onSimulationStarted(String batchId, String farmerId, String scenarioId) {
                 listener1Called.set(true);
                 latch1.countDown();
             }
@@ -267,7 +267,7 @@ public class SimulationManagerTest {
         
         SimulationListener listener2 = new SimulationListener() {
             @Override
-            public void onSimulationStarted(String batchId, String farmerId) {
+            public void onSimulationStarted(String batchId, String farmerId, String scenarioId) {
                 listener2Called.set(true);
                 latch2.countDown();
             }
@@ -305,7 +305,7 @@ public class SimulationManagerTest {
         
         SimulationListener listener = new SimulationListener() {
             @Override
-            public void onSimulationStarted(String batchId, String farmerId) {
+            public void onSimulationStarted(String batchId, String farmerId, String scenarioId) {
                 callCount.incrementAndGet();
             }
             
@@ -341,7 +341,7 @@ public class SimulationManagerTest {
         
         simulationManager.registerListener(new SimulationListener() {
             @Override
-            public void onSimulationStarted(String batchId, String farmerId) {}
+            public void onSimulationStarted(String batchId, String farmerId, String scenarioId) {}
             
             @Override
             public void onProgressUpdate(String batchId, double progress, String currentLocation) {}
