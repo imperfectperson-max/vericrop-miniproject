@@ -831,10 +831,8 @@ public class ConsumerController implements SimulationListener {
                     
                     // Write header
                     if (isCsv) {
-                        writer.println("Verification History Export - " + 
-                            LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-                        writer.println("Timestamp,Batch ID,Status,Details");
-                        writer.println(); // Empty line
+                        // CSV format with proper column headers
+                        writer.println("Entry");
                     } else {
                         writer.println("==============================================");
                         writer.println("VERICROP - Verification History Export");
@@ -847,9 +845,8 @@ public class ConsumerController implements SimulationListener {
                     // Write each history entry
                     for (String entry : verificationHistory) {
                         if (isCsv) {
-                            // Parse and format as CSV
-                            // Entry format: "timestamp: batch_id - status (details)"
-                            String csvEntry = entry.replace(",", ";"); // Escape commas
+                            // Properly escape CSV data by wrapping in quotes if contains comma
+                            String csvEntry = entry.contains(",") ? "\"" + entry.replace("\"", "\"\"") + "\"" : entry;
                             writer.println(csvEntry);
                         } else {
                             writer.println(entry);
