@@ -1375,26 +1375,22 @@ public class LogisticsController implements SimulationListener {
         LocalDate startDate = startDatePicker.getValue();
         LocalDate endDate = endDatePicker.getValue();
         
-        // Validate date range for Quality Compliance reports (required)
-        if ("Quality Compliance".equals(reportType)) {
-            if (startDate == null || endDate == null) {
-                showAlert(Alert.AlertType.WARNING, "Date Range Required",
-                        "Quality Compliance reports require both Start Date and End Date to be selected.\n\n" +
-                        "Please select a date range to filter simulations.");
-                return;
-            }
-            if (startDate.isAfter(endDate)) {
-                showAlert(Alert.AlertType.WARNING, "Invalid Date Range",
-                        "Start Date must be before or equal to End Date.");
-                return;
-            }
-        } else {
-            // For other report types, use default date range if not provided
-            if (startDate == null || endDate == null) {
-                // Use default date range (last 30 days)
-                endDate = LocalDate.now();
-                startDate = endDate.minusDays(30);
-            }
+        // Validate date range - REQUIRED for all report exports to accurately capture 3 simulation types
+        if (startDate == null || endDate == null) {
+            showAlert(Alert.AlertType.WARNING, "Date Range Required",
+                    "All reports require both Start Date and End Date to be selected.\n\n" +
+                    "Please select a date range to accurately filter and analyze the 3 simulation types:\n" +
+                    "• Example 1 - Smooth Delivery (Apples)\n" +
+                    "• Example 2 - Temperature Alert (Carrots)\n" +
+                    "• Example 3 - Quality Journey (Vegetables)");
+            return;
+        }
+        
+        // Validate date order
+        if (startDate.isAfter(endDate)) {
+            showAlert(Alert.AlertType.WARNING, "Invalid Date Range",
+                    "Start Date must be before or equal to End Date.");
+            return;
         }
         
         // Get export format using enum parsing
@@ -1604,41 +1600,42 @@ public class LogisticsController implements SimulationListener {
         LocalDate startDate = startDatePicker.getValue();
         LocalDate endDate = endDatePicker.getValue();
         
-        // Validate date range for Quality Compliance reports (required)
-        if ("Quality Compliance".equals(reportType)) {
-            if (startDate == null || endDate == null) {
-                Platform.runLater(() -> {
-                    reportArea.setText("=== ERROR ===\n\n" +
-                        "Quality Compliance reports require both Start Date and End Date to be selected.\n\n" +
-                        "Please select a date range from the Date Range section above to filter simulations " +
-                        "and generate an accurate Quality Compliance report.\n\n" +
-                        "The date range is used to:\n" +
-                        "- Filter simulations by their creation/completion timestamp\n" +
-                        "- Calculate compliance statistics for the selected period\n" +
-                        "- Determine quality grades and violation counts\n\n" +
-                        "For other report types, the date range is optional and defaults to the last 30 days.");
-                });
-                showAlert(Alert.AlertType.WARNING, "Date Range Required",
-                        "Quality Compliance reports require both Start Date and End Date.\n\n" +
-                        "Please select a date range to filter simulations.");
-                return;
-            }
-            if (startDate.isAfter(endDate)) {
-                Platform.runLater(() -> {
-                    reportArea.setText("=== ERROR ===\n\n" +
-                        "Invalid Date Range: Start Date must be before or equal to End Date.\n\n" +
-                        "Please adjust the date range and try again.");
-                });
-                showAlert(Alert.AlertType.WARNING, "Invalid Date Range",
-                        "Start Date must be before or equal to End Date.");
-                return;
-            }
-        } else {
-            // For other report types, use default date range if not provided
-            if (startDate == null || endDate == null) {
-                endDate = LocalDate.now();
-                startDate = endDate.minusDays(30);
-            }
+        // Validate date range - REQUIRED for all report types to accurately capture 3 simulation types
+        if (startDate == null || endDate == null) {
+            Platform.runLater(() -> {
+                reportArea.setText("=== ERROR ===\n\n" +
+                    "All reports require both Start Date and End Date to be selected.\n\n" +
+                    "Please select a date range from the Date Range section above to filter simulations " +
+                    "and generate an accurate report.\n\n" +
+                    "The date range is used to:\n" +
+                    "- Filter simulations by their creation/completion timestamp\n" +
+                    "- Capture the 3 simulation types from ProducerController:\n" +
+                    "  • Example 1 - Smooth Delivery (Apples)\n" +
+                    "  • Example 2 - Temperature Alert (Carrots)\n" +
+                    "  • Example 3 - Quality Journey (Vegetables)\n" +
+                    "- Calculate accurate statistics for the selected period\n" +
+                    "- Determine quality grades and violation counts\n\n" +
+                    "This ensures reports accurately capture and analyze all simulation types.");
+            });
+            showAlert(Alert.AlertType.WARNING, "Date Range Required",
+                    "All reports require both Start Date and End Date to be selected.\n\n" +
+                    "Please select a date range to accurately filter and analyze the 3 simulation types:\n" +
+                    "• Example 1 - Smooth Delivery (Apples)\n" +
+                    "• Example 2 - Temperature Alert (Carrots)\n" +
+                    "• Example 3 - Quality Journey (Vegetables)");
+            return;
+        }
+        
+        // Validate date order
+        if (startDate.isAfter(endDate)) {
+            Platform.runLater(() -> {
+                reportArea.setText("=== ERROR ===\n\n" +
+                    "Invalid Date Range: Start Date must be before or equal to End Date.\n\n" +
+                    "Please adjust the date range and try again.");
+            });
+            showAlert(Alert.AlertType.WARNING, "Invalid Date Range",
+                    "Start Date must be before or equal to End Date.");
+            return;
         }
         
         final String dateRange = "Date Range: " + startDate + " to " + endDate + "\n";
@@ -1655,22 +1652,25 @@ public class LogisticsController implements SimulationListener {
      * Generate report content based on report type.
      * Pulls data from persistence service and computes relevant statistics.
      * 
-     * DATE RANGE FILTERING (Quality Compliance requirement):
+     * DATE RANGE FILTERING (REQUIRED FOR ALL REPORTS):
      * =======================================================
-     * For Quality Compliance reports, the date range is MANDATORY and validated
-     * in handleGenerateReport() and handleExportReport(). The date range filters
+     * All report types now require a mandatory date range, validated in
+     * handleGenerateReport() and handleExportReport(). The date range filters
      * simulations by their creation/completion timestamp before any aggregations.
      * 
      * This ensures:
+     * - Accurate capture of the 3 simulation types from ProducerController:
+     *   • Example 1 - Smooth Delivery (Apples, 2 min)
+     *   • Example 2 - Temperature Alert (Carrots, 2 min)
+     *   • Example 3 - Quality Journey (Vegetables, 2 min)
      * - Quality metrics (avg initial/final quality, degradation) reflect only the selected period
      * - Compliance counts (compliant vs non-compliant) are accurate for the time range
      * - Quality grade buckets (High >=80%, Medium 60-79%, Low <60%) count filtered simulations
-     * 
-     * For other report types, date range is optional and defaults to last 30 days.
+     * - All simulation types are properly differentiated and analyzed
      * 
      * @param reportType The type of report to generate
-     * @param startDate Start date for the report period (validated for Quality Compliance)
-     * @param endDate End date for the report period (validated for Quality Compliance)
+     * @param startDate Start date for the report period (REQUIRED - validated before calling)
+     * @param endDate End date for the report period (REQUIRED - validated before calling)
      * @param dateRange Formatted date range string
      * @return Formatted report content
      */
