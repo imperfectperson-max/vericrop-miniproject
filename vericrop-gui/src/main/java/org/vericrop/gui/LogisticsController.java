@@ -1737,24 +1737,27 @@ public class LogisticsController implements SimulationListener {
         sb.append("• Delivered: ").append(countByStatus("DELIVERED")).append("\n\n");
         
         // Count shipments by type to highlight the 3 simulation examples
-        long applesCount = shipments.stream().filter(s -> s.getBatchId().contains("APPLES")).count();
-        long carrotsCount = shipments.stream().filter(s -> s.getBatchId().contains("CARROTS")).count();
-        long veggiesCount = shipments.stream().filter(s -> 
-            s.getBatchId().contains("VEGGIES") || s.getBatchId().contains("VEGETABLES")).count();
+        // Match batch prefixes from presentation scenarios: SMOOTH, ALERT, QUALITY
+        long smoothCount = shipments.stream().filter(s -> 
+            s.getBatchId().contains("SMOOTH") || s.getBatchId().contains("APPLES")).count();
+        long alertCount = shipments.stream().filter(s -> 
+            s.getBatchId().contains("ALERT") || s.getBatchId().contains("CARROTS")).count();
+        long qualityCount = shipments.stream().filter(s -> 
+            s.getBatchId().contains("QUALITY") || s.getBatchId().contains("VEGGIES") || s.getBatchId().contains("VEGETABLES")).count();
         
-        if (applesCount + carrotsCount + veggiesCount > 0) {
+        if (smoothCount + alertCount + qualityCount > 0) {
             sb.append("━━━ BY DELIVERY TYPE ━━━\n");
-            if (applesCount > 0) {
-                sb.append("• Farm to Consumer (Apples): ").append(applesCount)
-                  .append(" - Warehouse stops, optimal cold chain\n");
+            if (smoothCount > 0) {
+                sb.append("• Scenario 1 - Smooth Delivery: ").append(smoothCount)
+                  .append(" - Normal operations, stable temps\n");
             }
-            if (carrotsCount > 0) {
-                sb.append("• Local Producer (Carrots): ").append(carrotsCount)
-                  .append(" - Short direct route, no warehouse\n");
+            if (alertCount > 0) {
+                sb.append("• Scenario 2 - Temperature Alert: ").append(alertCount)
+                  .append(" - With temperature spike events\n");
             }
-            if (veggiesCount > 0) {
-                sb.append("• Cross-Region (Vegetables): ").append(veggiesCount)
-                  .append(" - Extended delivery, temperature events\n");
+            if (qualityCount > 0) {
+                sb.append("• Scenario 3 - Quality Journey: ").append(qualityCount)
+                  .append(" - Full quality tracking journey\n");
             }
             sb.append("\n");
         }
@@ -1775,16 +1778,18 @@ public class LogisticsController implements SimulationListener {
             sb.append("• Average Humidity: ").append(String.format("%.1f%%", avgHumidity)).append("\n\n");
             
             // Count historical shipments by type
-            long histApples = persistedShipments.stream().filter(s -> s.getBatchId().contains("APPLES")).count();
-            long histCarrots = persistedShipments.stream().filter(s -> s.getBatchId().contains("CARROTS")).count();
-            long histVeggies = persistedShipments.stream().filter(s -> 
-                s.getBatchId().contains("VEGGIES") || s.getBatchId().contains("VEGETABLES")).count();
+            long histSmooth = persistedShipments.stream().filter(s -> 
+                s.getBatchId().contains("SMOOTH") || s.getBatchId().contains("APPLES")).count();
+            long histAlert = persistedShipments.stream().filter(s -> 
+                s.getBatchId().contains("ALERT") || s.getBatchId().contains("CARROTS")).count();
+            long histQuality = persistedShipments.stream().filter(s -> 
+                s.getBatchId().contains("QUALITY") || s.getBatchId().contains("VEGGIES") || s.getBatchId().contains("VEGETABLES")).count();
             
-            if (histApples + histCarrots + histVeggies > 0) {
+            if (histSmooth + histAlert + histQuality > 0) {
                 sb.append("━━━ HISTORICAL BY TYPE ━━━\n");
-                if (histApples > 0) sb.append("• Apples (Farm to Consumer): ").append(histApples).append("\n");
-                if (histCarrots > 0) sb.append("• Carrots (Local Producer): ").append(histCarrots).append("\n");
-                if (histVeggies > 0) sb.append("• Vegetables (Cross-Region): ").append(histVeggies).append("\n");
+                if (histSmooth > 0) sb.append("• Scenario 1 - Smooth Delivery: ").append(histSmooth).append("\n");
+                if (histAlert > 0) sb.append("• Scenario 2 - Temperature Alert: ").append(histAlert).append("\n");
+                if (histQuality > 0) sb.append("• Scenario 3 - Quality Journey: ").append(histQuality).append("\n");
                 sb.append("\n");
             }
             
@@ -1792,9 +1797,9 @@ public class LogisticsController implements SimulationListener {
             sb.append("━━━ RECENT SHIPMENTS ━━━\n");
             persistedShipments.stream().limit(5).forEach(s -> {
                 String type = "";
-                if (s.getBatchId().contains("APPLES")) type = " [Farm-to-Consumer]";
-                else if (s.getBatchId().contains("CARROTS")) type = " [Local-Producer]";
-                else if (s.getBatchId().contains("VEGGIES") || s.getBatchId().contains("VEGETABLES")) type = " [Cross-Region]";
+                if (s.getBatchId().contains("SMOOTH") || s.getBatchId().contains("APPLES")) type = " [Scenario-1]";
+                else if (s.getBatchId().contains("ALERT") || s.getBatchId().contains("CARROTS")) type = " [Scenario-2]";
+                else if (s.getBatchId().contains("QUALITY") || s.getBatchId().contains("VEGGIES") || s.getBatchId().contains("VEGETABLES")) type = " [Scenario-3]";
                 
                 sb.append("• ").append(s.getBatchId()).append(type)
                   .append(" | ").append(s.getStatus())
@@ -2039,6 +2044,13 @@ public class LogisticsController implements SimulationListener {
     /**
      * Helper method to filter simulations by type.
      * 
+     * Matches the 3 presentation scenarios from ProducerController using batch prefixes:
+     * - Example 1: SMOOTH (Smooth Delivery scenario - Apples)
+     * - Example 2: ALERT (Temperature Alert scenario - Carrots)
+     * - Example 3: QUALITY (Quality Journey scenario - Vegetables)
+     * 
+     * Also supports legacy batch IDs that contain APPLES, CARROTS, or VEGGIES.
+     * 
      * Note: This duplicates logic from ReportExportService.SimulationType enum.
      * The duplication is intentional to avoid creating a dependency between GUI controllers
      * and the service layer's internal enum. This keeps the controllers decoupled from
@@ -2051,15 +2063,27 @@ public class LogisticsController implements SimulationListener {
             .filter(s -> {
                 switch (example) {
                     case "example_1":
-                        return s.getBatchId().contains("APPLES") || 
-                               (s.getScenarioId() != null && s.getScenarioId().contains("example_1"));
+                        // Match Scenario 1: Smooth Delivery (prefix: SMOOTH)
+                        return s.getBatchId().contains("SMOOTH") ||
+                               s.getBatchId().contains("APPLES") || 
+                               (s.getScenarioId() != null && s.getScenarioId().contains("example_1")) ||
+                               (s.getScenarioId() != null && s.getScenarioId().contains("presentation_scenario_1")) ||
+                               (s.getScenarioId() != null && s.getScenarioId().contains("smooth_delivery"));
                     case "example_2":
-                        return s.getBatchId().contains("CARROTS") || 
-                               (s.getScenarioId() != null && s.getScenarioId().contains("example_2"));
+                        // Match Scenario 2: Temperature Alert (prefix: ALERT)
+                        return s.getBatchId().contains("ALERT") ||
+                               s.getBatchId().contains("CARROTS") || 
+                               (s.getScenarioId() != null && s.getScenarioId().contains("example_2")) ||
+                               (s.getScenarioId() != null && s.getScenarioId().contains("presentation_scenario_2")) ||
+                               (s.getScenarioId() != null && s.getScenarioId().contains("temperature_alert"));
                     case "example_3":
-                        return s.getBatchId().contains("VEGGIES") || 
+                        // Match Scenario 3: Quality Journey (prefix: QUALITY)
+                        return s.getBatchId().contains("QUALITY") ||
+                               s.getBatchId().contains("VEGGIES") || 
                                s.getBatchId().contains("VEGETABLES") ||
-                               (s.getScenarioId() != null && s.getScenarioId().contains("example_3"));
+                               (s.getScenarioId() != null && s.getScenarioId().contains("example_3")) ||
+                               (s.getScenarioId() != null && s.getScenarioId().contains("presentation_scenario_3")) ||
+                               (s.getScenarioId() != null && s.getScenarioId().contains("quality_journey"));
                     default:
                         return false;
                 }
