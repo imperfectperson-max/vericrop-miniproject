@@ -1380,9 +1380,9 @@ public class LogisticsController implements SimulationListener {
             showAlert(Alert.AlertType.WARNING, "Date Range Required",
                     "All reports require both Start Date and End Date to be selected.\n\n" +
                     "Please select a date range to accurately filter and analyze the 3 simulation types:\n" +
-                    "• Example 1 - Smooth Delivery (Apples)\n" +
-                    "• Example 2 - Temperature Alert (Carrots)\n" +
-                    "• Example 3 - Quality Journey (Vegetables)");
+                    "• Scenario 1 - Smooth Delivery\n" +
+                    "• Scenario 2 - Temperature Alert\n" +
+                    "• Scenario 3 - Quality Journey");
             return;
         }
         
@@ -1610,9 +1610,9 @@ public class LogisticsController implements SimulationListener {
                     "The date range is used to:\n" +
                     "- Filter simulations by their creation/completion timestamp\n" +
                     "- Capture the 3 simulation types from ProducerController:\n" +
-                    "  • Example 1 - Smooth Delivery (Apples)\n" +
-                    "  • Example 2 - Temperature Alert (Carrots)\n" +
-                    "  • Example 3 - Quality Journey (Vegetables)\n" +
+                    "  • Scenario 1 - Smooth Delivery\n" +
+                    "  • Scenario 2 - Temperature Alert\n" +
+                    "  • Scenario 3 - Quality Journey\n" +
                     "- Calculate accurate statistics for the selected period\n" +
                     "- Determine quality grades and violation counts\n\n" +
                     "This ensures reports accurately capture and analyze all simulation types.");
@@ -1620,9 +1620,9 @@ public class LogisticsController implements SimulationListener {
             showAlert(Alert.AlertType.WARNING, "Date Range Required",
                     "All reports require both Start Date and End Date to be selected.\n\n" +
                     "Please select a date range to accurately filter and analyze the 3 simulation types:\n" +
-                    "• Example 1 - Smooth Delivery (Apples)\n" +
-                    "• Example 2 - Temperature Alert (Carrots)\n" +
-                    "• Example 3 - Quality Journey (Vegetables)");
+                    "• Scenario 1 - Smooth Delivery\n" +
+                    "• Scenario 2 - Temperature Alert\n" +
+                    "• Scenario 3 - Quality Journey");
             return;
         }
         
@@ -1660,9 +1660,9 @@ public class LogisticsController implements SimulationListener {
      * 
      * This ensures:
      * - Accurate capture of the 3 simulation types from ProducerController:
-     *   • Example 1 - Smooth Delivery (Apples, 2 min)
-     *   • Example 2 - Temperature Alert (Carrots, 2 min)
-     *   • Example 3 - Quality Journey (Vegetables, 2 min)
+     *   • Scenario 1 - Smooth Delivery (2 min)
+     *   • Scenario 2 - Temperature Alert (2 min)
+     *   • Scenario 3 - Quality Journey (2 min)
      * - Quality metrics (avg initial/final quality, degradation) reflect only the selected period
      * - Compliance counts (compliant vs non-compliant) are accurate for the time range
      * - Quality grade buckets (High >=80%, Medium 60-79%, Low <60%) count filtered simulations
@@ -2061,31 +2061,30 @@ public class LogisticsController implements SimulationListener {
             List<PersistedSimulation> simulations, String example) {
         return simulations.stream()
             .filter(s -> {
-                switch (example) {
-                    case "example_1":
-                        // Match Scenario 1: Smooth Delivery (prefix: SMOOTH)
-                        return s.getBatchId().contains("SMOOTH") ||
-                               s.getBatchId().contains("APPLES") || 
-                               (s.getScenarioId() != null && s.getScenarioId().contains("example_1")) ||
-                               (s.getScenarioId() != null && s.getScenarioId().contains("presentation_scenario_1")) ||
-                               (s.getScenarioId() != null && s.getScenarioId().contains("smooth_delivery"));
-                    case "example_2":
-                        // Match Scenario 2: Temperature Alert (prefix: ALERT)
-                        return s.getBatchId().contains("ALERT") ||
-                               s.getBatchId().contains("CARROTS") || 
-                               (s.getScenarioId() != null && s.getScenarioId().contains("example_2")) ||
-                               (s.getScenarioId() != null && s.getScenarioId().contains("presentation_scenario_2")) ||
-                               (s.getScenarioId() != null && s.getScenarioId().contains("temperature_alert"));
-                    case "example_3":
-                        // Match Scenario 3: Quality Journey (prefix: QUALITY)
-                        return s.getBatchId().contains("QUALITY") ||
-                               s.getBatchId().contains("VEGGIES") || 
-                               s.getBatchId().contains("VEGETABLES") ||
-                               (s.getScenarioId() != null && s.getScenarioId().contains("example_3")) ||
-                               (s.getScenarioId() != null && s.getScenarioId().contains("presentation_scenario_3")) ||
-                               (s.getScenarioId() != null && s.getScenarioId().contains("quality_journey"));
-                    default:
-                        return false;
+                if ("example_1".equals(example)) {
+                    // Match Scenario 1: Smooth Delivery (prefix: SMOOTH)
+                    return s.getBatchId().contains("SMOOTH") ||
+                           s.getBatchId().contains("APPLES") || 
+                           (s.getScenarioId() != null && s.getScenarioId().contains("example_1")) ||
+                           (s.getScenarioId() != null && s.getScenarioId().contains("presentation_scenario_1")) ||
+                           (s.getScenarioId() != null && s.getScenarioId().contains("smooth_delivery"));
+                } else if ("example_2".equals(example)) {
+                    // Match Scenario 2: Temperature Alert (prefix: ALERT)
+                    return s.getBatchId().contains("ALERT") ||
+                           s.getBatchId().contains("CARROTS") || 
+                           (s.getScenarioId() != null && s.getScenarioId().contains("example_2")) ||
+                           (s.getScenarioId() != null && s.getScenarioId().contains("presentation_scenario_2")) ||
+                           (s.getScenarioId() != null && s.getScenarioId().contains("temperature_alert"));
+                } else if ("example_3".equals(example)) {
+                    // Match Scenario 3: Quality Journey (prefix: QUALITY)
+                    return s.getBatchId().contains("QUALITY") ||
+                           s.getBatchId().contains("VEGGIES") || 
+                           s.getBatchId().contains("VEGETABLES") ||
+                           (s.getScenarioId() != null && s.getScenarioId().contains("example_3")) ||
+                           (s.getScenarioId() != null && s.getScenarioId().contains("presentation_scenario_3")) ||
+                           (s.getScenarioId() != null && s.getScenarioId().contains("quality_journey"));
+                } else {
+                    return false;
                 }
             })
             .collect(Collectors.toList());
