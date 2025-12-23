@@ -8,6 +8,8 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
+import java.io.FileWriter;
+import java.io.PrintWriter;
 import java.util.Set;
 import java.util.HashSet;
 import java.util.Map;
@@ -826,8 +828,7 @@ public class ConsumerController implements SimulationListener {
                 boolean isCsv = fileName.endsWith(".csv");
                 
                 // Write history to file
-                try (java.io.PrintWriter writer = new java.io.PrintWriter(
-                        new java.io.FileWriter(selectedFile))) {
+                try (PrintWriter writer = new PrintWriter(new FileWriter(selectedFile))) {
                     
                     // Write header
                     if (isCsv) {
