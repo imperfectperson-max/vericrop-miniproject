@@ -846,9 +846,16 @@ public class ConsumerController implements SimulationListener {
                     // Write each history entry
                     for (String entry : verificationHistory) {
                         if (isCsv) {
-                            // Properly escape CSV data by wrapping in quotes if contains comma
-                            String csvEntry = entry.contains(",") ? "\"" + entry.replace("\"", "\"\"") + "\"" : entry;
-                            writer.println(csvEntry);
+                            // Properly escape CSV data per RFC 4180
+                            // Wrap in quotes if contains comma, quote, newline, or carriage return
+                            boolean needsQuoting = entry.contains(",") || entry.contains("\"") || 
+                                                  entry.contains("\n") || entry.contains("\r");
+                            if (needsQuoting) {
+                                // Escape quotes by doubling them, then wrap entire field in quotes
+                                writer.println("\"" + entry.replace("\"", "\"\"") + "\"");
+                            } else {
+                                writer.println(entry);
+                            }
                         } else {
                             writer.println(entry);
                         }
