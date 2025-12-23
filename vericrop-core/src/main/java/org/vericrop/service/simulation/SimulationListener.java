@@ -12,8 +12,9 @@ public interface SimulationListener {
      * 
      * @param batchId the ID of the batch being simulated
      * @param farmerId the ID of the farmer/producer
+     * @param scenarioId the ID of the scenario being run (e.g., "example_1", "presentation_scenario_2", or "NORMAL" for default)
      */
-    void onSimulationStarted(String batchId, String farmerId);
+    void onSimulationStarted(String batchId, String farmerId, String scenarioId);
     
     /**
      * Called periodically during simulation to report progress.

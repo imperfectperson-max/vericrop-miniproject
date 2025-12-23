@@ -394,8 +394,9 @@ public class LogisticsController implements SimulationListener {
                     // Initialize timeline to starting state
                     updateTimeline(batchId, 0.0, "Started");
                     
-                    // Persist simulation start
-                    persistSimulationStart(batchId, farmerId);
+                    // Persist simulation start with scenario ID (use "NORMAL" for Kafka-initiated)
+                    // TODO: Kafka event should include scenarioId in future versions
+                    persistSimulationStart(batchId, farmerId, "NORMAL");
                     
                     // Add shipment to Active Shipments table (UI)
                     addShipmentToTable(batchId, farmerId != null ? farmerId : "Unknown");
@@ -2417,7 +2418,7 @@ public class LogisticsController implements SimulationListener {
     // ========== SimulationListener Implementation ==========
     
     @Override
-    public void onSimulationStarted(String batchId, String farmerId) {
+    public void onSimulationStarted(String batchId, String farmerId, String scenarioId) {
         // Remove from stopped simulations if restarting (allows chart updates again)
         stoppedSimulations.remove(batchId);
         
@@ -2431,7 +2432,8 @@ public class LogisticsController implements SimulationListener {
             return;
         }
         
-        logger.info("Simulation started for batch: {} from farmer: {}", batchId, farmerId);
+        logger.info("Simulation started for batch: {} from farmer: {} with scenario: {}", 
+                   batchId, farmerId, scenarioId);
         
         Platform.runLater(() -> {
             alerts.add(0, "🚚 Delivery simulation started for: " + batchId);
@@ -2445,8 +2447,8 @@ public class LogisticsController implements SimulationListener {
             // Initialize timeline to starting state
             updateTimeline(batchId, 0.0, "Started");
             
-            // Persist simulation start
-            persistSimulationStart(batchId, farmerId);
+            // Persist simulation start with actual scenario ID
+            persistSimulationStart(batchId, farmerId, scenarioId);
             
             // Persist shipment
             persistShipmentUpdate(batchId, farmerId, "CREATED", "Origin", 4.0, 65.0, "Starting", null);
@@ -2495,17 +2497,17 @@ public class LogisticsController implements SimulationListener {
     }
     
     /**
-     * Persist simulation start event.
+     * Persist simulation start event with scenario ID.
      */
-    private void persistSimulationStart(String batchId, String farmerId) {
+    private void persistSimulationStart(String batchId, String farmerId, String scenarioId) {
         if (persistenceService == null) return;
         
         try {
-            PersistedSimulation simulation = new PersistedSimulation(batchId, farmerId, "NORMAL");
+            PersistedSimulation simulation = new PersistedSimulation(batchId, farmerId, scenarioId);
             simulation.setStatus("STARTED");
             simulation.setInitialQuality(100.0);
             persistenceService.saveSimulation(simulation);
-            System.out.println("📝 Persisted simulation start: " + batchId);
+            System.out.println("📝 Persisted simulation start: " + batchId + " with scenario: " + scenarioId);
         } catch (Exception e) {
             System.err.println("⚠️ Failed to persist simulation start: " + e.getMessage());
         }

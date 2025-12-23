@@ -1504,7 +1504,7 @@ public class ConsumerController implements SimulationListener {
     // ========== SimulationListener Implementation ==========
     
     @Override
-    public void onSimulationStarted(String batchId, String farmerId) {
+    public void onSimulationStarted(String batchId, String farmerId, String scenarioId) {
         Platform.runLater(() -> {
             currentBatchId = batchId;
             lastProgress = 0.0;
@@ -1523,7 +1523,7 @@ public class ConsumerController implements SimulationListener {
             if (statusLabel != null) statusLabel.setText("Started");
             if (temperatureLabel != null) temperatureLabel.setText("Monitoring...");
             
-            System.out.println("ConsumerController: Simulation started - " + batchId + " from " + farmerId);
+            System.out.println("ConsumerController: Simulation started - " + batchId + " from " + farmerId + " (scenario: " + scenarioId + ")");
         });
     }
     
