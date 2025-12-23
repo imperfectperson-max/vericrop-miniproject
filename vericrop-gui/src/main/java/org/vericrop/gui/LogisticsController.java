@@ -1375,26 +1375,22 @@ public class LogisticsController implements SimulationListener {
         LocalDate startDate = startDatePicker.getValue();
         LocalDate endDate = endDatePicker.getValue();
         
-        // Validate date range for Quality Compliance reports (required)
-        if ("Quality Compliance".equals(reportType)) {
-            if (startDate == null || endDate == null) {
-                showAlert(Alert.AlertType.WARNING, "Date Range Required",
-                        "Quality Compliance reports require both Start Date and End Date to be selected.\n\n" +
-                        "Please select a date range to filter simulations.");
-                return;
-            }
-            if (startDate.isAfter(endDate)) {
-                showAlert(Alert.AlertType.WARNING, "Invalid Date Range",
-                        "Start Date must be before or equal to End Date.");
-                return;
-            }
-        } else {
-            // For other report types, use default date range if not provided
-            if (startDate == null || endDate == null) {
-                // Use default date range (last 30 days)
-                endDate = LocalDate.now();
-                startDate = endDate.minusDays(30);
-            }
+        // Validate date range - REQUIRED for all report exports to accurately capture 3 simulation types
+        if (startDate == null || endDate == null) {
+            showAlert(Alert.AlertType.WARNING, "Date Range Required",
+                    "All reports require both Start Date and End Date to be selected.\n\n" +
+                    "Please select a date range to accurately filter and analyze the 3 simulation types:\n" +
+                    "• Scenario 1 - Smooth Delivery\n" +
+                    "• Scenario 2 - Temperature Alert\n" +
+                    "• Scenario 3 - Quality Journey");
+            return;
+        }
+        
+        // Validate date order
+        if (startDate.isAfter(endDate)) {
+            showAlert(Alert.AlertType.WARNING, "Invalid Date Range",
+                    "Start Date must be before or equal to End Date.");
+            return;
         }
         
         // Get export format using enum parsing
@@ -1604,41 +1600,42 @@ public class LogisticsController implements SimulationListener {
         LocalDate startDate = startDatePicker.getValue();
         LocalDate endDate = endDatePicker.getValue();
         
-        // Validate date range for Quality Compliance reports (required)
-        if ("Quality Compliance".equals(reportType)) {
-            if (startDate == null || endDate == null) {
-                Platform.runLater(() -> {
-                    reportArea.setText("=== ERROR ===\n\n" +
-                        "Quality Compliance reports require both Start Date and End Date to be selected.\n\n" +
-                        "Please select a date range from the Date Range section above to filter simulations " +
-                        "and generate an accurate Quality Compliance report.\n\n" +
-                        "The date range is used to:\n" +
-                        "- Filter simulations by their creation/completion timestamp\n" +
-                        "- Calculate compliance statistics for the selected period\n" +
-                        "- Determine quality grades and violation counts\n\n" +
-                        "For other report types, the date range is optional and defaults to the last 30 days.");
-                });
-                showAlert(Alert.AlertType.WARNING, "Date Range Required",
-                        "Quality Compliance reports require both Start Date and End Date.\n\n" +
-                        "Please select a date range to filter simulations.");
-                return;
-            }
-            if (startDate.isAfter(endDate)) {
-                Platform.runLater(() -> {
-                    reportArea.setText("=== ERROR ===\n\n" +
-                        "Invalid Date Range: Start Date must be before or equal to End Date.\n\n" +
-                        "Please adjust the date range and try again.");
-                });
-                showAlert(Alert.AlertType.WARNING, "Invalid Date Range",
-                        "Start Date must be before or equal to End Date.");
-                return;
-            }
-        } else {
-            // For other report types, use default date range if not provided
-            if (startDate == null || endDate == null) {
-                endDate = LocalDate.now();
-                startDate = endDate.minusDays(30);
-            }
+        // Validate date range - REQUIRED for all report types to accurately capture 3 simulation types
+        if (startDate == null || endDate == null) {
+            Platform.runLater(() -> {
+                reportArea.setText("=== ERROR ===\n\n" +
+                    "All reports require both Start Date and End Date to be selected.\n\n" +
+                    "Please select a date range from the Date Range section above to filter simulations " +
+                    "and generate an accurate report.\n\n" +
+                    "The date range is used to:\n" +
+                    "- Filter simulations by their creation/completion timestamp\n" +
+                    "- Capture the 3 simulation types from ProducerController:\n" +
+                    "  • Scenario 1 - Smooth Delivery\n" +
+                    "  • Scenario 2 - Temperature Alert\n" +
+                    "  • Scenario 3 - Quality Journey\n" +
+                    "- Calculate accurate statistics for the selected period\n" +
+                    "- Determine quality grades and violation counts\n\n" +
+                    "This ensures reports accurately capture and analyze all simulation types.");
+            });
+            showAlert(Alert.AlertType.WARNING, "Date Range Required",
+                    "All reports require both Start Date and End Date to be selected.\n\n" +
+                    "Please select a date range to accurately filter and analyze the 3 simulation types:\n" +
+                    "• Scenario 1 - Smooth Delivery\n" +
+                    "• Scenario 2 - Temperature Alert\n" +
+                    "• Scenario 3 - Quality Journey");
+            return;
+        }
+        
+        // Validate date order
+        if (startDate.isAfter(endDate)) {
+            Platform.runLater(() -> {
+                reportArea.setText("=== ERROR ===\n\n" +
+                    "Invalid Date Range: Start Date must be before or equal to End Date.\n\n" +
+                    "Please adjust the date range and try again.");
+            });
+            showAlert(Alert.AlertType.WARNING, "Invalid Date Range",
+                    "Start Date must be before or equal to End Date.");
+            return;
         }
         
         final String dateRange = "Date Range: " + startDate + " to " + endDate + "\n";
@@ -1655,22 +1652,25 @@ public class LogisticsController implements SimulationListener {
      * Generate report content based on report type.
      * Pulls data from persistence service and computes relevant statistics.
      * 
-     * DATE RANGE FILTERING (Quality Compliance requirement):
+     * DATE RANGE FILTERING (REQUIRED FOR ALL REPORTS):
      * =======================================================
-     * For Quality Compliance reports, the date range is MANDATORY and validated
-     * in handleGenerateReport() and handleExportReport(). The date range filters
+     * All report types now require a mandatory date range, validated in
+     * handleGenerateReport() and handleExportReport(). The date range filters
      * simulations by their creation/completion timestamp before any aggregations.
      * 
      * This ensures:
+     * - Accurate capture of the 3 simulation types from ProducerController:
+     *   • Scenario 1 - Smooth Delivery (2 min)
+     *   • Scenario 2 - Temperature Alert (2 min)
+     *   • Scenario 3 - Quality Journey (2 min)
      * - Quality metrics (avg initial/final quality, degradation) reflect only the selected period
      * - Compliance counts (compliant vs non-compliant) are accurate for the time range
      * - Quality grade buckets (High >=80%, Medium 60-79%, Low <60%) count filtered simulations
-     * 
-     * For other report types, date range is optional and defaults to last 30 days.
+     * - All simulation types are properly differentiated and analyzed
      * 
      * @param reportType The type of report to generate
-     * @param startDate Start date for the report period (validated for Quality Compliance)
-     * @param endDate End date for the report period (validated for Quality Compliance)
+     * @param startDate Start date for the report period (REQUIRED - validated before calling)
+     * @param endDate End date for the report period (REQUIRED - validated before calling)
      * @param dateRange Formatted date range string
      * @return Formatted report content
      */
@@ -1737,24 +1737,27 @@ public class LogisticsController implements SimulationListener {
         sb.append("• Delivered: ").append(countByStatus("DELIVERED")).append("\n\n");
         
         // Count shipments by type to highlight the 3 simulation examples
-        long applesCount = shipments.stream().filter(s -> s.getBatchId().contains("APPLES")).count();
-        long carrotsCount = shipments.stream().filter(s -> s.getBatchId().contains("CARROTS")).count();
-        long veggiesCount = shipments.stream().filter(s -> 
-            s.getBatchId().contains("VEGGIES") || s.getBatchId().contains("VEGETABLES")).count();
+        // Match batch prefixes from presentation scenarios: SMOOTH, ALERT, QUALITY
+        long smoothCount = shipments.stream().filter(s -> 
+            s.getBatchId().contains("SMOOTH") || s.getBatchId().contains("APPLES")).count();
+        long alertCount = shipments.stream().filter(s -> 
+            s.getBatchId().contains("ALERT") || s.getBatchId().contains("CARROTS")).count();
+        long qualityCount = shipments.stream().filter(s -> 
+            s.getBatchId().contains("QUALITY") || s.getBatchId().contains("VEGGIES") || s.getBatchId().contains("VEGETABLES")).count();
         
-        if (applesCount + carrotsCount + veggiesCount > 0) {
+        if (smoothCount + alertCount + qualityCount > 0) {
             sb.append("━━━ BY DELIVERY TYPE ━━━\n");
-            if (applesCount > 0) {
-                sb.append("• Farm to Consumer (Apples): ").append(applesCount)
-                  .append(" - Warehouse stops, optimal cold chain\n");
+            if (smoothCount > 0) {
+                sb.append("• Scenario 1 - Smooth Delivery: ").append(smoothCount)
+                  .append(" - Normal operations, stable temps\n");
             }
-            if (carrotsCount > 0) {
-                sb.append("• Local Producer (Carrots): ").append(carrotsCount)
-                  .append(" - Short direct route, no warehouse\n");
+            if (alertCount > 0) {
+                sb.append("• Scenario 2 - Temperature Alert: ").append(alertCount)
+                  .append(" - With temperature spike events\n");
             }
-            if (veggiesCount > 0) {
-                sb.append("• Cross-Region (Vegetables): ").append(veggiesCount)
-                  .append(" - Extended delivery, temperature events\n");
+            if (qualityCount > 0) {
+                sb.append("• Scenario 3 - Quality Journey: ").append(qualityCount)
+                  .append(" - Full quality tracking journey\n");
             }
             sb.append("\n");
         }
@@ -1775,16 +1778,18 @@ public class LogisticsController implements SimulationListener {
             sb.append("• Average Humidity: ").append(String.format("%.1f%%", avgHumidity)).append("\n\n");
             
             // Count historical shipments by type
-            long histApples = persistedShipments.stream().filter(s -> s.getBatchId().contains("APPLES")).count();
-            long histCarrots = persistedShipments.stream().filter(s -> s.getBatchId().contains("CARROTS")).count();
-            long histVeggies = persistedShipments.stream().filter(s -> 
-                s.getBatchId().contains("VEGGIES") || s.getBatchId().contains("VEGETABLES")).count();
+            long histSmooth = persistedShipments.stream().filter(s -> 
+                s.getBatchId().contains("SMOOTH") || s.getBatchId().contains("APPLES")).count();
+            long histAlert = persistedShipments.stream().filter(s -> 
+                s.getBatchId().contains("ALERT") || s.getBatchId().contains("CARROTS")).count();
+            long histQuality = persistedShipments.stream().filter(s -> 
+                s.getBatchId().contains("QUALITY") || s.getBatchId().contains("VEGGIES") || s.getBatchId().contains("VEGETABLES")).count();
             
-            if (histApples + histCarrots + histVeggies > 0) {
+            if (histSmooth + histAlert + histQuality > 0) {
                 sb.append("━━━ HISTORICAL BY TYPE ━━━\n");
-                if (histApples > 0) sb.append("• Apples (Farm to Consumer): ").append(histApples).append("\n");
-                if (histCarrots > 0) sb.append("• Carrots (Local Producer): ").append(histCarrots).append("\n");
-                if (histVeggies > 0) sb.append("• Vegetables (Cross-Region): ").append(histVeggies).append("\n");
+                if (histSmooth > 0) sb.append("• Scenario 1 - Smooth Delivery: ").append(histSmooth).append("\n");
+                if (histAlert > 0) sb.append("• Scenario 2 - Temperature Alert: ").append(histAlert).append("\n");
+                if (histQuality > 0) sb.append("• Scenario 3 - Quality Journey: ").append(histQuality).append("\n");
                 sb.append("\n");
             }
             
@@ -1792,9 +1797,9 @@ public class LogisticsController implements SimulationListener {
             sb.append("━━━ RECENT SHIPMENTS ━━━\n");
             persistedShipments.stream().limit(5).forEach(s -> {
                 String type = "";
-                if (s.getBatchId().contains("APPLES")) type = " [Farm-to-Consumer]";
-                else if (s.getBatchId().contains("CARROTS")) type = " [Local-Producer]";
-                else if (s.getBatchId().contains("VEGGIES") || s.getBatchId().contains("VEGETABLES")) type = " [Cross-Region]";
+                if (s.getBatchId().contains("SMOOTH") || s.getBatchId().contains("APPLES")) type = " [Scenario-1]";
+                else if (s.getBatchId().contains("ALERT") || s.getBatchId().contains("CARROTS")) type = " [Scenario-2]";
+                else if (s.getBatchId().contains("QUALITY") || s.getBatchId().contains("VEGGIES") || s.getBatchId().contains("VEGETABLES")) type = " [Scenario-3]";
                 
                 sb.append("• ").append(s.getBatchId()).append(type)
                   .append(" | ").append(s.getStatus())
@@ -2039,6 +2044,19 @@ public class LogisticsController implements SimulationListener {
     /**
      * Helper method to filter simulations by type.
      * 
+     * Matches the 3 presentation scenarios from ProducerController using batch prefixes:
+     * - Scenario 1 (example_1): SMOOTH - Smooth Delivery
+     * - Scenario 2 (example_2): ALERT - Temperature Alert
+     * - Scenario 3 (example_3): QUALITY - Quality Journey
+     * 
+     * @param simulations List of simulations to filter
+     * @param example The scenario identifier ("example_1", "example_2", or "example_3")
+     *                Note: Uses "example" naming internally to match scenario ID field in persistence,
+     *                while user-facing labels use "Scenario" naming for clarity.
+     * @return Filtered list of simulations matching the specified scenario type
+     * 
+     * Also supports legacy batch IDs that contain APPLES, CARROTS, or VEGGIES.
+     * 
      * Note: This duplicates logic from ReportExportService.SimulationType enum.
      * The duplication is intentional to avoid creating a dependency between GUI controllers
      * and the service layer's internal enum. This keeps the controllers decoupled from
@@ -2049,19 +2067,30 @@ public class LogisticsController implements SimulationListener {
             List<PersistedSimulation> simulations, String example) {
         return simulations.stream()
             .filter(s -> {
-                switch (example) {
-                    case "example_1":
-                        return s.getBatchId().contains("APPLES") || 
-                               (s.getScenarioId() != null && s.getScenarioId().contains("example_1"));
-                    case "example_2":
-                        return s.getBatchId().contains("CARROTS") || 
-                               (s.getScenarioId() != null && s.getScenarioId().contains("example_2"));
-                    case "example_3":
-                        return s.getBatchId().contains("VEGGIES") || 
-                               s.getBatchId().contains("VEGETABLES") ||
-                               (s.getScenarioId() != null && s.getScenarioId().contains("example_3"));
-                    default:
-                        return false;
+                if ("example_1".equals(example)) {
+                    // Match Scenario 1: Smooth Delivery (prefix: SMOOTH)
+                    return s.getBatchId().contains("SMOOTH") ||
+                           s.getBatchId().contains("APPLES") || 
+                           (s.getScenarioId() != null && s.getScenarioId().contains("example_1")) ||
+                           (s.getScenarioId() != null && s.getScenarioId().contains("presentation_scenario_1")) ||
+                           (s.getScenarioId() != null && s.getScenarioId().contains("smooth_delivery"));
+                } else if ("example_2".equals(example)) {
+                    // Match Scenario 2: Temperature Alert (prefix: ALERT)
+                    return s.getBatchId().contains("ALERT") ||
+                           s.getBatchId().contains("CARROTS") || 
+                           (s.getScenarioId() != null && s.getScenarioId().contains("example_2")) ||
+                           (s.getScenarioId() != null && s.getScenarioId().contains("presentation_scenario_2")) ||
+                           (s.getScenarioId() != null && s.getScenarioId().contains("temperature_alert"));
+                } else if ("example_3".equals(example)) {
+                    // Match Scenario 3: Quality Journey (prefix: QUALITY)
+                    return s.getBatchId().contains("QUALITY") ||
+                           s.getBatchId().contains("VEGGIES") || 
+                           s.getBatchId().contains("VEGETABLES") ||
+                           (s.getScenarioId() != null && s.getScenarioId().contains("example_3")) ||
+                           (s.getScenarioId() != null && s.getScenarioId().contains("presentation_scenario_3")) ||
+                           (s.getScenarioId() != null && s.getScenarioId().contains("quality_journey"));
+                } else {
+                    return false;
                 }
             })
             .collect(Collectors.toList());
