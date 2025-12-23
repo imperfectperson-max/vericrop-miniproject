@@ -4,6 +4,7 @@
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 <?import javafx.scene.image.ImageView?>
+<?import javafx.scene.image.Image?>
 <?import javafx.scene.chart.PieChart?>
 <?import javafx.scene.chart.BarChart?>
 <?import javafx.scene.chart.CategoryAxis?>
@@ -20,7 +21,11 @@
             <!-- Header -->
             <HBox spacing="15" alignment="CENTER_LEFT">
                 <HBox spacing="10" alignment="CENTER">
-                    <Circle radius="25" fill="linear-gradient(to right, #2E8B57, #3CB371)"/>
+                    <ImageView fitHeight="50" fitWidth="50" preserveRatio="true">
+                        <image>
+                            <Image url="@../images/vericrop-icon.png"/>
+                        </image>
+                    </ImageView>
                     <VBox spacing="2">
                         <Label text="VeriCrop" style="-fx-font-size: 28px; -fx-font-weight: bold; -fx-text-fill: #2E8B57;"/>
                         <Label text="Farm Management Dashboard" style="-fx-font-size: 14px; -fx-text-fill: #666;"/>

@@ -4,6 +4,8 @@
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 <?import javafx.scene.text.*?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.image.Image?>
 
 <VBox xmlns="http://javafx.com/javafx/11.0.1" xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="org.vericrop.gui.ConsumerController"
@@ -16,10 +18,17 @@
 
     <!-- Header -->
     <HBox spacing="20" alignment="CENTER_LEFT">
-        <VBox spacing="2">
-            <Label text="VERICROP - PRODUCT VERIFICATION" styleClass="title-label"/>
-            <Label text="Consumer Portal - Verify Product Authenticity" style="-fx-text-fill: #666; -fx-font-size: 12px;"/>
-        </VBox>
+        <HBox spacing="10" alignment="CENTER">
+            <ImageView fitHeight="45" fitWidth="45" preserveRatio="true">
+                <image>
+                    <Image url="@../images/vericrop-icon.png"/>
+                </image>
+            </ImageView>
+            <VBox spacing="2">
+                <Label text="VERICROP - PRODUCT VERIFICATION" styleClass="title-label"/>
+                <Label text="Consumer Portal - Verify Product Authenticity" style="-fx-text-fill: #666; -fx-font-size: 12px;"/>
+            </VBox>
+        </HBox>
         <Region HBox.hgrow="ALWAYS"/>
 
         <!-- Navigation Buttons -->
