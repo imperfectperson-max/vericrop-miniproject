@@ -453,4 +453,86 @@ public class SimulationDao {
         
         return simulation;
     }
+    
+    /**
+     * Get total count of simulations.
+     * 
+     * @return Total number of simulations
+     */
+    public int getTotalCount() {
+        String sql = "SELECT COUNT(*) FROM simulations";
+        
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+            
+            if (rs.next()) {
+                return rs.getInt(1);
+            }
+        } catch (SQLException e) {
+            logger.error("Error getting total simulation count: {}", e.getMessage());
+        }
+        return 0;
+    }
+    
+    /**
+     * Get count of simulations by status.
+     * 
+     * @param status Status to filter by (e.g., "completed", "running")
+     * @return Count of simulations with that status
+     */
+    public int getCountByStatus(String status) {
+        String sql = "SELECT COUNT(*) FROM simulations WHERE status = ?";
+        
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setString(1, status);
+            
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
+            }
+        } catch (SQLException e) {
+            logger.error("Error getting simulation count by status: {}", e.getMessage());
+        }
+        return 0;
+    }
+    
+    /**
+     * Get recent simulations (limit to specified count).
+     * 
+     * @param limit Maximum number of simulations to return
+     * @return List of recent simulations
+     */
+    public List<Simulation> getRecent(int limit) {
+        String sql = "SELECT s.*, " +
+                     "owner.username as owner_username, " +
+                     "supplier.username as supplier_username, " +
+                     "consumer.username as consumer_username " +
+                     "FROM simulations s " +
+                     "LEFT JOIN users owner ON s.owner_user_id = owner.id " +
+                     "LEFT JOIN users supplier ON s.supplier_user_id = supplier.id " +
+                     "LEFT JOIN users consumer ON s.consumer_user_id = consumer.id " +
+                     "ORDER BY s.created_at DESC " +
+                     "LIMIT ?";
+        
+        List<Simulation> simulations = new ArrayList<>();
+        
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setInt(1, limit);
+            
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    simulations.add(mapResultSetToSimulation(rs));
+                }
+            }
+        } catch (SQLException e) {
+            logger.error("Error getting recent simulations: {}", e.getMessage());
+        }
+        return simulations;
+    }
 }
