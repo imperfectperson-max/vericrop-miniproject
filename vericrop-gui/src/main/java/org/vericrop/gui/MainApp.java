@@ -172,6 +172,10 @@ public class MainApp extends Application {
     public void showConsumerScreen() {
         switchToScreen("consumer.fxml");
     }
+    
+    public void showAnalyticsScreen() {
+        switchToScreen("analytics.fxml");
+    }
 
     public static MainApp getInstance() {
         return instance;

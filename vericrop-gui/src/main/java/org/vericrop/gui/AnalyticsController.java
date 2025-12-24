@@ -10,8 +10,14 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import org.vericrop.service.simulation.SimulationListener;
 import org.vericrop.service.simulation.SimulationManager;
+import org.vericrop.gui.app.ApplicationContext;
+import org.vericrop.gui.services.AuthenticationService;
+import org.vericrop.gui.dao.SimulationDao;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class AnalyticsController implements SimulationListener {
+    private static final Logger logger = LoggerFactory.getLogger(AnalyticsController.class);
 
     @FXML private Label totalBatchesLabel;
     @FXML private Label avgQualityLabel;
@@ -34,9 +40,40 @@ public class AnalyticsController implements SimulationListener {
 
     private ObservableList<Supplier> suppliers = FXCollections.observableArrayList();
     private ObservableList<Alert> alerts = FXCollections.observableArrayList();
+    
+    private AuthenticationService authService;
+    private SimulationDao simulationDao;
 
     @FXML
     public void initialize() {
+        // Check admin authentication
+        authService = ApplicationContext.getInstance().getAuthenticationService();
+        
+        if (!authService.isAuthenticated()) {
+            showAccessDenied("You must be logged in to access analytics");
+            return;
+        }
+        
+        String currentRole = authService.getCurrentRole();
+        if (!"ADMIN".equalsIgnoreCase(currentRole)) {
+            logger.warn("Non-admin user attempted to access analytics: user={}, role={}", 
+                       authService.getCurrentUser(), currentRole);
+            showAccessDenied("Admin access required. Your role: " + currentRole);
+            return;
+        }
+        
+        logger.info("✅ Admin user accessing analytics: {}", authService.getCurrentUser());
+        
+        // Get SimulationDao from ApplicationContext
+        try {
+            simulationDao = new org.vericrop.gui.dao.SimulationDao(
+                ApplicationContext.getInstance().getBatchRepository().getDataSource());
+        } catch (Exception e) {
+            logger.error("Failed to initialize SimulationDao: {}", e.getMessage());
+            simulationDao = null;
+        }
+        
+        // Initialize analytics components
         setupKPIs();
         setupSupplierTable();
         setupAlertsTable();
@@ -44,6 +81,26 @@ public class AnalyticsController implements SimulationListener {
         setupCharts();
         setupNavigation();
         registerWithSimulationManager();
+    }
+    
+    /**
+     * Show access denied message and redirect to login
+     */
+    private void showAccessDenied(String message) {
+        Platform.runLater(() -> {
+            javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
+                javafx.scene.control.Alert.AlertType.ERROR);
+            alert.setTitle("Access Denied");
+            alert.setHeaderText("Analytics - Admin Only");
+            alert.setContentText(message);
+            alert.showAndWait();
+            
+            // Redirect to login
+            MainApp mainApp = MainApp.getInstance();
+            if (mainApp != null) {
+                mainApp.switchToScreen("login.fxml");
+            }
+        });
     }
     
     /**
@@ -80,18 +137,53 @@ public class AnalyticsController implements SimulationListener {
     }
 
     private void setupKPIs() {
-        // Load real data from services or display empty state
-        if (shouldLoadDemoData()) {
+        // Load real data from simulations database
+        if (simulationDao != null && !shouldLoadDemoData()) {
+            try {
+                int totalSimulations = simulationDao.getTotalCount();
+                int completedSimulations = simulationDao.getCountByStatus("completed");
+                
+                // Display real statistics
+                totalBatchesLabel.setText(String.valueOf(totalSimulations));
+                
+                // Calculate on-time delivery rate (using completed simulations as proxy)
+                if (totalSimulations > 0) {
+                    int onTimePercentage = (int) ((completedSimulations * 100.0) / totalSimulations);
+                    onTimeDeliveryLabel.setText(onTimePercentage + "%");
+                } else {
+                    onTimeDeliveryLabel.setText("--");
+                }
+                
+                // For now, set placeholders for quality metrics
+                // These could be calculated from batch data in the future
+                avgQualityLabel.setText("--");
+                spoilageRateLabel.setText("--");
+                
+                logger.info("Analytics KPIs loaded: {} total simulations, {} completed", 
+                           totalSimulations, completedSimulations);
+            } catch (Exception e) {
+                logger.error("Failed to load analytics KPIs: {}", e.getMessage());
+                setDefaultKPIs();
+            }
+        } else if (shouldLoadDemoData()) {
+            // Load demo data
             totalBatchesLabel.setText("1,247 (demo)");
             avgQualityLabel.setText("87% ↑2% (demo)");
             spoilageRateLabel.setText("2% ↓1% (demo)");
             onTimeDeliveryLabel.setText("96% (demo)");
         } else {
-            totalBatchesLabel.setText("0");
-            avgQualityLabel.setText("--");
-            spoilageRateLabel.setText("--");
-            onTimeDeliveryLabel.setText("--");
+            setDefaultKPIs();
         }
+    }
+    
+    /**
+     * Set default KPI values when no data is available
+     */
+    private void setDefaultKPIs() {
+        totalBatchesLabel.setText("0");
+        avgQualityLabel.setText("--");
+        spoilageRateLabel.setText("--");
+        onTimeDeliveryLabel.setText("--");
     }
 
     private void setupSupplierTable() {
