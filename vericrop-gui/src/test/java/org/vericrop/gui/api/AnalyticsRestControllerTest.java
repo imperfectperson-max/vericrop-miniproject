@@ -31,7 +31,12 @@ class AnalyticsRestControllerTest {
         assertNotNull(response);
         assertEquals(200, response.getStatusCodeValue());
         assertNotNull(response.getBody());
-        assertTrue(((List<BatchInfo>) response.getBody()).isEmpty());
+        
+        // Safe cast after instanceof check
+        assertTrue(response.getBody() instanceof java.util.List);
+        @SuppressWarnings("unchecked")
+        List<BatchInfo> batches = (List<BatchInfo>) response.getBody();
+        assertTrue(batches.isEmpty());
     }
     
     @Test
@@ -48,6 +53,8 @@ class AnalyticsRestControllerTest {
         // Verify batch was added
         ResponseEntity<?> getResponse = controller.getRecentBatches(null);
         assertNotNull(getResponse.getBody());
+        assertTrue(getResponse.getBody() instanceof java.util.List);
+        @SuppressWarnings("unchecked")
         List<BatchInfo> batches = (List<BatchInfo>) getResponse.getBody();
         assertEquals(1, batches.size());
         assertEquals("TEST_BATCH_001", batches.get(0).getBatchId());
@@ -68,6 +75,8 @@ class AnalyticsRestControllerTest {
         
         // Verify status was updated
         ResponseEntity<?> getResponse = controller.getRecentBatches(null);
+        assertTrue(getResponse.getBody() instanceof java.util.List);
+        @SuppressWarnings("unchecked")
         List<BatchInfo> batches = (List<BatchInfo>) getResponse.getBody();
         assertEquals("DELIVERED", batches.get(0).getStatus());
     }
@@ -95,6 +104,8 @@ class AnalyticsRestControllerTest {
         
         // Verify compliance was updated
         ResponseEntity<?> getResponse = controller.getRecentBatches(null);
+        assertTrue(getResponse.getBody() instanceof java.util.List);
+        @SuppressWarnings("unchecked")
         List<BatchInfo> batches = (List<BatchInfo>) getResponse.getBody();
         assertTrue(batches.get(0).getCompliant());
         assertEquals(0, batches.get(0).getViolationCount());
@@ -110,6 +121,8 @@ class AnalyticsRestControllerTest {
         
         // Verify batch was created with compliance
         ResponseEntity<?> getResponse = controller.getRecentBatches(null);
+        assertTrue(getResponse.getBody() instanceof java.util.List);
+        @SuppressWarnings("unchecked")
         List<BatchInfo> batches = (List<BatchInfo>) getResponse.getBody();
         assertEquals(1, batches.size());
         assertEquals("NEW_BATCH", batches.get(0).getBatchId());
@@ -138,6 +151,8 @@ class AnalyticsRestControllerTest {
         
         // Should be sorted by timestamp descending (most recent first)
         ResponseEntity<?> response = controller.getRecentBatches(null);
+        assertTrue(response.getBody() instanceof java.util.List);
+        @SuppressWarnings("unchecked")
         List<BatchInfo> batches = (List<BatchInfo>) response.getBody();
         
         assertEquals(3, batches.size());

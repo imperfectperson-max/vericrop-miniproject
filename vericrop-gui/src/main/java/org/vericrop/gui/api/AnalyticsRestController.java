@@ -32,11 +32,13 @@ public class AnalyticsRestController {
     }
     
     /**
-     * No-arg constructor for testing
+     * Package-private constructor for testing.
+     * Skips authentication when jwtService is null.
+     * DO NOT use in production code.
      */
-    public AnalyticsRestController() {
+    AnalyticsRestController() {
         this.jwtService = null;
-        logger.info("AnalyticsRestController initialized in test mode");
+        logger.info("AnalyticsRestController initialized in TEST MODE (authentication disabled)");
     }
     
     /**
@@ -94,6 +96,7 @@ public class AnalyticsRestController {
         if (authError != null) {
             return authError;
         }
+        
         List<BatchInfo> batches = new ArrayList<>(recentBatches.values());
         // Sort by timestamp descending (most recent first)
         batches.sort((a, b) -> Long.compare(b.getTimestamp(), a.getTimestamp()));
