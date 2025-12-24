@@ -10,8 +10,13 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import org.vericrop.service.simulation.SimulationListener;
 import org.vericrop.service.simulation.SimulationManager;
+import org.vericrop.gui.app.ApplicationContext;
+import org.vericrop.gui.services.AuthenticationService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class AnalyticsController implements SimulationListener {
+    private static final Logger logger = LoggerFactory.getLogger(AnalyticsController.class);
 
     @FXML private Label totalBatchesLabel;
     @FXML private Label avgQualityLabel;
@@ -34,9 +39,30 @@ public class AnalyticsController implements SimulationListener {
 
     private ObservableList<Supplier> suppliers = FXCollections.observableArrayList();
     private ObservableList<Alert> alerts = FXCollections.observableArrayList();
+    
+    private AuthenticationService authService;
 
     @FXML
     public void initialize() {
+        // Check admin authentication
+        authService = ApplicationContext.getInstance().getAuthenticationService();
+        
+        if (!authService.isAuthenticated()) {
+            showAccessDenied("You must be logged in to access analytics");
+            return;
+        }
+        
+        String currentRole = authService.getCurrentRole();
+        if (!"ADMIN".equalsIgnoreCase(currentRole)) {
+            logger.warn("Non-admin user attempted to access analytics: user={}, role={}", 
+                       authService.getCurrentUser(), currentRole);
+            showAccessDenied("Admin access required. Your role: " + currentRole);
+            return;
+        }
+        
+        logger.info("✅ Admin user accessing analytics: {}", authService.getCurrentUser());
+        
+        // Initialize analytics components
         setupKPIs();
         setupSupplierTable();
         setupAlertsTable();
@@ -44,6 +70,26 @@ public class AnalyticsController implements SimulationListener {
         setupCharts();
         setupNavigation();
         registerWithSimulationManager();
+    }
+    
+    /**
+     * Show access denied message and redirect to login
+     */
+    private void showAccessDenied(String message) {
+        Platform.runLater(() -> {
+            javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
+                javafx.scene.control.Alert.AlertType.ERROR);
+            alert.setTitle("Access Denied");
+            alert.setHeaderText("Analytics - Admin Only");
+            alert.setContentText(message);
+            alert.showAndWait();
+            
+            // Redirect to login
+            MainApp mainApp = MainApp.getInstance();
+            if (mainApp != null) {
+                mainApp.switchToScreen("login.fxml");
+            }
+        });
     }
     
     /**
