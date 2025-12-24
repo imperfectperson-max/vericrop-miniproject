@@ -376,15 +376,15 @@ public class AnalyticsController implements SimulationListener {
     // ========== SimulationListener Implementation ==========
     
     @Override
-    public void onSimulationStarted(String batchId, String farmerId) {
+    public void onSimulationStarted(String batchId, String farmerId, String scenarioId) {
         Platform.runLater(() -> {
             alerts.add(0, new Alert(
                 java.time.LocalDateTime.now().format(
                     java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")),
                 "INFO",
-                "Delivery simulation started for batch: " + batchId
+                "Delivery simulation started for batch: " + batchId + " (scenario: " + scenarioId + ")"
             ));
-            System.out.println("AnalyticsController: Simulation started - " + batchId);
+            System.out.println("AnalyticsController: Simulation started - " + batchId + " (scenario: " + scenarioId + ")");
         });
     }
     

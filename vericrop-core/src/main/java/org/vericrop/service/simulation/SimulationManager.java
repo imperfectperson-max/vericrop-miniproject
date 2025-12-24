@@ -122,6 +122,7 @@ public class SimulationManager {
     private static class SimulationState {
         final String batchId;
         final String farmerId;
+        final String scenarioId;
         final long startTime;
         final List<RouteWaypoint> route;
         volatile double progress;
@@ -141,17 +142,23 @@ public class SimulationManager {
         private static final double DEFAULT_INITIAL_QUALITY = 95.0;
         
         SimulationState(String batchId, String farmerId, List<RouteWaypoint> route) {
-            this(batchId, farmerId, route, SimulationConfig.forDemo());
+            this(batchId, farmerId, route, SimulationConfig.forDemo(), DEFAULT_INITIAL_QUALITY, "NORMAL");
         }
         
         SimulationState(String batchId, String farmerId, List<RouteWaypoint> route, SimulationConfig config) {
-            this(batchId, farmerId, route, config, DEFAULT_INITIAL_QUALITY);
+            this(batchId, farmerId, route, config, DEFAULT_INITIAL_QUALITY, "NORMAL");
         }
         
         SimulationState(String batchId, String farmerId, List<RouteWaypoint> route, 
                        SimulationConfig config, double initialQuality) {
+            this(batchId, farmerId, route, config, initialQuality, "NORMAL");
+        }
+        
+        SimulationState(String batchId, String farmerId, List<RouteWaypoint> route, 
+                       SimulationConfig config, double initialQuality, String scenarioId) {
             this.batchId = batchId;
             this.farmerId = farmerId;
+            this.scenarioId = scenarioId != null ? scenarioId : "NORMAL";
             this.startTime = System.currentTimeMillis();
             this.route = route;
             this.progress = 0.0;
@@ -332,7 +339,7 @@ public class SimulationManager {
             if (isRunning()) {
                 SimulationState state = currentSimulation.get();
                 if (state != null) {
-                    notifyStarted(state.batchId, state.farmerId);
+                    notifyStarted(state.batchId, state.farmerId, state.scenarioId);
                     notifyProgress(state.batchId, state.progress, state.currentLocation);
                 }
             }
@@ -357,11 +364,11 @@ public class SimulationManager {
                                DeliverySimulator.GeoCoordinate destination,
                                int numWaypoints, double avgSpeedKmh, long updateIntervalMs) {
         startSimulation(batchId, farmerId, origin, destination, numWaypoints, avgSpeedKmh, 
-                       updateIntervalMs, null);
+                       updateIntervalMs, null, null);
     }
     
     /**
-     * Start a new simulation with scenario support.
+     * Start a new simulation with scenario support (legacy - backward compatibility).
      * 
      * @param batchId Batch identifier
      * @param farmerId Farmer/producer identifier
@@ -377,6 +384,28 @@ public class SimulationManager {
                                DeliverySimulator.GeoCoordinate destination,
                                int numWaypoints, double avgSpeedKmh, long updateIntervalMs,
                                Scenario scenario) {
+        startSimulation(batchId, farmerId, origin, destination, numWaypoints, avgSpeedKmh, 
+                       updateIntervalMs, scenario, null);
+    }
+    
+    /**
+     * Start a new simulation with scenario and scenario ID support.
+     * 
+     * @param batchId Batch identifier
+     * @param farmerId Farmer/producer identifier
+     * @param origin Starting location
+     * @param destination Final destination
+     * @param numWaypoints Number of waypoints per route segment
+     * @param avgSpeedKmh Average speed in km/h
+     * @param updateIntervalMs Update interval for simulation
+     * @param scenario Delivery scenario (null = NORMAL)
+     * @param scenarioId Scenario identifier (e.g., "example_1", "presentation_scenario_2", or null for "NORMAL")
+     */
+    public void startSimulation(String batchId, String farmerId, 
+                               DeliverySimulator.GeoCoordinate origin,
+                               DeliverySimulator.GeoCoordinate destination,
+                               int numWaypoints, double avgSpeedKmh, long updateIntervalMs,
+                               Scenario scenario, String scenarioId) {
         if (running.get()) {
             logger.warn("Simulation already running for batch: {}", currentSimulation.get().batchId);
             notifyError(batchId, "Another simulation is already running");
@@ -386,14 +415,18 @@ public class SimulationManager {
         // Use NORMAL scenario if none provided
         Scenario effectiveScenario = scenario != null ? scenario : Scenario.NORMAL;
         
+        // Use "NORMAL" scenarioId if none provided
+        String effectiveScenarioId = scenarioId != null ? scenarioId : "NORMAL";
+        
         // Mark as running and notify listeners immediately to update UI fast
         // This ensures "Starting simulation..." disappears quickly and UI shows active state
         running.set(true);
-        notifyStarted(batchId, farmerId);
+        notifyStarted(batchId, farmerId, effectiveScenarioId);
         
         try {
             logger.info("=== Starting End-to-End Simulation ===");
-            logger.info("Batch: {}, Farmer: {}, Scenario: {}", batchId, farmerId, effectiveScenario.getDisplayName());
+            logger.info("Batch: {}, Farmer: {}, Scenario: {}, ScenarioId: {}", 
+                       batchId, farmerId, effectiveScenario.getDisplayName(), effectiveScenarioId);
             
             long startTime = System.currentTimeMillis();
             
@@ -442,8 +475,10 @@ public class SimulationManager {
             logger.info("Step 5: Initializing map simulation...");
             mapSimulator.initializeForScenario(effectiveScenario, batchId, route.size());
             
-            // Step 6: Update state
-            SimulationState state = new SimulationState(batchId, farmerId, route);
+            // Step 6: Update state with scenario ID
+            SimulationState state = new SimulationState(batchId, farmerId, route, 
+                                                       SimulationConfig.forDemo(), 
+                                                       95.0, effectiveScenarioId);
             currentSimulation.set(state);
             running.set(true);
             
@@ -633,6 +668,15 @@ public class SimulationManager {
     }
     
     /**
+     * Get the scenario ID of the current simulation.
+     * @return scenario ID or "NORMAL" if no simulation running
+     */
+    public String getScenarioId() {
+        SimulationState state = currentSimulation.get();
+        return state != null ? state.scenarioId : "NORMAL";
+    }
+    
+    /**
      * Start monitoring progress using time-scaled simulation.
      * Uses monotonic progress tracking to prevent restart bugs.
      * Progress is calculated based on elapsed real time scaled by timeScale.
@@ -787,10 +831,10 @@ public class SimulationManager {
     /**
      * Notify all listeners that simulation started.
      */
-    private void notifyStarted(String batchId, String farmerId) {
+    private void notifyStarted(String batchId, String farmerId, String scenarioId) {
         for (SimulationListener listener : listeners) {
             try {
-                listener.onSimulationStarted(batchId, farmerId);
+                listener.onSimulationStarted(batchId, farmerId, scenarioId);
             } catch (Exception e) {
                 logger.error("Error notifying listener of simulation start", e);
             }

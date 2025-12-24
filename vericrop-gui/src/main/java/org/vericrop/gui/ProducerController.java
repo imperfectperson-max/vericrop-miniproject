@@ -1560,7 +1560,8 @@ public class ProducerController implements SimulationListener {
                         System.out.println("🚀 Starting scenario simulation for batch: " + finalBatchId + 
                                          " | Farmer: " + farmerId + " | Origin: " + origin.getName() +
                                          " | Waypoints: " + waypoints + " | Speed: " + speedKmh + " km/h");
-                        manager.startSimulation(finalBatchId, farmerId, origin, destination, waypoints, speedKmh, updateIntervalMs);
+                        manager.startSimulation(finalBatchId, farmerId, origin, destination, waypoints, speedKmh, updateIntervalMs, 
+                                               finalScenario.getScenario(), finalScenario.getId());
 
                         // Start map simulation and temperature compliance together via LogisticsService
                         if (logisticsService != null) {
@@ -2620,7 +2621,7 @@ public class ProducerController implements SimulationListener {
     // ========== SimulationListener Implementation ==========
     
     @Override
-    public void onSimulationStarted(String batchId, String farmerId) {
+    public void onSimulationStarted(String batchId, String farmerId, String scenarioId) {
         Platform.runLater(() -> {
             activeSimulationId = batchId;
             if (startSimButton != null) {
@@ -2633,7 +2634,7 @@ public class ProducerController implements SimulationListener {
                 simStatusLabel.setText("✅ Simulation started for: " + batchId);
                 simStatusLabel.setStyle("-fx-text-fill: #10B981;");
             }
-            System.out.println("🎬 Simulation started notification received: " + batchId);
+            System.out.println("🎬 Simulation started notification received: " + batchId + " (scenario: " + scenarioId + ")");
         });
     }
     

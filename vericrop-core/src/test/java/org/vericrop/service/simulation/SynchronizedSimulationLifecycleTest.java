@@ -112,7 +112,7 @@ public class SynchronizedSimulationLifecycleTest {
         
         SimulationListener listener = new SimulationListener() {
             @Override
-            public void onSimulationStarted(String batchId, String farmerId) {
+            public void onSimulationStarted(String batchId, String farmerId, String scenarioId) {
                 eventCount.incrementAndGet();
             }
             
@@ -257,7 +257,7 @@ public class SynchronizedSimulationLifecycleTest {
         
         SimulationListener listener = new SimulationListener() {
             @Override
-            public void onSimulationStarted(String batchId, String farmerId) {}
+            public void onSimulationStarted(String batchId, String farmerId, String scenarioId) {}
             
             @Override
             public void onProgressUpdate(String batchId, double progress, String currentLocation) {}
@@ -352,7 +352,7 @@ public class SynchronizedSimulationLifecycleTest {
         // Simulated ProducerController listener
         SimulationListener producerListener = new SimulationListener() {
             @Override
-            public void onSimulationStarted(String batchId, String farmerId) {
+            public void onSimulationStarted(String batchId, String farmerId, String scenarioId) {
                 producerEvents.add("STARTED:" + batchId + ":" + farmerId);
                 allStartedLatch.countDown();
             }
@@ -373,7 +373,7 @@ public class SynchronizedSimulationLifecycleTest {
         // Simulated LogisticsController listener
         SimulationListener logisticsListener = new SimulationListener() {
             @Override
-            public void onSimulationStarted(String batchId, String farmerId) {
+            public void onSimulationStarted(String batchId, String farmerId, String scenarioId) {
                 logisticsEvents.add("STARTED:" + batchId + ":" + farmerId);
                 allStartedLatch.countDown();
             }
@@ -394,7 +394,7 @@ public class SynchronizedSimulationLifecycleTest {
         // Simulated ConsumerController listener
         SimulationListener consumerListener = new SimulationListener() {
             @Override
-            public void onSimulationStarted(String batchId, String farmerId) {
+            public void onSimulationStarted(String batchId, String farmerId, String scenarioId) {
                 consumerEvents.add("STARTED:" + batchId + ":" + farmerId);
                 allStartedLatch.countDown();
             }
@@ -439,7 +439,7 @@ public class SynchronizedSimulationLifecycleTest {
         
         SimulationListener lateListener = new SimulationListener() {
             @Override
-            public void onSimulationStarted(String batchId, String farmerId) {
+            public void onSimulationStarted(String batchId, String farmerId, String scenarioId) {
                 lateListenerNotified.set(true);
                 receivedBatchId.set(batchId);
             }
@@ -470,7 +470,7 @@ public class SynchronizedSimulationLifecycleTest {
         
         SimulationListener orderTrackingListener = new SimulationListener() {
             @Override
-            public void onSimulationStarted(String batchId, String farmerId) {
+            public void onSimulationStarted(String batchId, String farmerId, String scenarioId) {
                 eventSequence.add("START");
             }
             
@@ -499,7 +499,7 @@ public class SynchronizedSimulationLifecycleTest {
     private SimulationListener createCountingListener(AtomicInteger counter) {
         return new SimulationListener() {
             @Override
-            public void onSimulationStarted(String batchId, String farmerId) {
+            public void onSimulationStarted(String batchId, String farmerId, String scenarioId) {
                 counter.incrementAndGet();
             }
             
