@@ -346,9 +346,9 @@ When making changes to vericrop-gui:
 ## Related Documentation
 
 - [Main README](../README.md) - Project overview
-- [Docker Implementation](../DOCKER_IMPLEMENTATION.md) - Deployment details
-- [Kafka Integration](../KAFKA_INTEGRATION.md) - Kafka setup guide
-- [Deployment Guide](../DEPLOYMENT.md) - Production deployment
+- [Docker Implementation](../docs/deployment/DOCKER_IMPLEMENTATION.md) - Deployment details
+- [Kafka Integration](../docs/implementation/KAFKA_INTEGRATION.md) - Kafka setup guide
+- [Deployment Guide](../docs/deployment/DEPLOYMENT.md) - Production deployment
 
 ## License
 

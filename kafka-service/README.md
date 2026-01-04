@@ -364,5 +364,5 @@ KAFKA_TOPIC_REPLICATION_FACTOR=3
 
 For issues or questions:
 - Check the main [README](../README.md)
-- Review [KAFKA_INTEGRATION.md](../KAFKA_INTEGRATION.md)
+- Review [KAFKA_INTEGRATION.md](../docs/implementation/KAFKA_INTEGRATION.md)
 - Open an issue on [GitHub](https://github.com/imperfectperson-max/vericrop-miniproject/issues)

@@ -321,7 +321,7 @@ docker-compose -f docker-compose.test.yml up -d
 ## 📚 Additional Documentation
 
 - [Main README](../README.md) - Project overview
-- [Deployment Guide](../DEPLOYMENT.md) - Production deployment
+- [Deployment Guide](../docs/deployment/DEPLOYMENT.md) - Production deployment
 - [ML Service API](../docker/ml-service/README.md) - ML service docs
 - [Database Schema](src/main/resources/db/schema.sql) - Database structure
 

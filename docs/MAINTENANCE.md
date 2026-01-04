@@ -265,5 +265,5 @@ chmod 755 backups
 ## Related Documentation
 
 - [README.md](../README.md) - Project overview
-- [DEPLOYMENT.md](../DEPLOYMENT.md) - Deployment guide
-- [CHANGELOG.md](../CHANGELOG.md) - Change history
+- [DEPLOYMENT.md](deployment/DEPLOYMENT.md) - Deployment guide
+- [CHANGELOG.md](project/CHANGELOG.md) - Change history

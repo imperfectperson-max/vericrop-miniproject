@@ -524,5 +524,5 @@ For production deployment, consider:
 For issues and questions:
 
 - GitHub Issues: https://github.com/imperfectperson-max/vericrop-miniproject/issues
-- Documentation: [README.md](README.md)
-- Kafka Integration: [KAFKA_INTEGRATION.md](KAFKA_INTEGRATION.md)
+- Documentation: [README.md](../../README.md)
+- Kafka Integration: [KAFKA_INTEGRATION.md](../implementation/KAFKA_INTEGRATION.md)
