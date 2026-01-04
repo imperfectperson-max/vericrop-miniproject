@@ -384,4 +384,4 @@ For production deployment with full functionality:
 4. Remove or unset VERICROP_LOAD_DEMO flag
 5. Configure production environment variables
 
-See [DEPLOYMENT.md](DEPLOYMENT.md) for production deployment guide.
+See [DEPLOYMENT.md](../deployment/DEPLOYMENT.md) for production deployment guide.

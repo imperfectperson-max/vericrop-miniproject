@@ -750,7 +750,7 @@ kafka-topics --alter --topic batch-events \
 ### Getting Help
 
 1. Check logs first: `docker-compose logs` or `kubectl logs`
-2. Review [README.md](README.md) for basic troubleshooting
+2. Review [README.md](../../README.md) for basic troubleshooting
 3. Search [GitHub Issues](https://github.com/imperfectperson-max/vericrop-miniproject/issues)
 4. Open new issue with:
    - Detailed description
@@ -760,9 +760,9 @@ kafka-topics --alter --topic batch-events \
 
 ## Additional Resources
 
-- [README.md](README.md) - General project documentation
-- [vericrop-gui/README.md](vericrop-gui/README.md) - GUI module details
-- [KAFKA_INTEGRATION.md](KAFKA_INTEGRATION.md) - Kafka setup
+- [README.md](../../README.md) - General project documentation
+- [vericrop-gui/README.md](../../vericrop-gui/README.md) - GUI module details
+- [KAFKA_INTEGRATION.md](../implementation/KAFKA_INTEGRATION.md) - Kafka setup
 - [Docker Documentation](https://docs.docker.com/)
 - [Kubernetes Documentation](https://kubernetes.io/docs/)
 - [Spring Boot Actuator](https://docs.spring.io/spring-boot/docs/current/reference/html/actuator.html)

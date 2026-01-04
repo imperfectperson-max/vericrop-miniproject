@@ -2700,7 +2700,7 @@ VeriCrop includes a comprehensive simulation system for testing and demonstratio
 - Three pre-configured delivery scenarios
 - REST API for programmatic access
 
-For detailed simulation testing procedures, see [TESTING_SIMULATION.md](TESTING_SIMULATION.md).
+For detailed simulation testing procedures, see [TESTING_SIMULATION.md](docs/guides/TESTING_SIMULATION.md).
 
 ## Stopping and Cleaning
 
@@ -3605,8 +3605,8 @@ If you encounter issues not covered here:
 
 2. **Review detailed documentation**:
    - [vericrop-gui/README.md](vericrop-gui/README.md) - GUI module details
-   - [KAFKA_INTEGRATION.md](KAFKA_INTEGRATION.md) - Kafka setup and usage
-   - [DEPLOYMENT.md](DEPLOYMENT.md) - Production deployment
+   - [KAFKA_INTEGRATION.md](docs/implementation/KAFKA_INTEGRATION.md) - Kafka setup and usage
+   - [DEPLOYMENT.md](docs/deployment/DEPLOYMENT.md) - Production deployment
    - [docs/GUI-setup.md](docs/GUI-setup.md) - GUI setup guide
 
 3. **Enable debug logging**:
