@@ -998,136 +998,88 @@ start-all.bat
 ./start-all.sh run          # Run GUI only
 ```
 
-## Database Setup & User Provisioning
+---
 
-VeriCrop uses PostgreSQL for metadata storage with Flyway for automatic migrations.
+## 💾 Database Setup & User Provisioning
 
-### Automatic Schema Initialization
+VeriCrop uses PostgreSQL with automatic schema initialization.
 
-When the application starts, it automatically ensures the required database schema exists. The `DatabaseInitializer` utility:
+### Quick Overview
 
-1. **Runs at startup** after the HikariCP connection pool is created
-2. **Loads** the idempotent schema from `src/main/resources/db/schema.sql`
-3. **Executes** CREATE TABLE IF NOT EXISTS statements for all required tables
-4. **Is resilient** - logs errors but doesn't crash the UI if the database is temporarily unavailable
+✅ **Automatic Setup** - Schema creates automatically on first run  
+✅ **Pre-configured Users** - Demo users ready for testing  
+✅ **Flyway Migrations** - Versioned database changes  
+✅ **Secure Authentication** - BCrypt password hashing
 
-**Tables created automatically:**
-- `users` - User authentication and profile information
-- `batches` - Batch metadata and quality tracking
-- `shipments` - Shipment tracking with blockchain integration
+### Default Users
+
+| Username | Password | Role | Use For |
+|----------|----------|------|---------|
+| `admin` | `admin123` | ADMIN | Full system access |
+| `farmer` | `farmer123` | FARMER | Producer operations |
+| `supplier` | `supplier123` | SUPPLIER | Logistics operations |
+| `producer_demo` | `DemoPass123!` | PRODUCER | Demo producer |
+| `logistics_demo` | `DemoPass123!` | LOGISTICS | Demo logistics |
+| `consumer_demo` | `DemoPass123!` | CONSUMER | Demo consumer |
+
+⚠️ **Security Note**: Change these passwords in production!
+
+<details>
+<summary>🔧 Advanced: Schema Details & Manual User Management</summary>
+
+
+**Automatic Schema Initialization:**
+
+Tables created on first run:
+- `users` - Authentication and profiles
+- `batches` - Batch metadata and quality
+- `shipments` - Shipment tracking with blockchain
 - `messages` - User-to-user messaging
-- `participants` - GUI instance tracking for contact discovery
-- `simulations` - Simulation metadata with supplier/consumer relationships
-- `simulation_batches` - Batch data during simulation runtime
+- `participants` - GUI instance tracking
+- `simulations` - Simulation metadata
+- `simulation_batches` - Simulation batch data
 
-This ensures registration and other DB operations no longer fail with "relation does not exist" errors on first run.
+**Database Migrations:**
 
-**To opt out of automatic schema initialization**, remove or rename the schema.sql file from resources. In this case, you must ensure the database schema is created manually or via Flyway migrations before starting the application.
+Flyway migrations in `src/vericrop-gui/main/resources/db/migration/`:
+- V1: Batches and quality tracking
+- V2: User authentication with BCrypt
+- V3: Shipment tracking with blockchain
+- V7: Simulation persistence
 
-### Database Migrations
-
-Database schema is managed through Flyway migrations located in `src/vericrop-gui/main/resources/db/migration/`:
-
-- **V1__create_batches_table.sql**: Batches and quality tracking tables
-- **V2__create_users_table.sql**: User authentication with BCrypt hashing
-- **V3__create_shipments_table.sql**: Shipment tracking with blockchain integration
-- **V7__create_simulations_table.sql**: Simulation persistence with supplier/consumer relationships
-
-**V7 Migration Details:**
-The V7 migration adds two new tables for simulation persistence:
-
-| Table | Description |
-|-------|-------------|
-| `simulations` | Stores simulation metadata with supplier/consumer relationships and unique simulation_token for multi-device access |
-| `simulation_batches` | Stores batch records created during simulation for report generation |
-
-**Simulations Table Fields:**
-- `id` (UUID): Primary key
-- `title` (string): Simulation title
-- `status` (string): created, running, completed, failed, stopped
-- `owner_user_id` (references users): User who created the simulation
-- `supplier_user_id` (references users): Supplier who can view this simulation
-- `consumer_user_id` (references users): Consumer who can view this simulation
-- `simulation_token` (string, unique): Secure token for multi-device access
-- `meta` (JSONB): Optional metadata
-
-Migrations run automatically on application startup when `spring.flyway.enabled=true` (default).
-
-### Pre-configured Users
-
-The V2 migration creates demo users for testing:
-
-| Username | Password | Role | Description |
-|----------|----------|------|-------------|
-| admin | admin123 | ADMIN | Full system access |
-| farmer | farmer123 | FARMER | Farm/producer operations |
-| supplier | supplier123 | SUPPLIER | Logistics operations |
-
-**⚠️ Security Note**: Change these passwords in production! Passwords are BCrypt hashed with cost factor 10.
-
-### Demo Users (Auto-Created on Startup)
-
-When the application starts, **DemoUserDataLoader** automatically seeds additional demo users with standardized roles for testing. These users are only created if they don't already exist (idempotent):
-
-| Username | Password | Role | Description |
-|----------|----------|------|-------------|
-| **producer_demo** | DemoPass123! | PRODUCER | Producer/farmer operations |
-| **logistics_demo** | DemoPass123! | LOGISTICS | Logistics/supplier operations |
-| **consumer_demo** | DemoPass123! | CONSUMER | Consumer verification |
-| **admin_demo** | DemoPass123! | ADMIN | Admin access (producer + logistics UIs) |
-
-**Role-Based Redirects After Login:**
-- **PRODUCER** → Producer screen (batch creation, quality assessment)
-- **LOGISTICS** → Logistics screen (shipment tracking, temperature monitoring)
-- **CONSUMER** → Consumer screen (product verification)
-- **ADMIN** → Producer screen (with access to both producer and logistics UIs)
-
-### Adding New Users
-
-To add users manually:
+**Adding New Users Manually:**
 
 ```sql
 -- Connect to PostgreSQL
 docker exec -it vericrop-postgres psql -U vericrop -d vericrop
 
--- Generate BCrypt hash (use online tool or bcrypt CLI)
--- For password "mypassword": $2a$10$...
-
--- Insert new user
+-- Insert new user (generate BCrypt hash first)
 INSERT INTO users (username, password_hash, email, full_name, role, status)
-VALUES (
-    'newuser',
-    '$2a$10$YOUR_BCRYPT_HASH_HERE',
-    'user@example.com',
-    'User Full Name',
-    'USER',
-    'active'
-);
+VALUES ('newuser', '$2a$10$YOUR_BCRYPT_HASH', 'user@example.com', 'Full Name', 'USER', 'active');
 ```
 
-### Authentication Features
+**Authentication Features:**
+- BCrypt password hashing (never plaintext)
+- Failed login tracking (locks after 5 attempts)
+- 30-minute automatic unlock
+- Role-based access control
+- Database fallback mode
 
-- **BCrypt Password Hashing**: Secure password storage (never plaintext)
-- **Failed Login Tracking**: Account locks after 5 failed attempts
-- **Lockout Duration**: 30 minutes automatic unlock
-- **Role-Based Access**: ADMIN, FARMER, SUPPLIER, CONSUMER, USER
-- **Last Login Tracking**: Monitors user activity
-- **Database Fallback**: Simple auth mode when database unavailable
+</details>
 
-### Verifying Database Setup
+### Verify Database Setup
 
 ```bash
-# Check migrations applied
+# Check migrations
 docker exec -it vericrop-postgres psql -U vericrop -d vericrop \
-  -c "SELECT version, description, installed_on FROM flyway_schema_history ORDER BY installed_rank;"
+  -c "SELECT version, description FROM flyway_schema_history;"
 
-# Verify users exist
+# Verify users
 docker exec -it vericrop-postgres psql -U vericrop -d vericrop \
-  -c "SELECT username, role, status, created_at FROM users;"
+  -c "SELECT username, role FROM users;"
+```
 
-# Check batches table
-docker exec -it vericrop-postgres psql -U vericrop -d vericrop \
-  -c "SELECT COUNT(*) as batch_count FROM batches;"
+---
 ```
 
 ## Local Development
@@ -2424,178 +2376,110 @@ curl http://localhost:8080/producer/blockchain?limit=5
 }
 ```
 
-## Running Tests
+---
 
-VeriCrop includes comprehensive test suites for Java and Python components. Always run tests before committing changes.
+## 🧪 Running Tests
+
+VeriCrop includes comprehensive test suites. Always run tests before committing changes.
+
+### Quick Test Commands
+
+```bash
+# Run all Java tests
+./gradlew test
+
+# Run all Python tests (from docker/ml-service directory)
+pytest
+
+# Run with coverage
+./gradlew test jacocoTestReport
+pytest --cov=. --cov-report=html
+```
+
+<details>
+<summary>📖 Detailed Testing Guide</summary>
 
 ### Java Tests
 
-#### Run All Tests
-
+**Run by Module:**
 ```bash
-# Run all Java tests across all modules
-./gradlew test
-
-# Expected output: BUILD SUCCESSFUL
-# Results: XXX tests, XXX passed, 0 failed, 0 skipped
-
-# Windows
-gradlew.bat test
+./gradlew :vericrop-core:test      # Core business logic
+./gradlew :vericrop-gui:test       # GUI application
+./gradlew :kafka-service:test      # Kafka service
 ```
 
-#### Run Tests for Specific Modules
-
+**Run Specific Tests:**
 ```bash
-# Test core business logic
-./gradlew :vericrop-core:test
-
-# Test GUI application
-./gradlew :vericrop-gui:test
-
-# Test Kafka service
-./gradlew :kafka-service:test
-
-# Test ML client
-./gradlew :ml-client:test
-```
-
-#### Run Specific Test Classes
-
-```bash
-# Run blockchain tests
 ./gradlew test --tests "*BlockchainTest"
-
-# Run ML service client tests
 ./gradlew test --tests "*MLServiceClientTest"
-
-# Run quality evaluation tests
 ./gradlew test --tests "*QualityEvaluationServiceTest"
-
-# Run authentication tests
-./gradlew test --tests "*AuthenticationServiceTest"
 ```
 
-#### Run with Coverage
-
+**View Reports:**
 ```bash
-# Run tests with JaCoCo coverage report
-./gradlew test jacocoTestReport
-
-# Expected output: BUILD SUCCESSFUL
-# Coverage report: build/reports/jacoco/test/html/index.html
-
-# View coverage report (Unix/Mac)
-open build/reports/jacoco/test/html/index.html
-
-# Windows
-start build\reports\jacoco\test\html\index.html
-```
-
-#### Run with Detailed Output
-
-```bash
-# Run with verbose logging
-./gradlew test --info
-
-# Run with debug output
-./gradlew test --debug
-
-# Run and show standard output
-./gradlew test --console=verbose
-```
-
-#### View Test Reports
-
-```bash
-# HTML test reports are generated automatically
-# Location: <module>/build/reports/tests/test/index.html
-
-# View vericrop-core test report
-open vericrop-core/build/reports/tests/test/index.html
-
-# View vericrop-gui test report
-open vericrop-gui/build/reports/tests/test/index.html
-
-# View all test reports
-find . -name "index.html" -path "*/reports/tests/*"
+# Reports generated at: <module>/build/reports/tests/test/index.html
+open vericrop-core/build/reports/tests/test/index.html  # Unix/Mac
+start build\reports\tests\test\index.html              # Windows
 ```
 
 ### Python Tests
 
-#### Setup Test Environment
-
+**Setup:**
 ```bash
-# Navigate to ML service directory
 cd docker/ml-service
-
-# Activate virtual environment (if using local setup)
 source venv/bin/activate  # Unix/Mac
 venv\Scripts\activate     # Windows
-
-# Install test dependencies
 pip install -r requirements-test.txt
-
-# Expected packages: pytest, pytest-cov, httpx
 ```
 
-#### Run All Python Tests
-
+**Run Tests:**
 ```bash
-# Run all tests
-pytest
-
-# Expected output:
-# ======================== test session starts =========================
-# collected XX items
-# tests/test_app.py ........                                    [100%]
-# ========================= XX passed in X.XXs =========================
-
-# Run with verbose output
-pytest -v
-
-# Run with extra verbosity
-pytest -vv
+pytest                              # All tests
+pytest -v                           # Verbose
+pytest tests/test_predict.py        # Specific file
+pytest -k "health"                  # Pattern match
 ```
 
-#### Run with Coverage
-
+**Coverage:**
 ```bash
-# Run tests with coverage report
-pytest --cov=. --cov-report=html
-
-# Expected output: Coverage report generated at htmlcov/index.html
-
-# View coverage report
-open htmlcov/index.html        # Unix/Mac
-start htmlcov\index.html       # Windows
-
-# Generate terminal coverage report
-pytest --cov=. --cov-report=term
-
-# Expected output shows coverage percentage per file
+pytest --cov=. --cov-report=html    # HTML report
+pytest --cov=. --cov-report=term    # Terminal report
+# View at: htmlcov/index.html
 ```
 
-#### Run Specific Test Files
+</details>
+
+### Manual Service Testing
 
 ```bash
-# Run specific test file
-pytest tests/test_predict.py
+# ML Service
+curl http://localhost:8000/health
+curl -X POST -F "file=@examples/sample.jpg" http://localhost:8000/predict
 
-# Run specific test function
-pytest tests/test_predict.py::test_predict_endpoint
+# Database
+docker exec -it vericrop-postgres psql -U vericrop -d vericrop \
+  -c "SELECT COUNT(*) FROM batches;"
 
-# Run tests matching pattern
-pytest -k "health"
-
-# Run tests by marker (if configured)
-pytest -m "unit"
+# Kafka
+docker exec -it vericrop-kafka kafka-console-consumer \
+  --bootstrap-server localhost:9092 --topic batch-events --from-beginning
 ```
 
-#### Run with Different Output Formats
+### Test Coverage Summary
 
-```bash
-# Run with detailed output
-pytest -v
+| Component | Coverage | Status |
+|-----------|----------|--------|
+| Blockchain operations | ✅ Full | Comprehensive unit tests |
+| Quality evaluation service | ✅ Core | Logic tested |
+| File ledger service | ✅ Full | Read/write tested |
+| ML service health | ✅ Full | API contract tested |
+| Batch operations | ✅ Full | Database ops tested |
+| User authentication | ✅ Full | BCrypt & validation |
+| Kafka messaging | ✅ Full | Message handling |
+| Integration tests | ⚠️ Partial | Service interactions |
+| GUI controllers | ⚠️ Manual | JavaFX UI testing |
+
+---
 
 # Run with short output
 pytest -q
