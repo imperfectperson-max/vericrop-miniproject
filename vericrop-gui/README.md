@@ -61,7 +61,7 @@ Database initialization is handled automatically via Flyway migrations:
 
 ```bash
 # Migrations run automatically on first startup
-# Located in: vericrop-gui/src/main/resources/db/migration/
+# Located in: src/vericrop-gui/main/resources/db/migration/
 
 # Verify migrations applied:
 docker exec -it vericrop-postgres psql -U vericrop -d vericrop \

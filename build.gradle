@@ -18,6 +18,26 @@ subprojects {
     apply plugin: 'java'
     apply plugin: 'io.spring.dependency-management'
 
+    // Configure source sets to use the new src structure at the root level
+    sourceSets {
+        main {
+            java {
+                srcDirs = ["${rootProject.projectDir}/src/${project.name}/main/java"]
+            }
+            resources {
+                srcDirs = ["${rootProject.projectDir}/src/${project.name}/main/resources"]
+            }
+        }
+        test {
+            java {
+                srcDirs = ["${rootProject.projectDir}/src/${project.name}/test/java"]
+            }
+            resources {
+                srcDirs = ["${rootProject.projectDir}/src/${project.name}/test/resources"]
+            }
+        }
+    }
+
     dependencyManagement {
         imports {
             mavenBom "org.springframework.boot:spring-boot-dependencies:3.1.0"

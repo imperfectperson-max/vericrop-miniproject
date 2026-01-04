@@ -342,17 +342,17 @@ java -version  # Should be 17+
 
 ## Files Modified for Demo Mode
 
-1. **vericrop-gui/src/main/java/org/vericrop/gui/app/ApplicationContext.java**
+1. **src/vericrop-gui/main/java/org/vericrop/gui/app/ApplicationContext.java**
    - Added getters for core services
    - Added BlockchainService and FileLedgerService support
    - Enhanced shutdown for demo services
 
-2. **vericrop-gui/src/main/java/org/vericrop/gui/LogisticsController.java**
+2. **src/vericrop-gui/main/java/org/vericrop/gui/LogisticsController.java**
    - Fixed table column bindings
    - Made map visualization null-safe
    - Made sync service startup safe
 
-4. **vericrop-gui/src/main/java/org/vericrop/gui/ConsumerController.java**
+4. **src/vericrop-gui/main/java/org/vericrop/gui/ConsumerController.java**
    - Enhanced demo mode fallback
    - Improved verification messages
 

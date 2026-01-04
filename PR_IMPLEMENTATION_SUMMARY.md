@@ -30,8 +30,8 @@ This PR successfully implements the complete JavaFX GUI and backend wiring for t
 - Alert broadcast on successful generation
 
 **Files**:
-- `vericrop-gui/src/main/java/org/vericrop/gui/util/QRGenerator.java` (155 lines)
-- `vericrop-gui/src/test/java/org/vericrop/gui/util/QRGeneratorTest.java` (134 lines, 6 tests)
+- `src/vericrop-gui/main/java/org/vericrop/gui/util/QRGenerator.java` (155 lines)
+- `src/vericrop-gui/test/java/org/vericrop/gui/util/QRGeneratorTest.java` (134 lines, 6 tests)
 - Updated `producer.fxml` with QR generation section
 - Updated `ProducerController.java` with `handleGenerateQR()` method
 
@@ -84,7 +84,7 @@ This PR successfully implements the complete JavaFX GUI and backend wiring for t
 - Integration with QR generation and simulator
 
 **Files**:
-- `vericrop-gui/src/main/java/org/vericrop/gui/services/AlertService.java` (238 lines)
+- `src/vericrop-gui/main/java/org/vericrop/gui/services/AlertService.java` (238 lines)
 - Wired to ApplicationContext
 
 **Features**:
@@ -107,7 +107,7 @@ This PR successfully implements the complete JavaFX GUI and backend wiring for t
 - Output directory: `generated_reports/`
 
 **Files**:
-- `vericrop-gui/src/main/java/org/vericrop/gui/util/ReportGenerator.java` (244 lines)
+- `src/vericrop-gui/main/java/org/vericrop/gui/util/ReportGenerator.java` (244 lines)
 
 **Report Types**:
 1. **Journey Reports**

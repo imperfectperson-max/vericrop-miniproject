@@ -47,17 +47,17 @@ Four Flyway migrations manage the database schema:
 
 ### Model Layer
 
-**User.java** (`vericrop-gui/src/main/java/org/vericrop/gui/models/User.java`)
+**User.java** (`src/vericrop-gui/main/java/org/vericrop/gui/models/User.java`)
 - Complete user model with all fields
 - Helper methods: isLocked(), isActive(), hasRole()
 
-**Message.java** (`vericrop-gui/src/main/java/org/vericrop/gui/models/Message.java`)
+**Message.java** (`src/vericrop-gui/main/java/org/vericrop/gui/models/Message.java`)
 - Complete message model
 - Helper methods: markAsRead(), getBodyPreview()
 
 ### DAO Layer
 
-**UserDao.java** (`vericrop-gui/src/main/java/org/vericrop/gui/dao/UserDao.java`)
+**UserDao.java** (`src/vericrop-gui/main/java/org/vericrop/gui/dao/UserDao.java`)
 - createUser() - Register new users with BCrypt hashing
 - findByUsername() - Lookup by username
 - findById() - Lookup by ID
@@ -67,7 +67,7 @@ Four Flyway migrations manage the database schema:
 - emailExists() - Check email availability
 - updateLastLogin() - Track login times
 
-**MessageDao.java** (`vericrop-gui/src/main/java/org/vericrop/gui/dao/MessageDao.java`)
+**MessageDao.java** (`src/vericrop-gui/main/java/org/vericrop/gui/dao/MessageDao.java`)
 - sendMessage() - Create new messages
 - getInboxMessages() - Get received messages
 - getSentMessages() - Get sent messages
@@ -325,25 +325,25 @@ No compilation errors
 
 ```
 Modified:
-- vericrop-gui/src/main/java/org/vericrop/gui/MainApp.java
-- vericrop-gui/src/main/java/org/vericrop/gui/app/ApplicationContext.java
-- vericrop-gui/src/main/java/org/vericrop/gui/persistence/PostgresBatchRepository.java
-- vericrop-gui/src/main/java/org/vericrop/gui/services/AuthenticationService.java
-- vericrop-gui/src/main/resources/fxml/login.fxml
+- src/vericrop-gui/main/java/org/vericrop/gui/MainApp.java
+- src/vericrop-gui/main/java/org/vericrop/gui/app/ApplicationContext.java
+- src/vericrop-gui/main/java/org/vericrop/gui/persistence/PostgresBatchRepository.java
+- src/vericrop-gui/main/java/org/vericrop/gui/services/AuthenticationService.java
+- src/vericrop-gui/main/resources/fxml/login.fxml
 - README.md
 
 Created:
-- vericrop-gui/src/main/resources/db/migration/V4__create_messages_table.sql
-- vericrop-gui/src/main/java/org/vericrop/gui/models/User.java
-- vericrop-gui/src/main/java/org/vericrop/gui/models/Message.java
-- vericrop-gui/src/main/java/org/vericrop/gui/dao/UserDao.java
-- vericrop-gui/src/main/java/org/vericrop/gui/dao/MessageDao.java
-- vericrop-gui/src/main/java/org/vericrop/gui/controller/EnhancedLoginController.java
-- vericrop-gui/src/main/java/org/vericrop/gui/controller/RegisterController.java
-- vericrop-gui/src/main/java/org/vericrop/gui/controller/InboxController.java
-- vericrop-gui/src/main/resources/fxml/register.fxml
-- vericrop-gui/src/main/resources/fxml/inbox.fxml
-- vericrop-gui/src/main/resources/fxml/login_roleselect.fxml (backup)
+- src/vericrop-gui/main/resources/db/migration/V4__create_messages_table.sql
+- src/vericrop-gui/main/java/org/vericrop/gui/models/User.java
+- src/vericrop-gui/main/java/org/vericrop/gui/models/Message.java
+- src/vericrop-gui/main/java/org/vericrop/gui/dao/UserDao.java
+- src/vericrop-gui/main/java/org/vericrop/gui/dao/MessageDao.java
+- src/vericrop-gui/main/java/org/vericrop/gui/controller/EnhancedLoginController.java
+- src/vericrop-gui/main/java/org/vericrop/gui/controller/RegisterController.java
+- src/vericrop-gui/main/java/org/vericrop/gui/controller/InboxController.java
+- src/vericrop-gui/main/resources/fxml/register.fxml
+- src/vericrop-gui/main/resources/fxml/inbox.fxml
+- src/vericrop-gui/main/resources/fxml/login_roleselect.fxml (backup)
 - docs/GUI-setup.md
 - AUTHENTICATION_IMPLEMENTATION.md
 ```

@@ -135,7 +135,7 @@ Run the smoke test script:
 ### Custom Configuration
 
 For advanced configuration, modify:
-- `vericrop-gui/src/main/resources/application.yml` - Spring Boot settings
+- `src/vericrop-gui/main/resources/application.yml` - Spring Boot settings
 - `docker-compose.yml` - Service configuration
 - `airflow/dags/vericrop_dag.py` - Airflow workflow settings
 
@@ -369,7 +369,7 @@ docker-compose restart vericrop-gui
 
 Enable debug logging:
 
-1. Edit `vericrop-gui/src/main/resources/application.yml`:
+1. Edit `src/vericrop-gui/main/resources/application.yml`:
    ```yaml
    logging:
      level:

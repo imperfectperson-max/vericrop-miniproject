@@ -37,7 +37,7 @@ This guide explains how to use the VeriCrop platform's Kafka messaging integrati
 
 ### 1. DTOs (Data Transfer Objects)
 
-Located in `vericrop-core/src/main/java/org/vericrop/dto/`:
+Located in `src/vericrop-core/main/java/org/vericrop/dto/`:
 
 - **EvaluationRequest**: Request for fruit quality evaluation
 - **EvaluationResult**: Result of quality evaluation with score and metadata
@@ -46,7 +46,7 @@ Located in `vericrop-core/src/main/java/org/vericrop/dto/`:
 ### 2. Services
 
 #### QualityEvaluationService
-- **Location**: `vericrop-core/src/main/java/org/vericrop/service/`
+- **Location**: `src/vericrop-core/main/java/org/vericrop/service/`
 - **Purpose**: Deterministic quality evaluation using image hash
 - **Features**:
   - Deterministic scoring (same input = same output)
@@ -56,7 +56,7 @@ Located in `vericrop-core/src/main/java/org/vericrop/dto/`:
   - Metadata: color_consistency, size_uniformity, defect_density
 
 #### FileLedgerService
-- **Location**: `vericrop-core/src/main/java/org/vericrop/service/impl/`
+- **Location**: `src/vericrop-core/main/java/org/vericrop/service/impl/`
 - **Purpose**: Append-only ledger for immutable shipment records
 - **Features**:
   - SHA-256 hash integrity verification
@@ -67,7 +67,7 @@ Located in `vericrop-core/src/main/java/org/vericrop/dto/`:
 ### 3. Kafka Messaging
 
 #### KafkaProducerService
-- **Location**: `kafka-service/src/main/java/org/vericrop/kafka/messaging/`
+- **Location**: `src/kafka-service/main/java/org/vericrop/kafka/messaging/`
 - **Topics**:
   - `evaluation-requests`: Quality evaluation requests
   - `evaluation-results`: Quality evaluation results
@@ -78,7 +78,7 @@ Located in `vericrop-core/src/main/java/org/vericrop/dto/`:
   - Configurable via `application.yml`
 
 #### KafkaConsumerService
-- **Location**: `kafka-service/src/main/java/org/vericrop/kafka/messaging/`
+- **Location**: `src/kafka-service/main/java/org/vericrop/kafka/messaging/`
 - **Features**:
   - Message handlers for different types
   - Graceful shutdown
@@ -87,7 +87,7 @@ Located in `vericrop-core/src/main/java/org/vericrop/dto/`:
 ### 4. REST API
 
 #### EvaluationController
-- **Location**: `vericrop-gui/src/main/java/org/vericrop/gui/controller/`
+- **Location**: `src/vericrop-gui/main/java/org/vericrop/gui/controller/`
 - **Base URL**: `http://localhost:8080/api`
 
 **Endpoints**:
@@ -130,7 +130,7 @@ bin/kafka-server-start.sh config/server.properties
 
 ### 2. Configuration
 
-Edit `vericrop-gui/src/main/resources/application.yml`:
+Edit `src/vericrop-gui/main/resources/application.yml`:
 
 ```yaml
 kafka:

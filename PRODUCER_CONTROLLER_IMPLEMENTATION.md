@@ -202,8 +202,8 @@ All tests use reflection to access the private `calculateRates()` method and ver
 - `docker/ml-service/tests/test_deterministic_rates.py` - Added count validation test
 
 ### Frontend
-- `vericrop-gui/src/main/java/org/vericrop/gui/ProducerController.java` - Added helper, updated calculations
-- `vericrop-gui/src/test/java/org/vericrop/gui/ProducerControllerTest.java` - New test file with 8 tests
+- `src/vericrop-gui/main/java/org/vericrop/gui/ProducerController.java` - Added helper, updated calculations
+- `src/vericrop-gui/test/java/org/vericrop/gui/ProducerControllerTest.java` - New test file with 8 tests
 
 ## Key Implementation Notes
 

@@ -8,6 +8,7 @@ COPY build.gradle settings.gradle ./
 COPY gradle gradle/
 COPY kafka-service kafka-service/
 COPY vericrop-core vericrop-core/
+COPY src src/
 
 # Use gradle command
 RUN gradle :kafka-service:jar --no-daemon --build-cache

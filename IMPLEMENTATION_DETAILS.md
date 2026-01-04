@@ -235,7 +235,7 @@ GET  /api/v1/delivery/simulation-status/{id}
 
 **Core Services:**
 ```
-vericrop-core/src/main/java/org/vericrop/
+src/vericrop-core/main/java/org/vericrop/
 ├── dto/
 │   └── Message.java                    (141 lines)
 └── service/
@@ -246,7 +246,7 @@ vericrop-core/src/main/java/org/vericrop/
 
 **REST Controllers:**
 ```
-vericrop-gui/src/main/java/org/vericrop/gui/controller/
+src/vericrop-gui/main/java/org/vericrop/gui/controller/
 ├── MessagingController.java            (227 lines)
 ├── QualityController.java              (186 lines)
 └── DeliveryController.java             (238 lines)
@@ -254,7 +254,7 @@ vericrop-gui/src/main/java/org/vericrop/gui/controller/
 
 **Tests:**
 ```
-vericrop-core/src/test/java/org/vericrop/service/
+src/vericrop-core/test/java/org/vericrop/service/
 ├── MessageServiceTest.java             (255 lines)
 ├── QualityDecayServiceTest.java        (227 lines)
 └── DeliverySimulatorTest.java          (192 lines)
@@ -262,7 +262,7 @@ vericrop-core/src/test/java/org/vericrop/service/
 
 **Modified Files:**
 ```
-vericrop-gui/src/main/java/org/vericrop/gui/
+src/vericrop-gui/main/java/org/vericrop/gui/
 ├── LogisticsController.java            (demo flag + chart labels)
 ├── ConsumerController.java             (demo flag)
 └── util/BlockchainInitializer.java     (demo flag)

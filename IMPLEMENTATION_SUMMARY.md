@@ -9,7 +9,7 @@ All requirements have been successfully implemented, tested, and code reviewed.
 
 ## Components Implemented
 
-### 1. MapSimulator (`vericrop-core/src/main/java/org/vericrop/service/MapSimulator.java`)
+### 1. MapSimulator (`src/vericrop-core/main/java/org/vericrop/service/MapSimulator.java`)
 - **Purpose**: Grid-based simulation tracking entity positions in real-time
 - **Features**:
   - 20x20 grid tracking 5 entity types (PRODUCER, CONSUMER, WAREHOUSE, DELIVERY_VEHICLE, RESOURCE)
@@ -19,7 +19,7 @@ All requirements have been successfully implemented, tested, and code reviewed.
   - Immutable snapshots serializable to JSON
 - **Tests**: 18 unit tests, all passing
 
-### 2. ScenarioManager (`vericrop-core/src/main/java/org/vericrop/service/ScenarioManager.java`)
+### 2. ScenarioManager (`src/vericrop-core/main/java/org/vericrop/service/ScenarioManager.java`)
 - **Purpose**: Unified manager for scenario selection and configuration
 - **Features**:
   - Consolidates 3 existing scenarios (scenario-01, scenario-02, scenario-03)
@@ -29,7 +29,7 @@ All requirements have been successfully implemented, tested, and code reviewed.
   - Supports backward compatibility with example-XX aliases
 - **Tests**: 22 unit tests, all passing
 
-### 3. SimulationRestController (`vericrop-gui/src/main/java/org/vericrop/gui/api/SimulationRestController.java`)
+### 3. SimulationRestController (`src/vericrop-gui/main/java/org/vericrop/gui/api/SimulationRestController.java`)
 - **Purpose**: REST API for accessing map simulation state
 - **Endpoints**:
   - GET `/api/simulation/map` - Current map state snapshot
@@ -40,7 +40,7 @@ All requirements have been successfully implemented, tested, and code reviewed.
 - **Features**: Thread-safe, error handling, JSON serialization
 
 ### 4. Integration with SimulationManager
-- **Changes**: Updated `vericrop-core/src/main/java/org/vericrop/service/simulation/SimulationManager.java`
+- **Changes**: Updated `src/vericrop-core/main/java/org/vericrop/service/simulation/SimulationManager.java`
 - **Features**:
   - Initializes MapSimulator with selected scenario
   - Steps MapSimulator each progress update (every 5 seconds)
