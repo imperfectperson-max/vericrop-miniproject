@@ -1,8 +1,10 @@
-# Kafka Service
+# 📨 Kafka Service
 
-Spring Kafka-based messaging service for event-driven communication in the VeriCrop system.
+> Spring Kafka-based messaging for event-driven communication in VeriCrop
 
-## Overview
+---
+
+## 📋 Overview
 
 The Kafka Service provides reliable, high-throughput messaging for:
 - Batch quality evaluation events
@@ -10,7 +12,9 @@ The Kafka Service provides reliable, high-throughput messaging for:
 - Real-time alerts and notifications
 - Blockchain ledger updates
 
-## Features
+---
+
+## ✨ Features
 
 - **Idempotent Producers**: Prevents duplicate messages
 - **Durable Consumer Groups**: Reliable message processing with offset management
@@ -21,7 +25,9 @@ The Kafka Service provides reliable, high-throughput messaging for:
 - **SASL Authentication**: Secure authentication
 - **Metrics**: Prometheus metrics for monitoring
 
-## Quick Start
+---
+
+## ⚡ Quick Start
 
 ### 1. Start Kafka
 

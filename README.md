@@ -1,13 +1,15 @@
-# VeriCrop Mini-Project
+# 🌾 VeriCrop Mini-Project
 
-> AI-Powered Agricultural Supply Chain Management with Quality Control and Blockchain Transparency
+> **AI-Powered Agricultural Supply Chain Management with Quality Control and Blockchain Transparency**
 
 ![Java](https://img.shields.io/badge/Java-17-orange.svg)
 ![Python](https://img.shields.io/badge/Python-3.11-green.svg)
 ![Kafka](https://img.shields.io/badge/Kafka-3.4.0-black.svg)
 ![Build](https://img.shields.io/badge/build-passing-brightgreen.svg)
 
-## Table of Contents
+---
+
+## 📋 Table of Contents
 
 - [Project Summary](#project-summary)
 - [Architecture](#architecture)
@@ -24,33 +26,36 @@
 - [Contributing](#contributing)
 - [Troubleshooting](#troubleshooting)
 
-## Project Summary
+## 🎯 Project Summary
 
-VeriCrop is a comprehensive mini-project that demonstrates modern supply chain management for agricultural products. The platform combines:
+VeriCrop is a comprehensive mini-project that demonstrates modern supply chain management for agricultural products.
 
-- **AI-Powered Quality Assessment**: Machine learning service for fruit quality classification
-- **Blockchain Transparency**: Immutable ledger for supply chain tracking
-- **Real-time Messaging**: Kafka-based event streaming for supply chain events
-- **Interactive GUI**: JavaFX desktop application for farm management, logistics, consumer verification, and analytics
-- **Workflow Orchestration**: Apache Airflow for automated quality evaluation pipelines
+### Key Features
+
+| Feature | Description |
+|---------|-------------|
+| 🤖 **AI Quality Assessment** | Machine learning service for fruit quality classification |
+| 🔗 **Blockchain Tracking** | Immutable ledger for supply chain transparency |
+| ⚡ **Real-time Messaging** | Kafka-based event streaming |
+| 🖥️ **Interactive GUI** | JavaFX desktop app for farm management & logistics |
+| 🔄 **Workflow Orchestration** | Apache Airflow for automated pipelines |
 
 ### Goals
 
-- Ensure food quality and safety through AI-powered classification
-- Provide end-to-end traceability from farm to consumer
-- Enable real-time monitoring of supply chain conditions
-- Demonstrate integration of modern technologies (Java, Python, Kafka, PostgreSQL, Docker)
-- Build trust in agricultural supply chains through transparency
+✅ Ensure food quality and safety through AI-powered classification  
+✅ Provide end-to-end traceability from farm to consumer  
+✅ Enable real-time monitoring of supply chain conditions  
+✅ Demonstrate integration of modern technologies  
+✅ Build trust in agricultural supply chains through transparency
 
-### Demo Mode
+---
 
-VeriCrop GUI can run in a **self-contained demo mode** without requiring external services (PostgreSQL, Kafka, ML Service). This is perfect for:
-- Quick demonstrations
-- Development without infrastructure setup
-- Testing UI flows in isolation
-- Offline scenarios
+## ⚡ Quick Start (5 Minutes)
 
-**⭐ Easiest way - Use the start script:**
+### Option 1: Demo Mode (Easiest - No Setup Required!)
+
+Perfect for quick demonstrations without any infrastructure setup.
+
 ```bash
 # Unix/Linux/Mac - Starts 3 GUI instances in demo mode
 ./start-all.sh demo
@@ -59,56 +64,70 @@ VeriCrop GUI can run in a **self-contained demo mode** without requiring externa
 start-all.bat demo
 ```
 
-**Alternative methods:**
+**That's it!** 🎉 No Docker, databases, or services needed.
+
+<details>
+<summary>📖 What is Demo Mode?</summary>
+
+Demo mode runs the VeriCrop GUI completely standalone with:
+- ✅ In-memory blockchain (no external network)
+- ✅ Mock ML predictions
+- ✅ Demo data in all screens
+- ✅ Fully functional delivery simulator
+- ✅ QR code generation
+- ✅ All UI flows operational
+
+Perfect for: presentations, testing, offline scenarios
+</details>
+
+### Option 2: Full Stack with Services
+
+For development with real databases and services.
+
 ```bash
-# Using environment variable
-export VERICROP_LOAD_DEMO=true
-./gradlew :vericrop-gui:run
-
-# Using system property
-./gradlew :vericrop-gui:run --args="-Dvericrop.loadDemo=true"
-
-# Windows PowerShell
-$env:VERICROP_LOAD_DEMO="true"
-./gradlew :vericrop-gui:run
+# Start all services with one command
+./start-all.sh           # Unix/Linux/Mac
+start-all.bat            # Windows
 ```
 
-**Demo mode features:**
-- In-memory blockchain (no external network)
-- Mock ML predictions
-- Demo data in all screens (Analytics, Logistics, Consumer)
-- Fully functional delivery simulator
-- QR code generation
-- All UI flows operational
-- Full screen display on PC (maximized window)
+**Services started:**
+- PostgreSQL (database)
+- Kafka (messaging)
+- ML Service (AI predictions)
+- Airflow (workflow orchestration)
+- GUI Application
 
-See [vericrop-gui/README.md](vericrop-gui/README.md) for detailed demo mode documentation.
+---
 
-### Example Simulation Files (3-4 Minute Demo Runs)
+## 🎮 Simulation Features
 
-VeriCrop includes three pre-configured simulation JSON files for quick demonstration:
+VeriCrop includes powerful simulation capabilities for testing and demonstration.
+
+### Quick Demo with Example Files
+
+Three pre-configured simulations ready to run (~3 minutes each):
 
 | Simulation | Duration | Description |
 |------------|----------|-------------|
-| `example_1_farmer_to_consumer.json` | ~3 min | Complete journey from farm to warehouse to retail store |
-| `example_2_producer_local.json` | ~1.5 min | Short local delivery from organic farm to distribution center |
-| `example_3_long_route.json` | ~3 min | Extended delivery with temperature events testing quality decay |
+| `example_1_farmer_to_consumer.json` | ~3 min | Complete journey: farm → warehouse → retail |
+| `example_2_producer_local.json` | ~1.5 min | Short local delivery to distribution center |
+| `example_3_long_route.json` | ~3 min | Extended delivery with temperature monitoring |
 
-**Location**: `src/vericrop-gui/main/resources/simulations/`
+📍 **Location**: `src/vericrop-gui/main/resources/simulations/`
+
+<details>
+<summary>🔧 Advanced: Simulation Configuration & API</summary>
 
 **Key Features**:
-- **Time Scaling**: Default 10x speed (`timeScale: 10.0`) makes a 30-minute simulated route complete in ~3 minutes real-time
+- **Time Scaling**: Default 10x speed makes simulations complete in ~3 minutes
 - **Quality Decay**: Tracks quality degradation based on temperature and time
-- **Lifecycle States**: Progresses through AVAILABLE → IN_TRANSIT → APPROACHING → COMPLETED
+- **Lifecycle States**: AVAILABLE → IN_TRANSIT → APPROACHING → COMPLETED
 - **Smooth Animation**: Map markers interpolate smoothly along route waypoints
 
 **Loading Simulations**:
 
-Simulations can be loaded programmatically using `SimulationLoader`:
-
 ```java
 import org.vericrop.service.simulation.SimulationLoader;
-import org.vericrop.service.simulation.SimulationLoader.SimulationDefinition;
 
 // Load a specific simulation
 SimulationDefinition sim = SimulationLoader.loadFromResource(
@@ -118,224 +137,53 @@ SimulationDefinition sim = SimulationLoader.loadFromResource(
 SimulationConfig config = sim.toSimulationConfig();
 
 // Generate batch ID
-String batchId = sim.generateBatchId(); // e.g., "APPLES_1700000000000"
+String batchId = sim.generateBatchId();
 ```
 
-**Customizing Time Scale**:
+**Adjusting Time Scale**:
+- `timeScale: 1.0` = real-time (30-min route takes 30 minutes)
+- `timeScale: 10.0` = 10x speed (30-min route in 3 minutes) **[Default]**
+- `timeScale: 30.0` = 30x speed (30-min route in 1 minute)
 
-To adjust simulation speed, modify the `timeScale` field in the JSON file:
-- `timeScale: 1.0` = real-time (30-minute route takes 30 minutes)
-- `timeScale: 10.0` = 10x speed (30-minute route completes in 3 minutes) **[Default]**
-- `timeScale: 30.0` = 30x speed (30-minute route completes in 1 minute)
+</details>
 
-### Map Simulation and Scenario Management
+<details>
+<summary>🗺️ Map Simulation & Scenario Management</summary>
 
-VeriCrop now includes integrated map simulation that runs alongside delivery simulations, providing a grid-based visualization of entity positions (producers, consumers, warehouses, vehicles, resources) as the simulation progresses.
+VeriCrop includes integrated map simulation with grid-based visualization of entity positions.
 
 **Key Features:**
-- **MapSimulator**: Grid-based simulation tracking entity positions in real-time
-- **ScenarioManager**: Unified manager for selecting and configuring delivery scenarios
-- **REST API**: Access current map state via `/api/simulation/map` endpoint
-- **Three Pre-configured Scenarios**:
-  - `scenario-01` (NORMAL): Normal cold-chain delivery (2-5°C, short spike allowed)
-  - `scenario-02` (COLD_STORAGE): Strict cold-chain (1-4°C, no spikes)
-  - `scenario-03` (HOT_TRANSPORT): High-risk delivery (0-6°C, multiple temperature events)
+- MapSimulator: Grid-based real-time tracking
+- ScenarioManager: Pre-configured delivery scenarios
+- REST API: Access map state via `/api/simulation/map`
+- Three Scenarios: Normal, Cold Storage, Hot Transport
 
-**Using the Simulation API:**
+**Using the API:**
 
 ```bash
-# Get current map state snapshot
+# Get current map state
 curl http://localhost:8080/api/simulation/map
 
-# List all available scenarios
+# List available scenarios
 curl http://localhost:8080/api/simulation/scenarios
 
-# Get specific scenario details
-curl http://localhost:8080/api/simulation/scenarios/scenario-01
-
-# Get simulation status including map state
-curl http://localhost:8080/api/simulation/status
-
-# Get all active shipments with real-time tracking
-curl http://localhost:8080/api/simulation/active-shipments
-
-# Start a simulation with supplier and consumer selection (required)
+# Start simulation (requires supplier and consumer usernames)
 curl -X POST http://localhost:8080/api/simulation/start \
   -H "Content-Type: application/json" \
   -d '{
     "supplierUsername": "supplier",
     "consumerUsername": "farmer",
     "title": "Apple Delivery Simulation",
-    "scenario_id": "scenario-02",
-    "batch_id": "BATCH_TEST_001"
+    "scenario_id": "scenario-02"
   }'
 ```
 
-**Required Parameters for Starting Simulation:**
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `supplierUsername` | string | Username of the supplier user (must exist in users table) |
-| `consumerUsername` | string | Username of the consumer user (must exist in users table) |
+**Full API documentation available in detailed view above.**
 
-**Optional Parameters:**
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `title` | string | Auto-generated | Simulation title |
-| `scenario_id` | string | "scenario-01" | Delivery scenario ID |
-| `batch_id` | string | Auto-generated | Batch identifier |
-| `owner_user_id` | long | 1 | Owner user ID |
+</details>
 
-**Start Simulation Response:**
-```json
-{
-  "success": true,
-  "message": "Simulation started successfully",
-  "simulation_id": "550e8400-e29b-41d4-a716-446655440000",
-  "simulation_token": "abc123def456...",
-  "batch_id": "BATCH_TEST_001",
-  "scenario_id": "scenario-02",
-  "title": "Apple Delivery Simulation",
-  "status": "running",
-  "owner_username": "admin",
-  "supplier_username": "supplier",
-  "consumer_username": "farmer",
-  "started_at": "2024-01-15T10:30:00"
-}
-```
-
-**Multi-Device Access with Simulation Token:**
-
-The `simulation_token` returned when starting a simulation allows multiple devices or instances to access the same simulation. Use the token to:
-
-```bash
-# Get simulation by token
-curl http://localhost:8080/api/simulation/by-token/{token}
-
-# Validate token for a simulation
-curl "http://localhost:8080/api/simulation/{simulationId}/validate-token?token={token}"
-```
-
-**Access Control:**
-
-Simulations are only accessible to:
-- The **owner** who created the simulation
-- The selected **supplier** user
-- The selected **consumer** user
-
-Pass `userId` via header or query param to enforce access control:
-```bash
-# Get simulation with access control
-curl -H "X-User-Id: 2" http://localhost:8080/api/simulation/{simulationId}
-
-# Get simulation report with access control
-curl "http://localhost:8080/api/simulation/{simulationId}/report?userId=2"
-```
-
-**Batch Management:**
-```bash
-# Create a batch within a simulation
-curl -X POST http://localhost:8080/api/simulation/{simulationId}/batches \
-  -H "Content-Type: application/json" \
-  -d '{"quantity": 100}'
-
-# Get batches for a simulation
-curl http://localhost:8080/api/simulation/{simulationId}/batches
-
-# Update batch progress
-curl -X PATCH http://localhost:8080/api/simulation/batches/{batchId}/progress \
-  -H "Content-Type: application/json" \
-  -d '{"temperature": 4.5, "humidity": 65.0, "location": "Highway Mile 50", "progress": 50.0}'
-```
-
-**Simulation Lifecycle:**
-```bash
-# Complete a simulation
-curl -X POST http://localhost:8080/api/simulation/{simulationId}/complete
-
-# Stop a simulation
-curl -X POST http://localhost:8080/api/simulation/{simulationId}/stop
-
-# List simulations for a user
-curl http://localhost:8080/api/simulation/user/{userId}
-
-# List only active simulations
-curl "http://localhost:8080/api/simulation/user/{userId}?activeOnly=true"
-```
-
-**Example Map Snapshot Response:**
-```json
-{
-  "timestamp": 1700000000000,
-  "simulation_step": 42,
-  "grid_width": 20,
-  "grid_height": 20,
-  "scenario_id": "NORMAL",
-  "entities": [
-    {
-      "id": "producer-BATCH_001",
-      "type": "PRODUCER",
-      "x": 2,
-      "y": 10,
-      "metadata": {"batch_id": "BATCH_001"}
-    },
-    {
-      "id": "vehicle-BATCH_001",
-      "type": "DELIVERY_VEHICLE",
-      "x": 12,
-      "y": 10,
-      "metadata": {
-        "batch_id": "BATCH_001",
-        "current_waypoint": 8,
-        "phase": "In transit - midpoint"
-      }
-    }
-  ]
-}
-```
-
-**Example Active Shipments Response:**
-```json
-{
-  "active_shipments": [
-    {
-      "batch_id": "BATCH_001",
-      "running": true,
-      "current_waypoint": 8,
-      "total_waypoints": 20,
-      "progress_percent": 40.0,
-      "current_location": {
-        "name": "Highway Rest Stop",
-        "temperature": 4.5,
-        "humidity": 65.0,
-        "timestamp": 1700000000000
-      },
-      "farmer_id": "FARMER_A",
-      "progress_manager": 40.0,
-      "current_location_name": "Highway Rest Stop"
-    }
-  ],
-  "count": 1,
-  "timestamp": 1700000000000,
-  "simulation_running": true
-}
-```
-
-**How to Run a Simulation:**
-
-1. **Via GUI Producer Screen:**
-   - Upload a product image for quality assessment
-   - Create a batch with the assessed quality data
-   - Click "Start Simulation" button
-   - Select a batch from the dropdown (or use current batch)
-   - Simulation runs with map tracking and temperature monitoring
-   - View progress in LogisticsController screen
-
-2. **Via REST API:**
-   - Use POST `/api/simulation/start` with scenario selection
-   - Monitor progress via GET `/api/simulation/active-shipments`
-   - Check map state via GET `/api/simulation/map`
-
-### Kafka-Backed Shared Simulation State (NEW)
+<details>
+<summary>🔄 Kafka-Backed Shared Simulation State</summary>
 
 VeriCrop now supports **shared simulation state** across multiple running instances. This enables different users (farmer, supplier, admin, consumer) to observe and modify the same simulation state in real time.
 
@@ -742,48 +590,65 @@ Quality grades are assigned based on final score:
 - **MARGINAL**: ≥40%
 - **REJECTED**: <40%
 
-## Architecture
+---
+
+## 🏗️ Architecture
 
 VeriCrop follows a microservices architecture with event-driven communication:
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    JavaFX GUI Application                       │
-│           (Farm, Logistics, Consumer, Analytics)                │
-└──────────────────┬──────────────────────────────────────────────┘
-                   │
-                   │ REST API / Kafka
-                   │
-┌──────────────────▼──────────────────────────────────────────────┐
-│                   VeriCrop Core Services                        │
-│  ┌──────────────┐ ┌──────────────┐ ┌──────────────────────┐   │
-│  │   Batch      │ │  Blockchain  │ │   Quality           │   │
-│  │  Management  │ │   Ledger     │ │  Evaluation         │   │
-│  └──────────────┘ └──────────────┘ └──────────────────────┘   │
-└────────┬──────────────────┬──────────────────┬─────────────────┘
-         │                  │                  │
-         ▼                  ▼                  ▼
-┌─────────────────┐ ┌──────────────┐ ┌─────────────────────┐
-│   PostgreSQL    │ │    Kafka     │ │   ML Service        │
-│   (Metadata)    │ │  (Events)    │ │   (FastAPI/ONNX)    │
-└─────────────────┘ └──────────────┘ └─────────────────────┘
-         │                  │                  │
-         │                  ▼                  │
-         │         ┌──────────────┐            │
-         │         │   Airflow    │            │
-         └─────────│ (Workflows)  │────────────┘
-                   └──────────────┘
+┌─────────────────────────────────────────┐
+│       JavaFX GUI Application             │
+│  (Farm, Logistics, Consumer, Analytics) │
+└──────────────┬──────────────────────────┘
+               │ REST API / Kafka
+               │
+┌──────────────▼──────────────────────────┐
+│       VeriCrop Core Services             │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐│
+│  │  Batch   │ │Blockchain│ │ Quality  ││
+│  │Management│ │  Ledger  │ │Evaluation││
+│  └──────────┘ └──────────┘ └──────────┘│
+└─────┬──────────┬──────────┬────────────┘
+      │          │          │
+      ▼          ▼          ▼
+┌──────────┐ ┌──────┐ ┌────────────┐
+│PostgreSQL│ │Kafka │ │ ML Service │
+│(Metadata)│ │(Event│ │(FastAPI)   │
+└──────────┘ │Stream│ └────────────┘
+             └──┬───┘
+                │
+           ┌────▼────┐
+           │ Airflow │
+           │(Workflow│
+           └─────────┘
 ```
 
-### Key Data Flows
+<details>
+<summary>📊 Key Data Flows</summary>
 
-1. **Batch Creation**: GUI → ML Service (quality prediction) → PostgreSQL + Kafka → Blockchain Ledger
-2. **Quality Evaluation**: Airflow DAG → Kafka (evaluation requests) → GUI Service → ML Service → Kafka (results)
-3. **Supply Chain Tracking**: GUI → Blockchain Ledger → Kafka (shipment events) → Analytics Dashboard
+1. **Batch Creation**: GUI → ML Service (quality prediction) → PostgreSQL + Kafka → Blockchain
+2. **Quality Evaluation**: Airflow DAG → Kafka → GUI Service → ML Service → Results
+3. **Supply Chain Tracking**: GUI → Blockchain → Kafka → Analytics Dashboard
 
-## Components
+</details>
 
-### vericrop-gui
+---
+
+## 📦 Components
+
+### Core Modules
+
+| Module | Description | Tech Stack |
+|--------|-------------|------------|
+| **vericrop-gui** | JavaFX desktop application | Java 17, JavaFX, Spring Boot |
+| **vericrop-core** | Shared business logic | Java 17, Jackson |
+| **kafka-service** | Event-driven messaging | Spring Boot, Spring Kafka |
+| **ml-service** | AI quality prediction | Python 3.11, FastAPI, ONNX |
+| **airflow** | Workflow orchestration | Apache Airflow 2.7.1 |
+
+<details>
+<summary>🖥️ VeriCrop GUI - Detailed Features</summary>
 
 **Location**: `vericrop-gui/`
 
@@ -1025,28 +890,34 @@ python scripts/verify-simulation.py --scenario route_disruption --output report.
 
 See [docs/simulation_notes.md](docs/simulation_notes.md) for detailed implementation notes.
 
-## Quickstart
+---
 
-Get VeriCrop running in under 10 minutes using Docker Compose.
+## 🚀 Quickstart (10 Minutes)
 
 ### Prerequisites
 
-Before you begin, ensure you have the following tools installed with the specified versions:
+| Tool | Version | Check Command |
+|------|---------|---------------|
+| **Java** | 17+ | `java -version` |
+| **Docker** | 20.10+ | `docker --version` |
+| **Docker Compose** | 2.0+ | `docker-compose --version` |
+| **Gradle** | 8.0+ | `./gradlew --version` |
+| **Python** | 3.11 | `python3 --version` |
 
-#### Required Tools
+<details>
+<summary>📖 Detailed Prerequisites Check</summary>
+
 
 1. **Git** - Version control
    ```bash
-   # Check version
    git --version
    # Expected: git version 2.30 or higher
    ```
 
 2. **Java 11+** (Java 17 recommended)
    ```bash
-   # Check version
    java -version
-   # Expected: openjdk version "17.0.x" or "11.0.x"
+   # Expected: openjdk version "17.0.x"
    
    # Verify JAVA_HOME is set
    echo $JAVA_HOME        # Unix/Mac
@@ -1055,24 +926,18 @@ Before you begin, ensure you have the following tools installed with the specifi
 
 3. **Gradle** (wrapper included, no separate install needed)
    ```bash
-   # Unix/Mac
-   ./gradlew --version
-   
-   # Windows
-   gradlew.bat --version
-   
+   ./gradlew --version    # Unix/Mac
+   gradlew.bat --version  # Windows
    # Expected: Gradle 8.x or higher
    ```
 
 4. **Docker & Docker Compose**
    ```bash
-   # Check Docker version
    docker --version
-   # Expected: Docker version 20.10+ or higher
+   # Expected: Docker version 20.10+
    
-   # Check Docker Compose version
    docker-compose --version
-   # Expected: Docker Compose version 2.0+ or higher
+   # Expected: Docker Compose version 2.0+
    
    # Verify Docker is running
    docker ps
@@ -1080,232 +945,33 @@ Before you begin, ensure you have the following tools installed with the specifi
 
 5. **Python 3.11** (for local ML service development)
    ```bash
-   # Check version
-   python3 --version
+   python3 --version      # Unix/Mac
+   python --version       # Windows
    # Expected: Python 3.11.x
-   
-   # Windows
-   python --version
    ```
 
-6. **Git LFS** (optional, only if large model files are tracked)
-   ```bash
-   # Check if installed
-   git lfs version
-   # Expected: git-lfs/3.x or higher
-   
-   # If not installed, see: https://git-lfs.github.com/
-   ```
+</details>
 
-#### Verify All Prerequisites
-
-Run all checks individually (recommended for troubleshooting):
-
-```bash
-# Check each tool individually
-git --version
-java -version
-./gradlew --version
-docker --version
-docker-compose --version
-python3 --version
-```
-
-Or run all checks at once (requires all tools in PATH):
-
-```bash
-# Unix/Mac - Combined check (may fail silently if tools missing)
-echo "Git: $(git --version 2>/dev/null || echo 'NOT FOUND')" && \
-echo "Java: $(java -version 2>&1 | head -n 1)" && \
-echo "Gradle: $(./gradlew --version 2>/dev/null | grep Gradle || echo 'NOT FOUND')" && \
-echo "Docker: $(docker --version 2>/dev/null || echo 'NOT FOUND')" && \
-echo "Docker Compose: $(docker-compose --version 2>/dev/null || echo 'NOT FOUND')" && \
-echo "Python: $(python3 --version 2>/dev/null || echo 'NOT FOUND')"
-
-# Windows (PowerShell)
-Write-Host "Git: $(git --version)"; `
-Write-Host "Java: $(java -version 2>&1 | Select-String 'version')"; `
-Write-Host "Docker: $(docker --version)"; `
-Write-Host "Docker Compose: $(docker-compose --version)"; `
-Write-Host "Python: $(python --version)"
-```
-
-### Running the Complete Stack
-
-**One-Click Start Scripts** (Recommended)
-
-For convenience, we provide start/stop scripts that handle all services in one command:
+### One-Command Start
 
 **Unix/Linux/Mac:**
 ```bash
-# Start all services with one command
 ./start-all.sh
-
-# Start 3 GUI instances in demo mode (no Docker required!)
-./start-all.sh demo
-
-# Start only infrastructure (PostgreSQL, Kafka, ML Service)
-./start-all.sh infra
-
-# Start simulation environment
-./start-all.sh simulation
-
-# Build Java + Docker images
-./start-all.sh all-build
-
-# Run the JavaFX GUI
-./start-all.sh run
-
-# Stop all services
-./stop-all.sh
-
-# Stop all and remove data volumes
-./stop-all.sh -v
 ```
 
 **Windows:**
 ```cmd
-REM Start all services with one command
 start-all.bat
-
-REM Start 3 GUI instances in demo mode (no Docker required!)
-start-all.bat demo
-
-REM Start only infrastructure (PostgreSQL, Kafka, ML Service)
-start-all.bat infra
-
-REM Start simulation environment
-start-all.bat simulation
-
-REM Build Java + Docker images
-start-all.bat all-build
-
-REM Run the JavaFX GUI
-start-all.bat run
-
-REM Stop all services
-stop-all.bat
-
-REM Stop all and remove data volumes
-stop-all.bat -v
 ```
 
-**Available Modes:**
+**What this does:**
+1. ✅ Starts PostgreSQL database
+2. ✅ Starts Kafka messaging
+3. ✅ Starts ML Service
+4. ✅ Starts Airflow orchestrator
+5. ✅ Launches GUI application
 
-| Mode | Description |
-|------|-------------|
-| `full` | Start all services (default): Kafka, PostgreSQL, ML Service, Airflow |
-| `demo` | **⭐ Start 3 GUI instances in demo mode (no Docker required!)** |
-| `infra` | Start infrastructure only: PostgreSQL, Kafka, Zookeeper, ML Service |
-| `kafka` | Start Kafka stack only |
-| `simulation` | Start simulation environment |
-| `prod` | Start production environment |
-| `build` | Build Java artifacts with Gradle |
-| `docker-build` | Build Docker images |
-| `all-build` | Build everything (Java + Docker) |
-| `run` | Run the JavaFX GUI application |
-
-**⭐ New: Demo Mode** - Perfect for quick demonstrations without Docker! The `demo` mode:
-- Starts 3 GUI instances automatically
-- Requires **only Java** (no Docker, PostgreSQL, Kafka, or ML Service)
-- Uses in-memory blockchain and mock ML predictions
-- Includes demo data in all screens
-- Perfect for presentations, testing, and offline scenarios
-
-For help: `./start-all.sh --help` or `start-all.bat --help`
-
----
-
-### Manual Setup
-
-Follow these step-by-step instructions to get VeriCrop running:
-
-#### Step 1: Clone the Repository
-
-```bash
-# Clone the repository
-git clone https://github.com/imperfectperson-max/vericrop-miniproject.git
-cd vericrop-miniproject
-
-# Expected output: Repository cloned successfully
-```
-
-#### Step 2: Configure Environment Variables
-
-```bash
-# Copy the example environment file
-cp .env.example .env
-
-# Unix/Mac - Edit with your preferred editor
-nano .env
-# or
-vim .env
-
-# Windows
-notepad .env
-```
-
-**Important**: Review and update these required variables in `.env`:
-
-- **PostgreSQL Settings**: `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_HOST`, `POSTGRES_PORT`
-- **Kafka Settings**: `KAFKA_BOOTSTRAP_SERVERS`, `KAFKA_ENABLED`
-- **ML Service**: `ML_SERVICE_URL`, `VERICROP_LOAD_DEMO` (set to `true` if model files missing)
-- **Airflow**: `AIRFLOW_ADMIN_USERNAME`, `AIRFLOW_ADMIN_PASSWORD`
-
-⚠️ **Security Warnings**:
-- Never commit `.env` files to version control! The `.gitignore` already excludes it.
-- For production environments, use strong passwords (16+ characters, mixed case, numbers, special chars).
-- Default credentials in `.env.example` are for development only - change them for production!
-
-#### Step 3: Build Java Artifacts
-
-```bash
-# Build all Java modules using Gradle wrapper
-./gradlew build
-
-# Expected output: BUILD SUCCESSFUL in XXs
-# This compiles vericrop-core, vericrop-gui, kafka-service modules
-
-# Windows
-gradlew.bat build
-```
-
-If build fails, see [Troubleshooting](#troubleshooting) section.
-
-#### Step 4: Start All Services with Docker Compose
-
-```bash
-# Start all services (PostgreSQL, Kafka, ML Service, Airflow)
-docker-compose up --build -d
-
-# Expected output:
-# Creating vericrop-postgres ... done
-# Creating vericrop-zookeeper ... done
-# Creating vericrop-kafka ... done
-# Creating vericrop-ml-service ... done
-# ...
-```
-
-#### Step 5: Wait for Services to be Healthy
-
-```bash
-# Check service status (wait 2-3 minutes for all to be healthy)
-docker-compose ps
-
-# Expected output: All services should show "Up" or "Up (healthy)"
-# Example:
-# NAME                     STATUS
-# vericrop-postgres        Up (healthy)
-# vericrop-kafka           Up (healthy)
-# vericrop-ml-service      Up (healthy)
-# ...
-```
-
-#### Step 6: Verify Services Are Running
-
-See the [Verify Services](#verify-services) section below for detailed health checks.
-
-### Accessing the Services
+**Service URLs:**
 
 | Service | URL | Credentials |
 |---------|-----|-------------|
@@ -1314,159 +980,106 @@ See the [Verify Services](#verify-services) section below for detailed health ch
 | **ML Service** | http://localhost:8000/health | - |
 | **PostgreSQL** | localhost:5432 | vericrop / vericrop123 |
 
-### Quick Test
+<details>
+<summary>⚙️ Advanced: Start Options & Manual Setup</summary>
+
+**Available Start Modes:**
 
 ```bash
-# Test ML service health
-curl http://localhost:8000/health
-# Expected: {"status":"healthy"}
-
-# Run the JavaFX GUI (from project root)
-./gradlew :vericrop-gui:run
+# Start modes
+./start-all.sh full         # All services (default)
+./start-all.sh demo         # Demo mode (no Docker)
+./start-all.sh infra        # Infrastructure only
+./start-all.sh kafka        # Kafka stack only
+./start-all.sh simulation   # Simulation environment
+./start-all.sh build        # Build Java artifacts
+./start-all.sh docker-build # Build Docker images
+./start-all.sh all-build    # Build everything
+./start-all.sh run          # Run GUI only
 ```
 
-### Stopping the Stack
+---
 
-```bash
-# Stop all services
-docker-compose down
+## 💾 Database Setup & User Provisioning
 
-# Stop and remove all data
-docker-compose down -v
-```
+VeriCrop uses PostgreSQL with automatic schema initialization.
 
-For detailed cleanup instructions, see the [Stopping and Cleaning](#stopping-and-cleaning) section.
+### Quick Overview
 
-## Database Setup & User Provisioning
+✅ **Automatic Setup** - Schema creates automatically on first run  
+✅ **Pre-configured Users** - Demo users ready for testing  
+✅ **Flyway Migrations** - Versioned database changes  
+✅ **Secure Authentication** - BCrypt password hashing
 
-VeriCrop uses PostgreSQL for metadata storage with Flyway for automatic migrations.
+### Default Users
 
-### Automatic Schema Initialization
+| Username | Password | Role | Use For |
+|----------|----------|------|---------|
+| `admin` | `admin123` | ADMIN | Full system access |
+| `farmer` | `farmer123` | FARMER | Producer operations |
+| `supplier` | `supplier123` | SUPPLIER | Logistics operations |
+| `producer_demo` | `DemoPass123!` | PRODUCER | Demo producer |
+| `logistics_demo` | `DemoPass123!` | LOGISTICS | Demo logistics |
+| `consumer_demo` | `DemoPass123!` | CONSUMER | Demo consumer |
 
-When the application starts, it automatically ensures the required database schema exists. The `DatabaseInitializer` utility:
+⚠️ **Security Note**: Change these passwords in production!
 
-1. **Runs at startup** after the HikariCP connection pool is created
-2. **Loads** the idempotent schema from `src/main/resources/db/schema.sql`
-3. **Executes** CREATE TABLE IF NOT EXISTS statements for all required tables
-4. **Is resilient** - logs errors but doesn't crash the UI if the database is temporarily unavailable
+<details>
+<summary>🔧 Advanced: Schema Details & Manual User Management</summary>
 
-**Tables created automatically:**
-- `users` - User authentication and profile information
-- `batches` - Batch metadata and quality tracking
-- `shipments` - Shipment tracking with blockchain integration
+
+**Automatic Schema Initialization:**
+
+Tables created on first run:
+- `users` - Authentication and profiles
+- `batches` - Batch metadata and quality
+- `shipments` - Shipment tracking with blockchain
 - `messages` - User-to-user messaging
-- `participants` - GUI instance tracking for contact discovery
-- `simulations` - Simulation metadata with supplier/consumer relationships
-- `simulation_batches` - Batch data during simulation runtime
+- `participants` - GUI instance tracking
+- `simulations` - Simulation metadata
+- `simulation_batches` - Simulation batch data
 
-This ensures registration and other DB operations no longer fail with "relation does not exist" errors on first run.
+**Database Migrations:**
 
-**To opt out of automatic schema initialization**, remove or rename the schema.sql file from resources. In this case, you must ensure the database schema is created manually or via Flyway migrations before starting the application.
+Flyway migrations in `src/vericrop-gui/main/resources/db/migration/`:
+- V1: Batches and quality tracking
+- V2: User authentication with BCrypt
+- V3: Shipment tracking with blockchain
+- V7: Simulation persistence
 
-### Database Migrations
-
-Database schema is managed through Flyway migrations located in `src/vericrop-gui/main/resources/db/migration/`:
-
-- **V1__create_batches_table.sql**: Batches and quality tracking tables
-- **V2__create_users_table.sql**: User authentication with BCrypt hashing
-- **V3__create_shipments_table.sql**: Shipment tracking with blockchain integration
-- **V7__create_simulations_table.sql**: Simulation persistence with supplier/consumer relationships
-
-**V7 Migration Details:**
-The V7 migration adds two new tables for simulation persistence:
-
-| Table | Description |
-|-------|-------------|
-| `simulations` | Stores simulation metadata with supplier/consumer relationships and unique simulation_token for multi-device access |
-| `simulation_batches` | Stores batch records created during simulation for report generation |
-
-**Simulations Table Fields:**
-- `id` (UUID): Primary key
-- `title` (string): Simulation title
-- `status` (string): created, running, completed, failed, stopped
-- `owner_user_id` (references users): User who created the simulation
-- `supplier_user_id` (references users): Supplier who can view this simulation
-- `consumer_user_id` (references users): Consumer who can view this simulation
-- `simulation_token` (string, unique): Secure token for multi-device access
-- `meta` (JSONB): Optional metadata
-
-Migrations run automatically on application startup when `spring.flyway.enabled=true` (default).
-
-### Pre-configured Users
-
-The V2 migration creates demo users for testing:
-
-| Username | Password | Role | Description |
-|----------|----------|------|-------------|
-| admin | admin123 | ADMIN | Full system access |
-| farmer | farmer123 | FARMER | Farm/producer operations |
-| supplier | supplier123 | SUPPLIER | Logistics operations |
-
-**⚠️ Security Note**: Change these passwords in production! Passwords are BCrypt hashed with cost factor 10.
-
-### Demo Users (Auto-Created on Startup)
-
-When the application starts, **DemoUserDataLoader** automatically seeds additional demo users with standardized roles for testing. These users are only created if they don't already exist (idempotent):
-
-| Username | Password | Role | Description |
-|----------|----------|------|-------------|
-| **producer_demo** | DemoPass123! | PRODUCER | Producer/farmer operations |
-| **logistics_demo** | DemoPass123! | LOGISTICS | Logistics/supplier operations |
-| **consumer_demo** | DemoPass123! | CONSUMER | Consumer verification |
-| **admin_demo** | DemoPass123! | ADMIN | Admin access (producer + logistics UIs) |
-
-**Role-Based Redirects After Login:**
-- **PRODUCER** → Producer screen (batch creation, quality assessment)
-- **LOGISTICS** → Logistics screen (shipment tracking, temperature monitoring)
-- **CONSUMER** → Consumer screen (product verification)
-- **ADMIN** → Producer screen (with access to both producer and logistics UIs)
-
-### Adding New Users
-
-To add users manually:
+**Adding New Users Manually:**
 
 ```sql
 -- Connect to PostgreSQL
 docker exec -it vericrop-postgres psql -U vericrop -d vericrop
 
--- Generate BCrypt hash (use online tool or bcrypt CLI)
--- For password "mypassword": $2a$10$...
-
--- Insert new user
+-- Insert new user (generate BCrypt hash first)
 INSERT INTO users (username, password_hash, email, full_name, role, status)
-VALUES (
-    'newuser',
-    '$2a$10$YOUR_BCRYPT_HASH_HERE',
-    'user@example.com',
-    'User Full Name',
-    'USER',
-    'active'
-);
+VALUES ('newuser', '$2a$10$YOUR_BCRYPT_HASH', 'user@example.com', 'Full Name', 'USER', 'active');
 ```
 
-### Authentication Features
+**Authentication Features:**
+- BCrypt password hashing (never plaintext)
+- Failed login tracking (locks after 5 attempts)
+- 30-minute automatic unlock
+- Role-based access control
+- Database fallback mode
 
-- **BCrypt Password Hashing**: Secure password storage (never plaintext)
-- **Failed Login Tracking**: Account locks after 5 failed attempts
-- **Lockout Duration**: 30 minutes automatic unlock
-- **Role-Based Access**: ADMIN, FARMER, SUPPLIER, CONSUMER, USER
-- **Last Login Tracking**: Monitors user activity
-- **Database Fallback**: Simple auth mode when database unavailable
+</details>
 
-### Verifying Database Setup
+### Verify Database Setup
 
 ```bash
-# Check migrations applied
+# Check migrations
 docker exec -it vericrop-postgres psql -U vericrop -d vericrop \
-  -c "SELECT version, description, installed_on FROM flyway_schema_history ORDER BY installed_rank;"
+  -c "SELECT version, description FROM flyway_schema_history;"
 
-# Verify users exist
+# Verify users
 docker exec -it vericrop-postgres psql -U vericrop -d vericrop \
-  -c "SELECT username, role, status, created_at FROM users;"
+  -c "SELECT username, role FROM users;"
+```
 
-# Check batches table
-docker exec -it vericrop-postgres psql -U vericrop -d vericrop \
-  -c "SELECT COUNT(*) as batch_count FROM batches;"
+---
 ```
 
 ## Local Development
@@ -2763,178 +2376,110 @@ curl http://localhost:8080/producer/blockchain?limit=5
 }
 ```
 
-## Running Tests
+---
 
-VeriCrop includes comprehensive test suites for Java and Python components. Always run tests before committing changes.
+## 🧪 Running Tests
+
+VeriCrop includes comprehensive test suites. Always run tests before committing changes.
+
+### Quick Test Commands
+
+```bash
+# Run all Java tests
+./gradlew test
+
+# Run all Python tests (from docker/ml-service directory)
+pytest
+
+# Run with coverage
+./gradlew test jacocoTestReport
+pytest --cov=. --cov-report=html
+```
+
+<details>
+<summary>📖 Detailed Testing Guide</summary>
 
 ### Java Tests
 
-#### Run All Tests
-
+**Run by Module:**
 ```bash
-# Run all Java tests across all modules
-./gradlew test
-
-# Expected output: BUILD SUCCESSFUL
-# Results: XXX tests, XXX passed, 0 failed, 0 skipped
-
-# Windows
-gradlew.bat test
+./gradlew :vericrop-core:test      # Core business logic
+./gradlew :vericrop-gui:test       # GUI application
+./gradlew :kafka-service:test      # Kafka service
 ```
 
-#### Run Tests for Specific Modules
-
+**Run Specific Tests:**
 ```bash
-# Test core business logic
-./gradlew :vericrop-core:test
-
-# Test GUI application
-./gradlew :vericrop-gui:test
-
-# Test Kafka service
-./gradlew :kafka-service:test
-
-# Test ML client
-./gradlew :ml-client:test
-```
-
-#### Run Specific Test Classes
-
-```bash
-# Run blockchain tests
 ./gradlew test --tests "*BlockchainTest"
-
-# Run ML service client tests
 ./gradlew test --tests "*MLServiceClientTest"
-
-# Run quality evaluation tests
 ./gradlew test --tests "*QualityEvaluationServiceTest"
-
-# Run authentication tests
-./gradlew test --tests "*AuthenticationServiceTest"
 ```
 
-#### Run with Coverage
-
+**View Reports:**
 ```bash
-# Run tests with JaCoCo coverage report
-./gradlew test jacocoTestReport
-
-# Expected output: BUILD SUCCESSFUL
-# Coverage report: build/reports/jacoco/test/html/index.html
-
-# View coverage report (Unix/Mac)
-open build/reports/jacoco/test/html/index.html
-
-# Windows
-start build\reports\jacoco\test\html\index.html
-```
-
-#### Run with Detailed Output
-
-```bash
-# Run with verbose logging
-./gradlew test --info
-
-# Run with debug output
-./gradlew test --debug
-
-# Run and show standard output
-./gradlew test --console=verbose
-```
-
-#### View Test Reports
-
-```bash
-# HTML test reports are generated automatically
-# Location: <module>/build/reports/tests/test/index.html
-
-# View vericrop-core test report
-open vericrop-core/build/reports/tests/test/index.html
-
-# View vericrop-gui test report
-open vericrop-gui/build/reports/tests/test/index.html
-
-# View all test reports
-find . -name "index.html" -path "*/reports/tests/*"
+# Reports generated at: <module>/build/reports/tests/test/index.html
+open vericrop-core/build/reports/tests/test/index.html  # Unix/Mac
+start build\reports\tests\test\index.html              # Windows
 ```
 
 ### Python Tests
 
-#### Setup Test Environment
-
+**Setup:**
 ```bash
-# Navigate to ML service directory
 cd docker/ml-service
-
-# Activate virtual environment (if using local setup)
 source venv/bin/activate  # Unix/Mac
 venv\Scripts\activate     # Windows
-
-# Install test dependencies
 pip install -r requirements-test.txt
-
-# Expected packages: pytest, pytest-cov, httpx
 ```
 
-#### Run All Python Tests
-
+**Run Tests:**
 ```bash
-# Run all tests
-pytest
-
-# Expected output:
-# ======================== test session starts =========================
-# collected XX items
-# tests/test_app.py ........                                    [100%]
-# ========================= XX passed in X.XXs =========================
-
-# Run with verbose output
-pytest -v
-
-# Run with extra verbosity
-pytest -vv
+pytest                              # All tests
+pytest -v                           # Verbose
+pytest tests/test_predict.py        # Specific file
+pytest -k "health"                  # Pattern match
 ```
 
-#### Run with Coverage
-
+**Coverage:**
 ```bash
-# Run tests with coverage report
-pytest --cov=. --cov-report=html
-
-# Expected output: Coverage report generated at htmlcov/index.html
-
-# View coverage report
-open htmlcov/index.html        # Unix/Mac
-start htmlcov\index.html       # Windows
-
-# Generate terminal coverage report
-pytest --cov=. --cov-report=term
-
-# Expected output shows coverage percentage per file
+pytest --cov=. --cov-report=html    # HTML report
+pytest --cov=. --cov-report=term    # Terminal report
+# View at: htmlcov/index.html
 ```
 
-#### Run Specific Test Files
+</details>
+
+### Manual Service Testing
 
 ```bash
-# Run specific test file
-pytest tests/test_predict.py
+# ML Service
+curl http://localhost:8000/health
+curl -X POST -F "file=@examples/sample.jpg" http://localhost:8000/predict
 
-# Run specific test function
-pytest tests/test_predict.py::test_predict_endpoint
+# Database
+docker exec -it vericrop-postgres psql -U vericrop -d vericrop \
+  -c "SELECT COUNT(*) FROM batches;"
 
-# Run tests matching pattern
-pytest -k "health"
-
-# Run tests by marker (if configured)
-pytest -m "unit"
+# Kafka
+docker exec -it vericrop-kafka kafka-console-consumer \
+  --bootstrap-server localhost:9092 --topic batch-events --from-beginning
 ```
 
-#### Run with Different Output Formats
+### Test Coverage Summary
 
-```bash
-# Run with detailed output
-pytest -v
+| Component | Coverage | Status |
+|-----------|----------|--------|
+| Blockchain operations | ✅ Full | Comprehensive unit tests |
+| Quality evaluation service | ✅ Core | Logic tested |
+| File ledger service | ✅ Full | Read/write tested |
+| ML service health | ✅ Full | API contract tested |
+| Batch operations | ✅ Full | Database ops tested |
+| User authentication | ✅ Full | BCrypt & validation |
+| Kafka messaging | ✅ Full | Message handling |
+| Integration tests | ⚠️ Partial | Service interactions |
+| GUI controllers | ⚠️ Manual | JavaFX UI testing |
+
+---
 
 # Run with short output
 pytest -q
