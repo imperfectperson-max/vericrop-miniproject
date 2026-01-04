@@ -9,12 +9,28 @@
 
 ---
 
+> 📚 **[View Complete Documentation Index](docs/README.md)** - Organized guides, deployment docs, and implementation details
+
+---
+
 ## 📋 Table of Contents
 
-- [Project Summary](#project-summary)
-- [Architecture](#architecture)
+**Quick Access:**
+- [Project Summary](#project-summary) - What is VeriCrop?
+- [Quick Start](#quick-start-5-minutes) - Get running in 5 minutes
+- [Architecture](#architecture) - System overview
+- [Documentation Index](docs/README.md) - 📚 Complete documentation library
+
+**Essential Guides:**
+- [Setup Guide](docs/guides/SETUP.md) - Detailed installation
+- [Deployment Guide](docs/deployment/DEPLOYMENT.md) - Production deployment
+- [Demo Mode](docs/guides/DEMO_MODE_GUIDE.md) - No-infrastructure demo
+
+<details>
+<summary><b>Full Table of Contents</b> (click to expand)</summary>
+
 - [Components](#components)
-- [Quickstart](#quickstart)
+- [Simulation Features](#simulation-features)
 - [Database Setup & User Provisioning](#database-setup--user-provisioning)
 - [Local Development](#local-development)
 - [Verify Services](#verify-services)
@@ -25,6 +41,8 @@
 - [Stopping and Cleaning](#stopping-and-cleaning)
 - [Contributing](#contributing)
 - [Troubleshooting](#troubleshooting)
+
+</details>
 
 ## 🎯 Project Summary
 
@@ -1359,6 +1377,9 @@ Get-Content logs\vericrop-gui.log -Tail 50  # Windows PowerShell
 
 ## Generated Output Directories
 
+<details>
+<summary><b>View Generated Output Directories</b> (QR codes, reports, ledgers, logs)</summary>
+
 The VeriCrop GUI generates various output files during operation:
 
 ### QR Codes
@@ -1575,7 +1596,12 @@ Simulation responses now include `temperatureSeries` data that populates the liv
 
 **Note**: All generated directories are excluded from version control via `.gitignore`.
 
+</details>
+
 ## Configuration
+
+<details>
+<summary><b>View Configuration Details</b> (environment variables, settings, connection pools)</summary>
 
 VeriCrop uses environment variables for configuration. All settings have sensible defaults for local development.
 
@@ -1674,7 +1700,12 @@ nano .env
 
 **Important**: Never commit `.env` files with real credentials to version control. The `.env.example` is tracked for reference only.
 
+</details>
+
 ## Authentication and Messaging
+
+<details>
+<summary><b>View Authentication and Messaging Details</b> (user auth, REST API, security)</summary>
 
 VeriCrop includes a complete user authentication and messaging system with PostgreSQL backend and REST API support.
 
@@ -1844,6 +1875,8 @@ For production deployment:
 3. **Enable SSL/TLS** for database connections
 4. **Review audit logs** regularly (check `last_login` and `failed_login_attempts`)
 5. **Update passwords** periodically
+
+</details>
 
 ## Verify Services
 
@@ -2083,6 +2116,9 @@ If any checks fail, see the [Troubleshooting](#troubleshooting) section.
 
 ## ML Service Contract
 
+<details>
+<summary><b>View ML Service API Details</b> (REST endpoints, prediction API, batch management)</summary>
+
 The ML Service provides REST API endpoints for quality prediction and dashboard data.
 
 ### Base URL
@@ -2189,7 +2225,12 @@ For detailed implementation, inspect:
 - **Java Client**: `src/vericrop-gui/main/java/org/vericrop/gui/clients/MLClientService.java`
 - **Model Logic**: `docker/ml-service/app.py` (prediction functions and ONNX model integration)
 
+</details>
+
 ## Producer API (Blockchain Record Creation)
+
+<details>
+<summary><b>View Producer API Details</b> (blockchain records, REST endpoints)</summary>
 
 The Producer API provides REST endpoints for creating and managing blockchain records for agricultural products.
 
@@ -2375,6 +2416,8 @@ curl http://localhost:8080/producer/blockchain?limit=5
   "timestamp": 1700000000001
 }
 ```
+
+</details>
 
 ---
 
@@ -2954,6 +2997,9 @@ We welcome contributions to VeriCrop! Here's how to get started.
 4. Squash commits before merge (optional)
 
 ## Troubleshooting
+
+<details>
+<summary><b>View Troubleshooting Guide</b> (common issues, solutions, debugging)</summary>
 
 Common issues and solutions with step-by-step resolution.
 
@@ -3581,6 +3627,8 @@ If you encounter issues not covered here:
      echo "Docker Compose: $(docker-compose --version)"
      ```
    - Relevant configuration (`.env` without secrets)
+
+</details>
 
 ## License
 
