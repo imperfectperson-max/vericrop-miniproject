@@ -341,7 +341,7 @@ docker exec vericrop-kafka kafka-console-consumer \
 
 ### Modified Files (5)
 1. `docker-compose.yml` - Complete rewrite (350+ lines)
-2. `vericrop-gui/src/main/resources/application.yml` - Environment variables
+2. `src/vericrop-gui/main/resources/application.yml` - Environment variables
 3. `airflow/dags/vericrop_dag.py` - Environment variable configuration
 4. `README.md` - Docker quick start section
 5. `.gitignore` - Added .env exclusion

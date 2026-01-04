@@ -94,7 +94,7 @@ VeriCrop includes three pre-configured simulation JSON files for quick demonstra
 | `example_2_producer_local.json` | ~1.5 min | Short local delivery from organic farm to distribution center |
 | `example_3_long_route.json` | ~3 min | Extended delivery with temperature events testing quality decay |
 
-**Location**: `vericrop-gui/src/main/resources/simulations/`
+**Location**: `src/vericrop-gui/main/resources/simulations/`
 
 **Key Features**:
 - **Time Scaling**: Default 10x speed (`timeScale: 10.0`) makes a 30-minute simulated route complete in ~3 minutes real-time
@@ -1365,7 +1365,7 @@ This ensures registration and other DB operations no longer fail with "relation 
 
 ### Database Migrations
 
-Database schema is managed through Flyway migrations located in `vericrop-gui/src/main/resources/db/migration/`:
+Database schema is managed through Flyway migrations located in `src/vericrop-gui/main/resources/db/migration/`:
 
 - **V1__create_batches_table.sql**: Batches and quality tracking tables
 - **V2__create_users_table.sql**: User authentication with BCrypt hashing
@@ -1792,7 +1792,7 @@ The system coordinates 6 domains for concurrent scenario execution:
 
 #### Components
 
-**ScenarioController** (`vericrop-core/src/main/java/org/vericrop/service/ScenarioController.java`)
+**ScenarioController** (`src/vericrop-core/main/java/org/vericrop/service/ScenarioController.java`)
 - Orchestrates concurrent execution across all 6 domains
 - Uses CompletableFuture for non-blocking parallel processing
 - Aggregates results from all domains
@@ -2043,7 +2043,7 @@ AIRFLOW_DB_PASSWORD=airflow123          # Airflow metadata DB password
 ### Configuration Files
 
 - **`.env.example`**: Template with all available configuration options
-- **`vericrop-gui/src/main/resources/application.yml`**: Spring Boot application configuration (overridden by environment variables)
+- **`src/vericrop-gui/main/resources/application.yml`**: Spring Boot application configuration (overridden by environment variables)
 - **`docker-compose.yml`**: Docker Compose service configuration
 
 ### Using .env.example
@@ -2573,7 +2573,7 @@ The ML Service is called by:
 
 For detailed implementation, inspect:
 - **ML Service**: [docker/ml-service/app.py](docker/ml-service/app.py)
-- **Java Client**: `vericrop-gui/src/main/java/org/vericrop/gui/clients/MLClientService.java`
+- **Java Client**: `src/vericrop-gui/main/java/org/vericrop/gui/clients/MLClientService.java`
 - **Model Logic**: `docker/ml-service/app.py` (prediction functions and ONNX model integration)
 
 ## Producer API (Blockchain Record Creation)

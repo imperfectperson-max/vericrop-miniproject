@@ -19,6 +19,7 @@ COPY vericrop-core vericrop-core/
 COPY kafka-service kafka-service/
 COPY ml-client ml-client/
 COPY vericrop-gui vericrop-gui/
+COPY src src/
 
 # Build using installed Gradle
 RUN gradle :vericrop-gui:bootJar --no-daemon -x test

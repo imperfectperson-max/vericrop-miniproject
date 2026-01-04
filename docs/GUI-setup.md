@@ -163,7 +163,7 @@ psql -h localhost -U vericrop -d vericrop
 SELECT username, role FROM users;
 
 -- If empty, run V2 migration manually
-\i vericrop-gui/src/main/resources/db/migration/V2__create_users_table.sql
+\i src/vericrop-gui/main/resources/db/migration/V2__create_users_table.sql
 ```
 
 ### Account Locked

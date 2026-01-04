@@ -8,7 +8,7 @@ This document summarizes the findings from exploring the existing vericrop-gui c
 
 ### Controller Files
 
-The three main controller types are located in `vericrop-gui/src/main/java/org/vericrop/gui/`:
+The three main controller types are located in `src/vericrop-gui/main/java/org/vericrop/gui/`:
 
 1. **LogisticsController.java** (~2400 lines)
    - Handles shipment tracking, timeline visualization, and live route mapping
@@ -52,7 +52,7 @@ The three main controller types are located in `vericrop-gui/src/main/java/org/v
 
 ### Simulation Services (vericrop-core)
 
-Located in `vericrop-core/src/main/java/org/vericrop/service/`:
+Located in `src/vericrop-core/main/java/org/vericrop/service/`:
 
 1. **SimulationManager.java**
    - Singleton manager for simulation lifecycle
@@ -179,7 +179,7 @@ Default timing for ~2 minute scenarios:
 3. `docker-compose-simulation.yml` - Simulation-specific Docker setup
 4. `scripts/run-multi-instance-simulation.sh` - Runner script
 5. `scripts/verify-simulation.py` - Verification script
-6. `vericrop-core/src/main/java/org/vericrop/service/simulation/MultiInstanceScenario.java` - Scenario definitions
+6. `src/vericrop-core/main/java/org/vericrop/service/simulation/MultiInstanceScenario.java` - Scenario definitions
 
 ### Files to Extend
 

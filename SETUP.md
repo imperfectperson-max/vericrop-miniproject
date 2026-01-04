@@ -459,7 +459,7 @@ After successful setup:
 
 - [VeriCrop GUI README](vericrop-gui/README.md) - GUI-specific documentation
 - [ML Service Documentation](docker/ml-service/README.md) - ML service API reference
-- [Database Schema](vericrop-gui/src/main/resources/db/schema.sql) - Database structure
+- [Database Schema](src/vericrop-gui/main/resources/db/schema.sql) - Database structure
 - [Docker Compose Reference](docker-compose.yml) - Service configuration
 
 ## Getting Help

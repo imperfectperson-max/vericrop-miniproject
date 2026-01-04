@@ -68,13 +68,13 @@ This implementation successfully transforms the vericrop-miniproject from a deve
 
 ### Added
 - `.github/workflows/ci.yml`
-- `vericrop-gui/src/main/resources/db/migration/V2__create_users_table.sql`
-- `vericrop-gui/src/main/resources/db/migration/V3__create_shipments_table.sql`
+- `src/vericrop-gui/main/resources/db/migration/V2__create_users_table.sql`
+- `src/vericrop-gui/main/resources/db/migration/V3__create_shipments_table.sql`
 
 ### Modified
 - `build.gradle` (BCrypt dependencies)
 - `docker/ml-service/app.py` (PyTorch fallback, analytics)
-- `vericrop-gui/src/main/java/org/vericrop/gui/services/AuthenticationService.java`
+- `src/vericrop-gui/main/java/org/vericrop/gui/services/AuthenticationService.java`
 - `README.md` (database documentation)
 - `vericrop-gui/README.md` (migration details)
 

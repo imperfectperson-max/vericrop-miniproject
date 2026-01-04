@@ -39,7 +39,7 @@ logistics-and-supply-chain/
 ## Services
 
 ### 1. BatchReportService
-**Location**: `vericrop-gui/src/main/java/org/vericrop/gui/services/BatchReportService.java`
+**Location**: `src/vericrop-gui/main/java/org/vericrop/gui/services/BatchReportService.java`
 
 **Purpose**: Generate batch reports with aggregated metrics.
 
@@ -62,7 +62,7 @@ logistics-and-supply-chain/
 - Acceptable count and percentage
 
 ### 2. QualityTrackingService
-**Location**: `vericrop-gui/src/main/java/org/vericrop/gui/services/QualityTrackingService.java`
+**Location**: `src/vericrop-gui/main/java/org/vericrop/gui/services/QualityTrackingService.java`
 
 **Purpose**: Track batch quality changes over time with decay application.
 
@@ -79,7 +79,7 @@ logistics-and-supply-chain/
 - Humidity penalty: 0.1% per percentage outside ideal range
 
 ### 3. Enhanced ReportGenerator
-**Location**: `vericrop-gui/src/main/java/org/vericrop/gui/util/ReportGenerator.java`
+**Location**: `src/vericrop-gui/main/java/org/vericrop/gui/util/ReportGenerator.java`
 
 **Purpose**: Generate reports in multiple formats with dual export.
 
@@ -104,7 +104,7 @@ logistics-and-supply-chain/
 ### Events
 
 #### BatchCreatedEvent
-**Location**: `kafka-service/src/main/java/org/vericrop/kafka/events/BatchCreatedEvent.java`
+**Location**: `src/kafka-service/main/java/org/vericrop/kafka/events/BatchCreatedEvent.java`
 
 **Fields**:
 - batch_id, batch_name, farmer, product_type, quantity
@@ -114,7 +114,7 @@ logistics-and-supply-chain/
 **Published When**: New batch is created
 
 #### OrderEvent
-**Location**: `kafka-service/src/main/java/org/vericrop/kafka/events/OrderEvent.java`
+**Location**: `src/kafka-service/main/java/org/vericrop/kafka/events/OrderEvent.java`
 
 **Fields**:
 - order_id, batch_id, buyer, seller
@@ -188,7 +188,7 @@ adjusted_price = base_price × (1 + prime_bonus - rejection_penalty)
 ## Database Schema
 
 ### V5 Migration: Add Image and QR Paths
-**Location**: `vericrop-gui/src/main/resources/db/migration/V5__add_image_and_qr_paths.sql`
+**Location**: `src/vericrop-gui/main/resources/db/migration/V5__add_image_and_qr_paths.sql`
 
 **Columns Added to `batches` table**:
 - `image_path VARCHAR(512)`: Path to batch image file
@@ -233,7 +233,7 @@ prime_rate = (remainder × 0.2) / 100
 ### Quality Label Normalization
 
 **Utility**: `QualityLabelUtil`
-**Location**: `vericrop-gui/src/main/java/org/vericrop/gui/util/QualityLabelUtil.java`
+**Location**: `src/vericrop-gui/main/java/org/vericrop/gui/util/QualityLabelUtil.java`
 
 **Purpose**: Ensure consistent quality label handling across system.
 
@@ -250,7 +250,7 @@ prime_rate = (remainder × 0.2) / 100
 ## QR Code Integration
 
 **Generator**: `QRGenerator`
-**Location**: `vericrop-gui/src/main/java/org/vericrop/gui/util/QRGenerator.java`
+**Location**: `src/vericrop-gui/main/java/org/vericrop/gui/util/QRGenerator.java`
 
 **Features**:
 - Generates scannable RGB PNG QR codes

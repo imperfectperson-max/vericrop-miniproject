@@ -107,23 +107,23 @@ a2bb59c - Address code review feedback: extract hardcoded constants and improve 
 ## 🎯 Files Changed
 
 ### New Files (11)
-1. `vericrop-gui/src/main/resources/db/migration/V6__create_participants_table.sql`
-2. `vericrop-gui/src/main/java/org/vericrop/gui/models/Participant.java`
-3. `vericrop-gui/src/main/java/org/vericrop/gui/dao/ParticipantDao.java`
-4. `vericrop-gui/src/main/java/org/vericrop/gui/controller/ContactsController.java`
-5. `vericrop-gui/src/main/java/org/vericrop/gui/controller/ContactMessagingController.java`
-6. `vericrop-gui/src/main/resources/fxml/contacts.fxml`
-7. `vericrop-gui/src/main/java/org/vericrop/gui/controller/ContactsViewController.java`
-8. `vericrop-gui/src/test/java/org/vericrop/gui/models/ParticipantTest.java`
+1. `src/vericrop-gui/main/resources/db/migration/V6__create_participants_table.sql`
+2. `src/vericrop-gui/main/java/org/vericrop/gui/models/Participant.java`
+3. `src/vericrop-gui/main/java/org/vericrop/gui/dao/ParticipantDao.java`
+4. `src/vericrop-gui/main/java/org/vericrop/gui/controller/ContactsController.java`
+5. `src/vericrop-gui/main/java/org/vericrop/gui/controller/ContactMessagingController.java`
+6. `src/vericrop-gui/main/resources/fxml/contacts.fxml`
+7. `src/vericrop-gui/main/java/org/vericrop/gui/controller/ContactsViewController.java`
+8. `src/vericrop-gui/test/java/org/vericrop/gui/models/ParticipantTest.java`
 9. `vericrop-gui/CONTACTS_AND_MESSAGING.md`
 
 ### Modified Files (6)
-1. `vericrop-gui/src/main/java/org/vericrop/gui/app/ApplicationContext.java`
-2. `vericrop-gui/src/main/java/org/vericrop/gui/MainApp.java`
-3. `vericrop-gui/src/main/java/org/vericrop/gui/ProducerController.java`
-4. `vericrop-gui/src/main/java/org/vericrop/gui/LogisticsController.java`
-5. `vericrop-gui/src/main/resources/fxml/producer.fxml`
-6. `vericrop-gui/src/main/resources/fxml/logistics.fxml`
+1. `src/vericrop-gui/main/java/org/vericrop/gui/app/ApplicationContext.java`
+2. `src/vericrop-gui/main/java/org/vericrop/gui/MainApp.java`
+3. `src/vericrop-gui/main/java/org/vericrop/gui/ProducerController.java`
+4. `src/vericrop-gui/main/java/org/vericrop/gui/LogisticsController.java`
+5. `src/vericrop-gui/main/resources/fxml/producer.fxml`
+6. `src/vericrop-gui/main/resources/fxml/logistics.fxml`
 7. `README.md`
 
 ## ✅ Quality Assurance
