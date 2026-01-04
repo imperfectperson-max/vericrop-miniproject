@@ -1,8 +1,10 @@
-# Kubernetes Deployment Manifests
+# ☸️ Kubernetes Deployment Manifests
 
-This directory contains Kubernetes manifests for deploying VeriCrop to a Kubernetes cluster.
+> Deploy VeriCrop to Kubernetes with production-ready configurations
 
-## Quick Start
+---
+
+## ⚡ Quick Start
 
 ```bash
 # 1. Create namespace
@@ -37,7 +39,9 @@ kubectl apply -f hpa.yaml
 kubectl apply -f ingress.yaml
 ```
 
-## Manifest Files
+---
+
+## 📦 Manifest Files
 
 | File | Description |
 |------|-------------|
@@ -51,7 +55,9 @@ kubectl apply -f ingress.yaml
 | `hpa.yaml` | Horizontal Pod Autoscalers |
 | `ingress.yaml` | Ingress rules for external access |
 
-## Prerequisites
+---
+
+## ✅ Prerequisites
 
 1. **Kubernetes Cluster**: Version 1.24+
 2. **kubectl**: Configured to access your cluster

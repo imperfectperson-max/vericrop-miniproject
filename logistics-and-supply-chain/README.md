@@ -1,8 +1,10 @@
-# Logistics and Supply Chain Directory
+# 📦 Logistics and Supply Chain Directory
 
-This directory contains all exported reports, summaries, and supply chain event logs from the VeriCrop system.
+> Exported reports, summaries, and supply chain event logs from VeriCrop
 
-## Directory Structure
+---
+
+## 📁 Directory Structure
 
 ### `/reports`
 Contains exportable reports in CSV and PDF formats:
@@ -30,7 +32,9 @@ Contains chronological event logs:
 - Transit and delivery events
 - Order and transaction events
 
-## Report Formats
+---
+
+## 📄 Report Formats
 
 ### CSV Reports
 - Machine-readable format for data analysis
