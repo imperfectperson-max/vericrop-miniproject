@@ -92,8 +92,11 @@ jobs:
           PYTHONHASHSEED: 0
           TZ: UTC
         run: |
-          # Run pytest with coverage and always write results.xml and coverage.xml
-          pytest -q docker/ml-service/tests --junitxml=results.xml --cov=docker/ml-service --cov-report=xml:coverage.xml --reruns=2 --reruns-delay=1 || true
+          # Run pytest with coverage (retry options from pytest.ini)
+          pytest -q docker/ml-service/tests \
+            --junitxml=results.xml \
+            --cov=docker/ml-service \
+            --cov-report=xml:coverage.xml || true
         continue-on-error: true
 
       - name: Collect container logs (always)

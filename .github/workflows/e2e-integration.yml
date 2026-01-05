@@ -89,8 +89,15 @@ jobs:
       - name: Run integration tests (produce junit xml)
         env:
           BASE_URL: http://localhost:8000
+          # Set Python hash seed for deterministic test execution
+          PYTHONHASHSEED: 0
+          TZ: UTC
         run: |
-          pytest -q docker/ml-service/tests --junitxml=results.xml || pytest -q tests --junitxml=results.xml || pytest -q --junitxml=results.xml || true
+          # Run pytest (retry options from pytest.ini)
+          # Try multiple test locations in case structure varies
+          pytest -q docker/ml-service/tests --junitxml=results.xml || \
+            pytest -q tests --junitxml=results.xml || \
+            pytest -q --junitxml=results.xml || true
           if [ ! -f results.xml ]; then
             echo '<testsuites></testsuites>' > results.xml
           fi
