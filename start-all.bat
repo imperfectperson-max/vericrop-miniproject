@@ -26,6 +26,7 @@ if errorlevel 1 (
     echo.
     echo TIP: Use demo mode to run without Docker: start-all.bat demo
     echo.
+    exit /b 1
 )
 echo ✓ Docker is installed
 
@@ -35,6 +36,7 @@ if errorlevel 1 (
     echo.
     echo TIP: Use demo mode to run without Docker: start-all.bat demo
     echo.
+    exit /b 1
 )
 echo ✓ Docker daemon is running
 
@@ -47,6 +49,7 @@ if errorlevel 1 (
         echo.
         echo TIP: Use demo mode to run without Docker: start-all.bat demo
         echo.
+        exit /b 1
     )
     set "DOCKER_COMPOSE=docker compose"
 )
@@ -85,6 +88,9 @@ if /I "%~1"=="run-gui" goto :run_gui
 if /I "%~1"=="gui" goto :run_gui
 if /I "%~1"=="build" goto :build_java
 if /I "%~1"=="help" goto :show_help
+
+echo Invalid command. Use 'start-all.bat help' for usage information.
+goto :end_script
 
 :start_all
 echo Starting all VeriCrop services...
@@ -265,8 +271,10 @@ if errorlevel 1 (
     echo ERROR: Java is not installed or not in PATH.
     echo Please install JDK 11+ and ensure JAVA_HOME is set.
     echo Skipping GUI instances...
+    exit /b 1
 )
 echo ✓ Java is available
+exit /b 0
 
 :build_java
 echo Building Java artifacts with Gradle...
