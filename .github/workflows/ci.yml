@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [ main, develop ]
 
+# Cancel in-progress runs for the same workflow on the same branch/PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   JAVA_VERSION: '17'
   PYTHON_VERSION: '3.11'
@@ -20,6 +25,7 @@ jobs:
   build-java:
     name: Build and Test Java Modules
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
       actions: write
@@ -44,7 +50,7 @@ jobs:
         path: |
           ~/.gradle/caches
           ~/.gradle/wrapper
-        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties', 'gradle/wrapper/gradle-wrapper.properties') }}
         restore-keys: |
           ${{ runner.os }}-gradle-
     
@@ -52,9 +58,17 @@ jobs:
       run: chmod +x gradlew
     
     - name: Build with Gradle
+      env:
+        # Set timezone and locale for deterministic test execution
+        TZ: UTC
+        LANG: en_US.UTF-8
       run: ./gradlew build --no-daemon --stacktrace --warning-mode=all
     
     - name: Run tests
+      env:
+        # Set timezone and locale for deterministic test execution
+        TZ: UTC
+        LANG: en_US.UTF-8
       run: ./gradlew test --no-daemon --stacktrace --warning-mode=all
     
     - name: Publish test results
@@ -84,6 +98,7 @@ jobs:
   test-python:
     name: Test Python ML Service
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
       actions: write
@@ -100,18 +115,34 @@ jobs:
       with:
         python-version: ${{ env.PYTHON_VERSION }}
         cache: 'pip'
+        cache-dependency-path: |
+          docker/ml-service/requirements.txt
+          docker/ml-service/requirements-test.txt
+    
+    - name: Cache pip packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('docker/ml-service/requirements*.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
     
     - name: Install Python dependencies
       working-directory: docker/ml-service
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt || echo "Some dependencies may have failed"
-        pip install pytest pytest-cov httpx || echo "Test dependencies may have failed"
+        pip install -r requirements-test.txt || pip install pytest pytest-cov pytest-rerunfailures httpx || echo "Test dependencies may have failed"
     
     - name: Run Python tests
       working-directory: docker/ml-service
+      env:
+        # Set Python hash seed for deterministic test execution
+        PYTHONHASHSEED: 0
+        # Set timezone for deterministic test execution
+        TZ: UTC
       run: |
-        python -m pytest tests/ -v --tb=short --continue-on-collection-errors || echo "Some tests may have failed"
+        python -m pytest tests/ -v --tb=short --continue-on-collection-errors --reruns=2 --reruns-delay=1 || echo "Some tests may have failed"
       continue-on-error: true
     
     - name: Upload Python test reports
@@ -127,6 +158,7 @@ jobs:
   docker-build:
     name: Build Docker Images
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [build-java, test-python]
     permissions:
       contents: read

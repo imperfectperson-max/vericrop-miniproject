@@ -2439,6 +2439,17 @@ pytest
 pytest --cov=. --cov-report=html
 ```
 
+### CI/CD and Test Reliability
+
+VeriCrop's CI pipeline includes several features to ensure reliable and fast test execution:
+
+- **Automatic Test Retries**: Flaky tests are automatically retried up to 2 times (Gradle Test Retry plugin for Java, pytest-rerunfailures for Python)
+- **Comprehensive Caching**: Gradle dependencies, pip packages, and Docker build layers are cached to speed up CI runs
+- **Deterministic Execution**: Environment variables (PYTHONHASHSEED=0, TZ=UTC) ensure consistent test behavior
+- **Health Checks**: E2E tests wait for services to be fully ready before running tests
+
+📖 **For detailed CI documentation**, including how to run tests locally with CI settings, see [docs/CI.md](docs/CI.md)
+
 <details>
 <summary>📖 Detailed Testing Guide</summary>
 

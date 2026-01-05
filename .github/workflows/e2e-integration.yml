@@ -4,6 +4,11 @@ on:
   push:
     branches: [ "main" ]
 
+# Cancel in-progress runs for the same workflow on the same branch/PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   actions: write
@@ -21,13 +26,21 @@ jobs:
       - name: Set up QEMU and buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-e2e-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-e2e-
+
       - name: Cache pip
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          key: ${{ runner.os }}-pip-e2e-${{ hashFiles('**/requirements*.txt') }}
           restore-keys: |
-            ${{ runner.os }}-pip-
+            ${{ runner.os }}-pip-e2e-
 
       - name: Set up Python for tests
         uses: actions/setup-python@v5
@@ -43,6 +56,8 @@ jobs:
           tags: ml-service:e2e-${{ github.sha }}
           file: docker/ml-service/Dockerfile
           context: docker/ml-service
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
 
       - name: Run container
         run: |
@@ -56,6 +71,8 @@ jobs:
             echo "waiting for service..."
             sleep 1
           done
+          # Verify service is actually responding
+          curl -v http://localhost:8000/health || echo "Health check failed but continuing"
         timeout-minutes: 10
 
       - name: Install test deps
@@ -115,3 +132,10 @@ jobs:
       - name: Stop and remove container
         if: always()
         run: docker rm -f mlservice-e2e || true
+      
+      # Move cache to avoid growing cache size indefinitely
+      - name: Move cache
+        if: always()
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache || true

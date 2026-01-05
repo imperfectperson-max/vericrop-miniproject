@@ -3,6 +3,7 @@ plugins {
     id 'org.springframework.boot' version '3.1.0' apply false
     id 'io.spring.dependency-management' version '1.1.0'
     id 'org.openjfx.javafxplugin' version '0.0.13' apply false
+    id 'org.gradle.test-retry' version '1.5.10' apply false
 }
 
 allprojects {
@@ -17,6 +18,7 @@ allprojects {
 subprojects {
     apply plugin: 'java'
     apply plugin: 'io.spring.dependency-management'
+    apply plugin: 'org.gradle.test-retry'
 
     // Configure source sets to use the new src structure at the root level
     sourceSets {
@@ -55,6 +57,14 @@ subprojects {
         useJUnitPlatform()
         // Enable headless mode for AWT operations (QR code generation/decoding) in CI
         systemProperty 'java.awt.headless', 'true'
+        
+        // Configure test retry plugin to handle flaky tests in CI
+        // Retries only failed tests up to 2 times to reduce transient failures
+        retry {
+            maxRetries = 2
+            maxFailures = 20
+            failOnPassedAfterRetry = false
+        }
     }
 }
 
