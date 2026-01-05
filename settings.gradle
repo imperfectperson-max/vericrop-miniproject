@@ -1,5 +1,14 @@
 rootProject.name = 'vericrop-miniproject'
 include 'vericrop-core'
 include 'kafka-service'
-include 'ml-client'
+
+// Conditionally include ml-client only if directory exists
+// This prevents CI failures when optional modules are not present and avoids
+// Gradle 9.0+ errors for missing project directories
+if (file('ml-client').exists()) {
+    include 'ml-client'
+} else {
+    logger.lifecycle("Skipping non-existent module: ml-client")
+}
+
 include 'vericrop-gui'

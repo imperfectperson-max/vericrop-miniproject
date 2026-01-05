@@ -92,13 +92,16 @@ project(':kafka-service') {
     }
 }
 
-project(':ml-client') {
-    dependencies {
-        implementation 'com.squareup.okhttp3:okhttp:4.11.0'
-        implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.2'
-        implementation 'org.slf4j:slf4j-api:2.0.7'
-        testImplementation 'org.junit.jupiter:junit-jupiter-api:5.9.3'
-        testImplementation 'org.junit.jupiter:junit-jupiter-engine:5.9.3'
+// Conditionally configure ml-client only if it exists
+if (file('ml-client').exists()) {
+    project(':ml-client') {
+        dependencies {
+            implementation 'com.squareup.okhttp3:okhttp:4.11.0'
+            implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.2'
+            implementation 'org.slf4j:slf4j-api:2.0.7'
+            testImplementation 'org.junit.jupiter:junit-jupiter-api:5.9.3'
+            testImplementation 'org.junit.jupiter:junit-jupiter-engine:5.9.3'
+        }
     }
 }
 
@@ -118,7 +121,10 @@ project(':vericrop-gui') {
 
     dependencies {
         implementation project(':vericrop-core')
-        implementation project(':ml-client')
+        // Conditionally depend on ml-client only if it exists
+        if (file('ml-client').exists()) {
+            implementation project(':ml-client')
+        }
         implementation project(':kafka-service')
 
         // JavaFX dependencies (including charts for PieChart support)
