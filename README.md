@@ -3055,6 +3055,63 @@ Common issues and solutions with step-by-step resolution.
 ./gradlew clean :vericrop-gui:run
 ```
 
+### Compilation Errors: Package org.vericrop.dto Does Not Exist
+
+**Symptom**: Build fails with "package org.vericrop.dto does not exist" errors in kafka-service module
+
+**Reproduction**:
+```bash
+./gradlew run
+# Error: package org.vericrop.dto does not exist
+# Cannot find symbol: class MapSimulationEvent
+# Cannot find symbol: class EvaluationRequest
+# Cannot find symbol: class TemperatureComplianceEvent
+# ... (32 errors total)
+```
+
+**Root Cause**: 
+- Corrupted Gradle build cache
+- Stale build artifacts from incomplete previous builds
+- Modules built out of dependency order (kafka-service before vericrop-core)
+
+**Resolution**:
+1. **Clean and rebuild** (recommended first step):
+   ```bash
+   ./gradlew clean build
+   ```
+
+2. **If still failing, clear Gradle cache**:
+   ```bash
+   # Unix/Linux/Mac
+   rm -rf ~/.gradle/caches
+   rm -rf .gradle
+   ./gradlew clean build
+   
+   # Windows
+   rmdir /s /q %USERPROFILE%\.gradle\caches
+   rmdir /s /q .gradle
+   gradlew.bat clean build
+   ```
+
+3. **Verify build order**:
+   ```bash
+   # Build modules in correct dependency order
+   ./gradlew :vericrop-core:build
+   ./gradlew :kafka-service:build
+   ./gradlew :vericrop-gui:build
+   ```
+
+**One-line fix** (works in 99% of cases):
+```bash
+./gradlew clean build
+```
+
+**Why this works**: 
+- `clean` removes all compiled classes and build artifacts
+- Gradle rebuilds modules in correct dependency order
+- vericrop-core compiles first, generating DTO classes
+- kafka-service can then find and reference the DTO classes
+
 ### Database Connection Failed
 
 **Symptom**: `Connection refused`, `Authentication failed`, or `org.postgresql.util.PSQLException`
