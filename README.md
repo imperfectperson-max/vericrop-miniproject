@@ -6,6 +6,9 @@
 ![Python](https://img.shields.io/badge/Python-3.11-green.svg)
 ![Kafka](https://img.shields.io/badge/Kafka-3.4.0-black.svg)
 ![Build](https://img.shields.io/badge/build-passing-brightgreen.svg)
+![Security](https://img.shields.io/badge/security-hardened-success.svg)
+![BCrypt](https://img.shields.io/badge/passwords-BCrypt-blue.svg)
+![JWT](https://img.shields.io/badge/auth-JWT-blue.svg)
 
 ---
 
@@ -25,11 +28,14 @@
 - [Setup Guide](docs/guides/SETUP.md) - Detailed installation
 - [Deployment Guide](docs/deployment/DEPLOYMENT.md) - Production deployment
 - [Demo Mode](docs/guides/DEMO_MODE_GUIDE.md) - No-infrastructure demo
+- [Security Policy](SECURITY.md) - 🔒 Security features and best practices
+- [Security Testing](docs/SECURITY_TESTING.md) - Security testing guide
 
 <details>
 <summary><b>Full Table of Contents</b> (click to expand)</summary>
 
 - [Components](#components)
+- [Security](#security)
 - [Simulation Features](#simulation-features)
 - [Database Setup & User Provisioning](#database-setup--user-provisioning)
 - [Local Development](#local-development)
@@ -650,6 +656,68 @@ VeriCrop follows a microservices architecture with event-driven communication:
 3. **Supply Chain Tracking**: GUI → Blockchain → Kafka → Analytics Dashboard
 
 </details>
+
+---
+
+## 🔒 Security
+
+VeriCrop is built with security as a core principle. The system implements multiple layers of protection to ensure data integrity, confidentiality, and availability.
+
+### Security Features
+
+| Security Measure | Implementation | Status |
+|------------------|----------------|--------|
+| 🔐 **Password Security** | BCrypt hashing (work factor 10) | ✅ Implemented |
+| 🎫 **Authentication** | JWT token-based auth (24h expiration) | ✅ Implemented |
+| 🛡️ **Account Protection** | Lockout after 5 failed attempts (30 min) | ✅ Implemented |
+| 👥 **Authorization** | Role-based access control (RBAC) | ✅ Implemented |
+| 🔗 **Data Integrity** | SHA-256 blockchain with tamper detection | ✅ Implemented |
+| 💉 **SQL Injection** | Prepared statements throughout | ✅ Implemented |
+| 🔒 **HTTPS/TLS** | SSL support for production | ✅ Configurable |
+| 🐳 **Container Security** | Docker network isolation | ✅ Implemented |
+| 📝 **Audit Logging** | Security event logging | ✅ Implemented |
+| 🔄 **Circuit Breakers** | Resilience4j protection | ✅ Implemented |
+
+### Quick Security Verification
+
+```bash
+# 1. Verify BCrypt password hashing
+docker exec -it vericrop-postgres psql -U vericrop -d vericrop \
+  -c "SELECT username, LEFT(password_hash, 4) FROM users LIMIT 1;"
+# Expected output: password_hash starts with $2a$ (BCrypt)
+
+# 2. Verify blockchain integrity
+curl http://localhost:8080/producer/blockchain/validate
+# Expected output: {"valid": true}
+
+# 3. Test account lockout protection
+# Try 6 failed logins - account should lock after 5 attempts
+
+# 4. Check secure configuration
+cat .env.example  # Never commit .env with real secrets!
+```
+
+### Security Documentation
+
+- **[SECURITY.md](SECURITY.md)** - Complete security policy and features
+- **[Security Testing Guide](docs/SECURITY_TESTING.md)** - Comprehensive testing procedures
+- **Production Checklist** - See SECURITY.md for deployment security steps
+
+### Reporting Security Issues
+
+Found a security vulnerability? Please report responsibly:
+- 📧 Contact: See [SECURITY.md](SECURITY.md) for reporting procedures
+- ⏱️ Response time: Within 48 hours
+- 🔒 Disclosure: Coordinated disclosure after fix
+
+**Why VeriCrop is Secure:**
+1. **Strong Authentication**: BCrypt + JWT with proper expiration
+2. **Data Protection**: SQL injection prevention, blockchain integrity
+3. **Network Security**: Docker isolation, minimal port exposure
+4. **Access Control**: Role-based permissions, account lockout
+5. **Monitoring**: Comprehensive security logging and audit trails
+6. **Dependencies**: Regular updates, vulnerability scanning
+7. **Best Practices**: OWASP Top 10 compliance, secure coding standards
 
 ---
 
