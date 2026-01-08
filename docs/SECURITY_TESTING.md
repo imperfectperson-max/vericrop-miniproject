@@ -518,18 +518,19 @@ jobs:
   security:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       
       - name: Set up JDK 17
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           java-version: '17'
+          distribution: 'temurin'
           
       - name: Run dependency check
         run: ./gradlew dependencyCheckAnalyze
         
       - name: Upload vulnerability report
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: dependency-check-report
           path: build/reports/dependency-check-report.html
