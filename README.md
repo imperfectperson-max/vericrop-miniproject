@@ -3757,7 +3757,7 @@ If you encounter issues not covered here:
 
 ## License
 
-**TODO**: License to be determined. Please contact the maintainer for licensing information.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Maintainers
 
